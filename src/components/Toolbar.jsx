@@ -106,25 +106,76 @@ function ToolbarIcon({ type }) {
 
 export default function Toolbar({ selected, onSelect }) {
   return (
-    <div style={{ width: 170, background: '#1a2a1a', padding: 10, overflowY: 'auto', borderRight: '2px solid #335533' }}>
-      <h3 style={{ margin: '0 0 10px', color: '#aaa', fontSize: 14 }}>🌲 Objects</h3>
+    <div style={{
+      width: 190,
+      background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
+      padding: 14,
+      overflowY: 'auto',
+      borderRight: '3px solid #446644',
+      boxShadow: 'inset -4px 0 12px rgba(0, 0, 0, 0.3)',
+    }}>
+      <h3 style={{
+        margin: '0 0 14px',
+        color: '#88dd88',
+        fontSize: 16,
+        fontWeight: 'bold',
+        textShadow: '0 2px 6px rgba(136, 221, 136, 0.3)',
+      }}>
+        🌲 Objects
+      </h3>
       {categories.map(cat => {
         const items = Object.entries(TILE_TYPES).filter(([, def]) => def.category === cat.id);
         if (items.length === 0) return null;
         return (
-          <div key={cat.id} style={{ marginBottom: 12 }}>
-            <div style={{ color: '#888', fontSize: 11, marginBottom: 4, textTransform: 'uppercase' }}>{cat.label}</div>
+          <div key={cat.id} style={{ marginBottom: 16 }}>
+            <div style={{
+              color: '#99bb99',
+              fontSize: 11,
+              marginBottom: 6,
+              textTransform: 'uppercase',
+              fontWeight: 'bold',
+              letterSpacing: 0.5,
+            }}>
+              {cat.label}
+            </div>
             {items.map(([type, def]) => {
               return (
                 <button
                   key={type}
                   onClick={() => onSelect(type)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                    padding: '5px 8px', marginBottom: 2,
-                    background: selected === type ? '#3a5a3a' : '#2a3a2a',
-                    border: selected === type ? '1px solid #66aa66' : '1px solid transparent',
-                    borderRadius: 4, color: '#ddd', cursor: 'pointer', fontSize: 12, textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    padding: '8px 10px',
+                    marginBottom: 4,
+                    background: selected === type
+                      ? 'linear-gradient(135deg, #3a5a3a 0%, #2a4a2a 100%)'
+                      : 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
+                    border: selected === type ? '2px solid #66aa66' : '2px solid transparent',
+                    borderRadius: 6,
+                    color: selected === type ? '#eeffee' : '#ddd',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    textAlign: 'left',
+                    fontWeight: selected === type ? '600' : '400',
+                    transition: 'all 0.15s ease',
+                    boxShadow: selected === type
+                      ? '0 4px 12px rgba(102, 170, 102, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+                      : '0 2px 6px rgba(0, 0, 0, 0.2)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selected !== type) {
+                      e.target.style.background = 'linear-gradient(135deg, #3a4a3a 0%, #2a3a2a 100%)';
+                      e.target.style.transform = 'translateX(2px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selected !== type) {
+                      e.target.style.background = 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)';
+                      e.target.style.transform = 'translateX(0)';
+                    }
                   }}
                 >
                   <ToolbarIcon type={type} />
@@ -135,7 +186,17 @@ export default function Toolbar({ selected, onSelect }) {
           </div>
         );
       })}
-      <div style={{ color: '#556644', fontSize: 10, marginTop: 10 }}>
+      <div style={{
+        color: '#99bb99',
+        fontSize: 11,
+        marginTop: 16,
+        padding: '8px',
+        background: 'rgba(0, 0, 0, 0.3)',
+        borderRadius: 6,
+        border: '1px solid #335533',
+        lineHeight: 1.6,
+      }}>
+        <strong>Controls:</strong><br />
         Left click: place<br />
         Right click: remove
       </div>

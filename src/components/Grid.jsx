@@ -324,7 +324,13 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
         onMouseUp={handleMouseUp}
         onContextMenu={handleRightClick}
         onMouseLeave={handleMouseLeave}
-        style={{ border: '2px solid #446644', cursor: 'crosshair', display: 'block' }}
+        style={{
+          border: '4px solid #66aa66',
+          borderRadius: 8,
+          cursor: 'crosshair',
+          display: 'block',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.05)',
+        }}
         tabIndex={-1}
       />
       {tooltip && (

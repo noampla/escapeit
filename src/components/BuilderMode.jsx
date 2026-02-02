@@ -146,8 +146,28 @@ export default function BuilderMode({ onBack, editLevel }) {
     setLoadMenuOpen(false);
   };
 
-  const barBtn = { padding: '6px 12px', background: '#2a3a2a', border: '1px solid #446644', borderRadius: 4, color: '#ccc', cursor: 'pointer', fontSize: 12 };
-  const activeBarBtn = (active) => ({ ...barBtn, background: active ? '#3a5a3a' : '#2a3a2a', border: active ? '1px solid #66aa66' : '1px solid #446644' });
+  const barBtn = {
+    padding: '8px 16px',
+    background: 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
+    border: '2px solid #446644',
+    borderRadius: 6,
+    color: '#ddd',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+  };
+  const activeBarBtn = (active) => ({
+    ...barBtn,
+    background: active
+      ? 'linear-gradient(135deg, #3a5a3a 0%, #2a4a2a 100%)'
+      : 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
+    border: active ? '2px solid #66aa66' : '2px solid #446644',
+    boxShadow: active
+      ? '0 4px 12px rgba(102, 170, 102, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+      : '0 2px 6px rgba(0, 0, 0, 0.3)',
+  });
 
   // Test mode - render SolverMode
   if (testMode) {
@@ -173,15 +193,38 @@ export default function BuilderMode({ onBack, editLevel }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0a1a0a' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      background: 'radial-gradient(ellipse at center, #0f2a0f 0%, #0a1a0a 60%, #050f05 100%)',
+    }}>
       {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#162a16', borderBottom: '2px solid #335533', flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '12px 16px',
+        background: 'linear-gradient(180deg, #1a3a1a 0%, #162a16 100%)',
+        borderBottom: '3px solid #446644',
+        flexWrap: 'wrap',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+      }}>
         <button onClick={onBack} style={barBtn}>← Menu</button>
         <input
           value={levelName}
           onChange={e => setLevelName(e.target.value)}
           placeholder="Forest name..."
-          style={{ padding: '5px 10px', background: '#2a3a2a', border: '1px solid #446644', borderRadius: 4, color: '#ddd', fontSize: 13, width: 200 }}
+          style={{
+            padding: '8px 14px',
+            background: 'rgba(26, 42, 26, 0.8)',
+            border: '2px solid #446644',
+            borderRadius: 6,
+            color: '#eee',
+            fontSize: 14,
+            width: 220,
+            boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.3)',
+          }}
         />
         <button onClick={handleSave} style={{ ...barBtn, background: saved ? '#2a4a2a' : '#2a3a4a' }}>
           {saved ? '✓ Saved' : 'Save'}
@@ -209,7 +252,15 @@ export default function BuilderMode({ onBack, editLevel }) {
         </button>
         <button onClick={handleTest} style={{ ...barBtn, background: '#2a4a3a' }}>▶ Test</button>
         <button onClick={handleClear} style={{ ...barBtn, background: '#4a2a2a' }}>Clear</button>
-        <span style={{ color: '#446644', fontSize: 11, marginLeft: 'auto' }}>
+        <span style={{
+          color: '#88aa88',
+          fontSize: 12,
+          marginLeft: 'auto',
+          padding: '4px 12px',
+          background: 'rgba(0, 0, 0, 0.3)',
+          borderRadius: 4,
+          border: '1px solid #335533',
+        }}>
           {subMode === 'build' ? 'Build (click+drag to paint, Shift+click to edit)' : 'Edit (click to select)'} | Tool: {selectedTool}
         </span>
       </div>
@@ -263,19 +314,26 @@ export default function BuilderMode({ onBack, editLevel }) {
         >
           <div
             style={{
-              background: '#1a2a1a',
-              border: '2px solid #446644',
-              borderRadius: 8,
-              padding: 20,
+              background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
+              border: '3px solid #66aa66',
+              borderRadius: 12,
+              padding: 30,
               minWidth: 500,
               maxWidth: 700,
               maxHeight: '80vh',
               overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ color: '#ccc', margin: '0 0 16px 0', fontSize: 20 }}>
-              Load Level
+            <h2 style={{
+              color: '#88dd88',
+              margin: '0 0 20px 0',
+              fontSize: 24,
+              fontWeight: 'bold',
+              textShadow: '0 2px 8px rgba(136, 221, 136, 0.3)',
+            }}>
+              🌲 Load Forest Level
             </h2>
             {(() => {
               const levels = loadLevels();
@@ -295,10 +353,22 @@ export default function BuilderMode({ onBack, editLevel }) {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '12px 16px',
-                        background: '#223322',
-                        borderRadius: 6,
-                        border: '1px solid #335533',
+                        padding: '14px 18px',
+                        background: 'linear-gradient(135deg, rgba(42, 74, 42, 0.5) 0%, rgba(26, 58, 26, 0.5) 100%)',
+                        borderRadius: 8,
+                        border: '2px solid #446644',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.border = '2px solid #66aa66';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 170, 102, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.border = '2px solid #446644';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
                       }}
                     >
                       <div>

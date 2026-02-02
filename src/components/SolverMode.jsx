@@ -864,7 +864,18 @@ export default function SolverMode({ level, onBack }) {
   // Calculate viewport bounds for dynamic canvas sizing
   const viewportBounds = useMemo(() => calculateViewportBounds(grid), [grid]);
 
-  const btnStyle = { padding: '10px 20px', background: '#2a3a2a', border: '1px solid #446644', borderRadius: 6, color: '#ccc', cursor: 'pointer', fontSize: 14 };
+  const btnStyle = {
+    padding: '12px 24px',
+    background: 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
+    border: '2px solid #446644',
+    borderRadius: 8,
+    color: '#eee',
+    cursor: 'pointer',
+    fontSize: 15,
+    fontWeight: '600',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+  };
 
   // Get interaction label for progress bar
   const getInteractionLabel = (type) => {
@@ -880,7 +891,15 @@ export default function SolverMode({ level, onBack }) {
 
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a1a0a', position: 'relative' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'radial-gradient(ellipse at center, #0f2a0f 0%, #0a1a0a 60%, #050f05 100%)',
+        position: 'relative',
+      }}
       tabIndex={0}
       ref={el => el && el.focus()}
     >
@@ -914,30 +933,46 @@ export default function SolverMode({ level, onBack }) {
             bottom: -50,
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(0,0,0,0.85)',
-            border: '2px solid #446644',
-            borderRadius: 8,
-            padding: '8px 12px',
-            minWidth: 200,
+            background: 'linear-gradient(180deg, rgba(26, 42, 26, 0.95) 0%, rgba(10, 26, 10, 0.95) 100%)',
+            border: '3px solid #66aa66',
+            borderRadius: 10,
+            padding: '10px 16px',
+            minWidth: 220,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
           }}>
-            <div style={{ color: '#ccc', fontSize: 12, marginBottom: 4, textAlign: 'center' }}>
+            <div style={{
+              color: '#eeffee',
+              fontSize: 13,
+              marginBottom: 6,
+              textAlign: 'center',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+            }}>
               {getInteractionLabel(interactionState.type)}
             </div>
             <div style={{
               width: '100%',
-              height: 8,
-              background: '#2a3a2a',
-              borderRadius: 4,
+              height: 10,
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: 5,
               overflow: 'hidden',
+              border: '1px solid #335533',
+              boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.5)',
             }}>
               <div style={{
                 width: `${interactionState.progress * 100}%`,
                 height: '100%',
-                background: '#44ff44',
+                background: 'linear-gradient(90deg, #44ff44 0%, #66ff88 100%)',
                 transition: 'width 16ms linear',
+                boxShadow: '0 0 10px rgba(68, 255, 68, 0.5)',
               }} />
             </div>
-            <div style={{ color: '#888', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+            <div style={{
+              color: '#99bb99',
+              fontSize: 11,
+              marginTop: 4,
+              textAlign: 'center',
+            }}>
               Hold E to continue
             </div>
           </div>
@@ -950,30 +985,46 @@ export default function SolverMode({ level, onBack }) {
             bottom: -50,
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(0,0,0,0.85)',
-            border: '2px solid #446644',
-            borderRadius: 8,
-            padding: '8px 12px',
-            minWidth: 200,
+            background: 'linear-gradient(180deg, rgba(26, 42, 26, 0.95) 0%, rgba(10, 26, 10, 0.95) 100%)',
+            border: '3px solid #66aa66',
+            borderRadius: 10,
+            padding: '10px 16px',
+            minWidth: 220,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
           }}>
-            <div style={{ color: '#ccc', fontSize: 12, marginBottom: 4, textAlign: 'center' }}>
+            <div style={{
+              color: '#eeffee',
+              fontSize: 13,
+              marginBottom: 6,
+              textAlign: 'center',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+            }}>
               {getInteractionLabel(mouseHoldState.interactionType)}
             </div>
             <div style={{
               width: '100%',
-              height: 8,
-              background: '#2a3a2a',
-              borderRadius: 4,
+              height: 10,
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: 5,
               overflow: 'hidden',
+              border: '1px solid #335533',
+              boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.5)',
             }}>
               <div style={{
                 width: `${mouseHoldState.progress * 100}%`,
                 height: '100%',
-                background: '#44ff44',
+                background: 'linear-gradient(90deg, #44ff44 0%, #66ff88 100%)',
                 transition: 'width 16ms linear',
+                boxShadow: '0 0 10px rgba(68, 255, 68, 0.5)',
               }} />
             </div>
-            <div style={{ color: '#888', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+            <div style={{
+              color: '#99bb99',
+              fontSize: 11,
+              marginTop: 4,
+              textAlign: 'center',
+            }}>
               Hold mouse button to continue
             </div>
           </div>
@@ -995,16 +1046,23 @@ export default function SolverMode({ level, onBack }) {
         >
           <div
             style={{
-              background: '#1a2a1a',
-              border: '2px solid #446644',
-              borderRadius: 8,
-              padding: 20,
-              minWidth: 300,
-              maxWidth: 400,
+              background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
+              border: '3px solid #66aa66',
+              borderRadius: 12,
+              padding: 24,
+              minWidth: 340,
+              maxWidth: 440,
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ color: '#ccc', margin: '0 0 12px 0', fontSize: 18 }}>
+            <h2 style={{
+              color: '#88dd88',
+              margin: '0 0 16px 0',
+              fontSize: 20,
+              fontWeight: 'bold',
+              textShadow: '0 2px 8px rgba(136, 221, 136, 0.3)',
+            }}>
               Drop Item (Q)
             </h2>
             {gameState.inventory.length === 0 ? (
@@ -1062,16 +1120,23 @@ export default function SolverMode({ level, onBack }) {
         >
           <div
             style={{
-              background: '#1a2a1a',
-              border: '2px solid #446644',
-              borderRadius: 8,
-              padding: 20,
-              minWidth: 300,
-              maxWidth: 400,
+              background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
+              border: '3px solid #66aa66',
+              borderRadius: 12,
+              padding: 24,
+              minWidth: 340,
+              maxWidth: 440,
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ color: '#ccc', margin: '0 0 12px 0', fontSize: 18 }}>
+            <h2 style={{
+              color: '#88dd88',
+              margin: '0 0 16px 0',
+              fontSize: 20,
+              fontWeight: 'bold',
+              textShadow: '0 2px 8px rgba(136, 221, 136, 0.3)',
+            }}>
               Choose Interaction
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1107,11 +1172,27 @@ export default function SolverMode({ level, onBack }) {
 
       {gameOver && (
         <div style={{
-          position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', zIndex: 20,
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 20,
         }}>
-          <h1 style={{ color: gameOver === 'win' ? '#44ff44' : '#ff4444', fontSize: 48, marginBottom: 20 }}>
-            {gameOver === 'win' ? 'YOU ESCAPED!' : 'GAME OVER'}
+          <h1 style={{
+            color: gameOver === 'win' ? '#44ff44' : '#ff4444',
+            fontSize: 56,
+            marginBottom: 30,
+            fontWeight: '900',
+            textShadow: gameOver === 'win'
+              ? '0 0 20px rgba(68, 255, 68, 0.8), 0 4px 16px rgba(68, 255, 68, 0.5)'
+              : '0 0 20px rgba(255, 68, 68, 0.8), 0 4px 16px rgba(255, 68, 68, 0.5)',
+            letterSpacing: 2,
+          }}>
+            {gameOver === 'win' ? '🎉 YOU ESCAPED! 🎉' : '💀 GAME OVER 💀'}
           </h1>
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={restart} style={btnStyle}>Restart (R)</button>
@@ -1120,7 +1201,16 @@ export default function SolverMode({ level, onBack }) {
         </div>
       )}
 
-      <div style={{ marginTop: 10, color: '#446644', fontSize: 11 }}>
+      <div style={{
+        marginTop: 16,
+        color: '#88aa88',
+        fontSize: 12,
+        padding: '8px 16px',
+        background: 'rgba(0, 0, 0, 0.4)',
+        borderRadius: 8,
+        border: '1px solid #335533',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+      }}>
         WASD/Arrows: Move | E: Pick up / Hold to interact | Q: Drop Item Menu | R: Restart | ESC: Menu
       </div>
     </div>
