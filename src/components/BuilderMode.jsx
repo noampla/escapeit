@@ -3,8 +3,9 @@ import Grid from './Grid';
 import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
 import MissionEditor from './MissionEditor';
+import SolverMode from './SolverMode';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid } from '../engine/tiles';
-import { saveLevel, generateId } from '../utils/storage';
+import { saveLevel, generateId, loadLevels } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 
 export default function BuilderMode({ onBack, editLevel }) {
@@ -28,6 +29,8 @@ export default function BuilderMode({ onBack, editLevel }) {
   const [saved, setSaved] = useState(false);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
+  const [testMode, setTestMode] = useState(false);
+  const [loadMenuOpen, setLoadMenuOpen] = useState(false);
   const lastDragPos = useRef(null);
 
   const pushUndo = useCallback((currentGrid) => {
@@ -116,8 +119,58 @@ export default function BuilderMode({ onBack, editLevel }) {
     }
   };
 
+  const handleTest = () => {
+    if (!missions || missions.length === 0) {
+      alert('Add at least one mission before testing.');
+      return;
+    }
+    setTestMode(true);
+  };
+
+  const handleLoadLevel = (level) => {
+    if (!saved && (grid.some(row => row.some(cell => cell.type !== 'empty')) || missions.length > 0)) {
+      if (!confirm('Load this level? Current unsaved changes will be lost.')) {
+        return;
+      }
+    }
+    // Load all level data
+    setGrid(level.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } }))));
+    setMissions(level.missions || []);
+    setLives(level.lives || DEFAULT_LIVES);
+    setInventoryCapacity(level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY);
+    setFixedOrder(level.fixedOrder || false);
+    setLevelName(level.name || '');
+    setSaved(false);
+    setUndoStack([]);
+    setRedoStack([]);
+    setLoadMenuOpen(false);
+  };
+
   const barBtn = { padding: '6px 12px', background: '#2a3a2a', border: '1px solid #446644', borderRadius: 4, color: '#ccc', cursor: 'pointer', fontSize: 12 };
   const activeBarBtn = (active) => ({ ...barBtn, background: active ? '#3a5a3a' : '#2a3a2a', border: active ? '1px solid #66aa66' : '1px solid #446644' });
+
+  // Test mode - render SolverMode
+  if (testMode) {
+    const testLevel = {
+      id: levelId,
+      name: levelName || 'Test Level',
+      grid,
+      missions,
+      lives,
+      inventoryCapacity,
+      fixedOrder,
+    };
+    return (
+      <div>
+        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
+          <button onClick={() => setTestMode(false)} style={{ ...barBtn, background: '#4a3a2a', padding: '10px 20px' }}>
+            ← Exit Test
+          </button>
+        </div>
+        <SolverMode level={testLevel} onBack={() => setTestMode(false)} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0a1a0a' }}>
@@ -132,6 +185,9 @@ export default function BuilderMode({ onBack, editLevel }) {
         />
         <button onClick={handleSave} style={{ ...barBtn, background: saved ? '#2a4a2a' : '#2a3a4a' }}>
           {saved ? '✓ Saved' : 'Save'}
+        </button>
+        <button onClick={() => setLoadMenuOpen(true)} style={{ ...barBtn, background: '#2a3a4a' }}>
+          Load
         </button>
 
         <div style={{ display: 'flex', border: '1px solid #446644', borderRadius: 4, overflow: 'hidden', marginLeft: 4 }}>
@@ -151,6 +207,7 @@ export default function BuilderMode({ onBack, editLevel }) {
         <button onClick={() => setShowTooltips(!showTooltips)} style={{ ...barBtn, background: showTooltips ? '#2a4a4a' : '#2a3a2a' }}>
           {showTooltips ? 'Tips ON' : 'Tips OFF'}
         </button>
+        <button onClick={handleTest} style={{ ...barBtn, background: '#2a4a3a' }}>▶ Test</button>
         <button onClick={handleClear} style={{ ...barBtn, background: '#4a2a2a' }}>Clear</button>
         <span style={{ color: '#446644', fontSize: 11, marginLeft: 'auto' }}>
           {subMode === 'build' ? 'Build (click+drag to paint, Shift+click to edit)' : 'Edit (click to select)'} | Tool: {selectedTool}
@@ -189,6 +246,93 @@ export default function BuilderMode({ onBack, editLevel }) {
         inventoryCapacity={inventoryCapacity}
         onInventoryCapacityChange={c => { setInventoryCapacity(c); setSaved(false); }}
       />
+
+      {/* Load level menu */}
+      {loadMenuOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.75)',
+            zIndex: 50,
+          }}
+          onClick={() => setLoadMenuOpen(false)}
+        >
+          <div
+            style={{
+              background: '#1a2a1a',
+              border: '2px solid #446644',
+              borderRadius: 8,
+              padding: 20,
+              minWidth: 500,
+              maxWidth: 700,
+              maxHeight: '80vh',
+              overflow: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ color: '#ccc', margin: '0 0 16px 0', fontSize: 20 }}>
+              Load Level
+            </h2>
+            {(() => {
+              const levels = loadLevels();
+              if (levels.length === 0) {
+                return (
+                  <div style={{ color: '#888', fontSize: 14, padding: 20, textAlign: 'center' }}>
+                    No saved levels found
+                  </div>
+                );
+              }
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {levels.map(level => (
+                    <div
+                      key={level.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        background: '#223322',
+                        borderRadius: 6,
+                        border: '1px solid #335533',
+                      }}
+                    >
+                      <div>
+                        <div style={{ color: '#ddd', fontSize: 15, fontWeight: 'bold' }}>{level.name || 'Unnamed Level'}</div>
+                        <div style={{ color: '#668866', fontSize: 11 }}>
+                          {level.missions?.length || 0} missions · {level.lives || 3} lives · {new Date(level.updatedAt || level.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleLoadLevel(level)}
+                        style={{
+                          ...barBtn,
+                          background: '#2a4a3a',
+                          padding: '8px 16px',
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = '#3a5a4a'}
+                        onMouseLeave={(e) => e.target.style.background = '#2a4a3a'}
+                      >
+                        Load
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <button
+              onClick={() => setLoadMenuOpen(false)}
+              style={{ ...barBtn, marginTop: 16, width: '100%', padding: '10px' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { TILE_TYPES, ITEM_TYPES } from '../utils/constants';
 
 const categories = [
@@ -14,12 +15,94 @@ const TOOLBAR_EMOJIS = {
   // Item tiles
   'item-key': '🔑',
   'item-axe': '🪓',
-  'item-bucket': '🪣',
   'item-rope': '🧵',
   'item-knife': '🔪',
   'item-sweater': '🧥',
-  'item-wood': '🪵',
 };
+
+// Draw mini bucket icon
+function drawMiniBucket(ctx, size) {
+  const s = size * 0.3;
+  const cx = size / 2, cy = size / 2;
+
+  ctx.fillStyle = '#6699cc';
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+  ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+  ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
+  ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#4477aa';
+  ctx.beginPath();
+  ctx.moveTo(cx + s * 0.3, cy - s * 0.6);
+  ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+  ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
+  ctx.lineTo(cx + s * 0.3, cy + s * 0.7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = '#556677';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
+  ctx.stroke();
+}
+
+// Draw mini wood icon
+function drawMiniWood(ctx, size) {
+  const s = size * 0.28;
+  const cx = size / 2, cy = size / 2;
+
+  ctx.fillStyle = '#6b4910';
+  ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 1.5, s * 0.55);
+
+  ctx.fillStyle = '#8b6914';
+  ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.6);
+
+  ctx.fillStyle = '#a58420';
+  ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.18);
+
+  ctx.fillStyle = '#8b6914';
+  ctx.beginPath();
+  ctx.arc(cx + s * 1.05, cy - s * 0.05, s * 0.22, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function ToolbarIcon({ type }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (type === 'item-bucket' || type === 'item-wood') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 16, 16);
+      if (type === 'item-bucket') {
+        drawMiniBucket(ctx, 16);
+      } else if (type === 'item-wood') {
+        drawMiniWood(ctx, 16);
+      }
+    }
+  }, [type]);
+
+  const emoji = TOOLBAR_EMOJIS[type];
+
+  if (type === 'item-bucket' || type === 'item-wood') {
+    return <canvas ref={canvasRef} width={16} height={16} style={{ flexShrink: 0 }} />;
+  }
+
+  if (emoji) {
+    return <span style={{ fontSize: 16 }}>{emoji}</span>;
+  }
+
+  const def = TILE_TYPES[type];
+  return <span style={{
+    width: 14, height: 14, borderRadius: 3,
+    background: def?.color || '#666', display: 'inline-block', flexShrink: 0,
+  }} />;
+}
 
 export default function Toolbar({ selected, onSelect }) {
   return (
@@ -32,7 +115,6 @@ export default function Toolbar({ selected, onSelect }) {
           <div key={cat.id} style={{ marginBottom: 12 }}>
             <div style={{ color: '#888', fontSize: 11, marginBottom: 4, textTransform: 'uppercase' }}>{cat.label}</div>
             {items.map(([type, def]) => {
-              const emoji = TOOLBAR_EMOJIS[type] || '';
               return (
                 <button
                   key={type}
@@ -45,11 +127,7 @@ export default function Toolbar({ selected, onSelect }) {
                     borderRadius: 4, color: '#ddd', cursor: 'pointer', fontSize: 12, textAlign: 'left',
                   }}
                 >
-                  <span style={{ fontSize: 16 }}>{emoji || ''}</span>
-                  <span style={{
-                    width: 14, height: 14, borderRadius: 3,
-                    background: def.color, display: emoji ? 'none' : 'inline-block', flexShrink: 0,
-                  }} />
+                  <ToolbarIcon type={type} />
                   {def.label}
                 </button>
               );

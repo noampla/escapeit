@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Grid from './Grid';
 import HUD from './HUD';
 import { findTile, cloneGrid } from '../engine/tiles';
@@ -30,6 +30,37 @@ function convertLegacyItems(grid) {
     }
   }
   return newGrid;
+}
+
+// Calculate viewport bounds from grid (bounding box of non-empty tiles + padding)
+function calculateViewportBounds(grid) {
+  let minX = GRID_COLS, minY = GRID_ROWS, maxX = -1, maxY = -1;
+
+  for (let y = 0; y < GRID_ROWS; y++) {
+    for (let x = 0; x < GRID_COLS; x++) {
+      const cell = grid[y][x];
+      if (cell.type !== 'empty') {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  // If no non-empty tiles found, return full grid
+  if (maxX === -1) {
+    return { minX: 0, minY: 0, maxX: GRID_COLS - 1, maxY: GRID_ROWS - 1 };
+  }
+
+  // Add padding (2 tiles on each side, clamped to grid bounds)
+  const padding = 2;
+  minX = Math.max(0, minX - padding);
+  minY = Math.max(0, minY - padding);
+  maxX = Math.min(GRID_COLS - 1, maxX + padding);
+  maxY = Math.min(GRID_ROWS - 1, maxY + padding);
+
+  return { minX, minY, maxX, maxY };
 }
 
 // Get adjacent tile positions
@@ -71,6 +102,8 @@ export default function SolverMode({ level, onBack }) {
   const [hazardZones, setHazardZones] = useState([]);
   const [interactionState, setInteractionState] = useState(null); // { type, startTime, targetPos, progress }
   const [dropMenuOpen, setDropMenuOpen] = useState(false);
+  const [interactionChoices, setInteractionChoices] = useState(null); // { choices: [{label, action}] }
+  const [mouseHoldState, setMouseHoldState] = useState(null); // { startTime, targetPos, progress }
 
   const messageTimerRef = useRef(null);
   const gridRef = useRef(grid);
@@ -190,24 +223,32 @@ export default function SolverMode({ level, onBack }) {
     const currentGrid = gridRef.current;
     const lastDir = lastDirRef.current;
 
-    const interactable = ['tree', 'water', 'fire', 'friend'];
+    const interactable = ['tree', 'water', 'raft', 'fire', 'friend'];
     const itemTilePattern = /^item-/;
 
     const adjacent = Object.entries(DIRECTIONS).map(([dir, dd]) => ({
       x: pos.x + dd.dx, y: pos.y + dd.dy, dir,
     })).filter(p => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS);
 
-    // Also check current position (for items)
-    const targets = [{ x: pos.x, y: pos.y, dir: 'self' }, ...adjacent];
+    // Check current position only for items (pickup)
+    // Check adjacent for hold-E interactions (tree, water, fire, friend)
+    const targets = [];
 
-    // Filter to interactable cells
-    const valid = targets.filter(p => {
-      const c = currentGrid[p.y][p.x];
-      if (itemTilePattern.test(c.type)) return true;
-      if (interactable.includes(c.type)) return true;
-      if (c.type === 'tree' && c.config.cuttable) return true;
-      return false;
-    });
+    // Current tile - only for item pickup
+    const currentCell = currentGrid[pos.y][pos.x];
+    if (itemTilePattern.test(currentCell.type)) {
+      targets.push({ x: pos.x, y: pos.y, dir: 'self' });
+    }
+
+    // Adjacent tiles - for hold-E interactions (no items)
+    for (const adj of adjacent) {
+      const c = currentGrid[adj.y][adj.x];
+      if (interactable.includes(c.type)) {
+        targets.push(adj);
+      }
+    }
+
+    const valid = targets;
 
     // Sort: last movement direction first, then others
     valid.sort((a, b) => {
@@ -237,6 +278,102 @@ export default function SolverMode({ level, onBack }) {
   const cancelInteraction = useCallback(() => {
     setInteractionState(null);
   }, []);
+
+  // Mouse hold handlers for interactions
+  const handleMouseInteraction = useCallback((x, y) => {
+    // Check if tile is adjacent to player
+    const pos = playerPosRef.current;
+    const dx = Math.abs(x - pos.x);
+    const dy = Math.abs(y - pos.y);
+    const isAdjacent = (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+
+    if (!isAdjacent) {
+      showMessage('Too far away!');
+      return;
+    }
+
+    const currentGrid = gridRef.current;
+    const currentGS = gameStateRef.current;
+    const c = currentGrid[y][x];
+
+    // Collect possible actions for this tile
+    const possibleActions = [];
+
+    // Cut tree with axe
+    if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
+      possibleActions.push({
+        type: 'cut-tree',
+        targetPos: { x, y },
+      });
+    }
+
+    // Fill bucket or build raft (water)
+    if (c.type === 'water') {
+      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
+      if (bucketIdx >= 0) {
+        possibleActions.push({
+          type: 'fill-bucket',
+          targetPos: { x, y },
+        });
+      }
+      if (hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
+        possibleActions.push({
+          type: 'build-raft',
+          targetPos: { x, y },
+        });
+      }
+    }
+
+    // Fill bucket from raft
+    if (c.type === 'raft') {
+      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
+      if (bucketIdx >= 0) {
+        possibleActions.push({
+          type: 'fill-bucket',
+          targetPos: { x, y },
+        });
+      }
+    }
+
+    // Extinguish fire
+    if (c.type === 'fire') {
+      const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
+      if (filledBucketIdx >= 0) {
+        possibleActions.push({
+          type: 'extinguish-fire',
+          targetPos: { x, y },
+        });
+      }
+    }
+
+    // Rescue friend
+    if (c.type === 'friend') {
+      possibleActions.push({
+        type: 'rescue-friend',
+        targetPos: { x, y },
+      });
+    }
+
+    if (possibleActions.length === 0) {
+      showMessage('Nothing to interact with here.');
+      return;
+    }
+
+    // If multiple actions, show choice menu
+    if (possibleActions.length > 1) {
+      setInteractionChoices({
+        choices: possibleActions.map(action => ({
+          label: getInteractionLabel(action.type).replace('...', ''),
+          action: () => setMouseHoldState({ startTime: Date.now(), targetPos: action.targetPos, interactionType: action.type, progress: 0 }),
+        })),
+      });
+      return;
+    }
+
+    // Single action - start hold interaction
+    const action = possibleActions[0];
+    setMouseHoldState({ startTime: Date.now(), targetPos: action.targetPos, interactionType: action.type, progress: 0 });
+  }, [showMessage]);
 
   // Complete interaction after holding E
   const completeInteraction = useCallback((interactionType, targetPos) => {
@@ -330,60 +467,112 @@ export default function SolverMode({ level, onBack }) {
     const currentGS = gameStateRef.current;
     const targets = getInteractTargets();
 
+    const possibleActions = [];
+
     for (const p of targets) {
       const c = currentGrid[p.y][p.x];
 
       // Pick up items - instant with E press
       if (c.type.startsWith('item-')) {
-        pickUpItem(c, p.x, p.y);
-        return;
+        const itemType = c.config.itemType || c.type.replace('item-', '');
+        const itemDef = ITEM_TYPES[itemType];
+        const itemLabel = itemDef?.label || itemType;
+        // Check inventory space
+        if (currentGS.inventory.length >= maxInventory) {
+          // Don't add to actions, but continue checking other interactions
+          continue;
+        }
+        possibleActions.push({
+          label: `Pick up ${itemLabel}`,
+          action: () => pickUpItem(c, p.x, p.y),
+        });
+        continue;
       }
 
-      // Cut cuttable tree with axe - requires holding E
-      if (c.type === 'tree' && c.config.cuttable) {
+      // Cut tree with axe - requires holding E (all trees are cuttable now)
+      if (c.type === 'tree') {
         if (hasItemType(currentGS.inventory, 'axe')) {
-          startInteraction('cut-tree', p);
-          return;
-        } else {
-          showMessage('You need an Axe to cut this tree.');
-          return;
+          possibleActions.push({
+            label: 'Cut tree with axe',
+            action: () => startInteraction('cut-tree', p),
+          });
         }
+        continue;
       }
 
       // Interact with water: fill bucket or build raft - requires holding E
       if (c.type === 'water') {
         const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
         if (bucketIdx >= 0) {
-          startInteraction('fill-bucket', p);
-          return;
+          possibleActions.push({
+            label: 'Fill bucket with water',
+            action: () => startInteraction('fill-bucket', p),
+          });
         }
         if (hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
-          startInteraction('build-raft', p);
-          return;
+          possibleActions.push({
+            label: 'Build raft (Rope + Wood)',
+            action: () => startInteraction('build-raft', p),
+          });
         }
-        showMessage('Need Rope + Wood to build a raft, or empty Bucket to fill.');
-        return;
+        continue;
+      }
+
+      // Interact with raft: fill bucket - requires holding E
+      if (c.type === 'raft') {
+        const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
+        if (bucketIdx >= 0) {
+          possibleActions.push({
+            label: 'Fill bucket with water',
+            action: () => startInteraction('fill-bucket', p),
+          });
+        }
+        continue;
       }
 
       // Extinguish fire with filled bucket - requires holding E
       if (c.type === 'fire') {
         const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
         if (filledBucketIdx >= 0) {
-          startInteraction('extinguish-fire', p);
-          return;
-        } else {
-          showMessage('You need a filled Bucket to extinguish fire.');
-          return;
+          possibleActions.push({
+            label: 'Extinguish fire with bucket',
+            action: () => startInteraction('extinguish-fire', p),
+          });
         }
+        continue;
       }
 
       // Rescue friend - requires holding E
       if (c.type === 'friend') {
-        startInteraction('rescue-friend', p);
-        return;
+        const friendName = c.config.name || 'Friend';
+        possibleActions.push({
+          label: `Rescue ${friendName}`,
+          action: () => startInteraction('rescue-friend', p),
+        });
+        continue;
       }
     }
-  }, [showMessage, pickUpItem, getInteractTargets, startInteraction]);
+
+    // If no actions available, show message
+    if (possibleActions.length === 0) {
+      const hasItemOnTile = currentGrid[playerPosRef.current.y][playerPosRef.current.x].type.startsWith('item-');
+      if (hasItemOnTile && currentGS.inventory.length >= maxInventory) {
+        showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+      } else {
+        showMessage('Nothing to interact with here.');
+      }
+      return;
+    }
+
+    // If only one action, execute it immediately
+    if (possibleActions.length === 1) {
+      possibleActions[0].action();
+      return;
+    }
+
+    // Multiple actions - show choice menu
+    setInteractionChoices({ choices: possibleActions });
+  }, [showMessage, pickUpItem, getInteractTargets, startInteraction, maxInventory]);
 
   // Movement logic
   const doMove = useCallback((dir) => {
@@ -434,6 +623,15 @@ export default function SolverMode({ level, onBack }) {
 
     // Snow - needs sweater
     if (targetCell.type === 'snow') {
+      // Reveal the snow tile and adjacent tiles even if blocked
+      setRevealedTiles(prev => {
+        const newRevealed = new Set(prev);
+        newRevealed.add(`${nx},${ny}`);
+        const adjacent = getAdjacentPositions(nx, ny);
+        adjacent.forEach(pos => newRevealed.add(pos.key));
+        return newRevealed;
+      });
+
       if (hasItemType(currentGS.inventory, 'sweater')) {
         setPlayerPos({ x: nx, y: ny });
       } else {
@@ -448,12 +646,12 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    // Fire - stepping on it damages
+    // Fire - stepping on it damages and pushes back
     if (targetCell.type === 'fire') {
       const remaining = loseLife();
       if (remaining > 0) {
         showMessage(`Burned by fire! Lives: ${remaining}`);
-        respawn();
+        // Stay at current position (pushed back), don't move to fire tile
       }
       return;
     }
@@ -490,7 +688,17 @@ export default function SolverMode({ level, onBack }) {
       keysDown.current.add(key);
 
       if (key === 'escape') {
-        setDropMenuOpen(false);
+        // Close interaction choice menu if open
+        if (interactionChoices) {
+          setInteractionChoices(null);
+          return;
+        }
+        // Close drop menu if open
+        if (dropMenuOpen) {
+          setDropMenuOpen(false);
+          return;
+        }
+        // Otherwise go back to menu
         onBack();
         return;
       }
@@ -526,7 +734,7 @@ export default function SolverMode({ level, onBack }) {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
     };
-  }, [onBack, restart, doInteract, cancelInteraction, showMessage]);
+  }, [onBack, restart, doInteract, cancelInteraction, showMessage, interactionChoices, dropMenuOpen]);
 
   // Movement loop
   useEffect(() => {
@@ -571,6 +779,29 @@ export default function SolverMode({ level, onBack }) {
 
     return () => clearInterval(interval);
   }, [interactionState, gameOver, completeInteraction]);
+
+  // Mouse hold interaction progress
+  useEffect(() => {
+    if (!mouseHoldState || gameOver) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - mouseHoldState.startTime;
+      const progress = Math.min(elapsed / INTERACTION_DURATION, 1);
+
+      setMouseHoldState(prev => {
+        if (!prev) return null;
+        return { ...prev, progress };
+      });
+
+      // Complete interaction when progress reaches 100%
+      if (progress >= 1) {
+        completeInteraction(mouseHoldState.interactionType, mouseHoldState.targetPos);
+        setMouseHoldState(null);
+      }
+    }, 16);
+
+    return () => clearInterval(interval);
+  }, [mouseHoldState, gameOver, completeInteraction]);
 
   // Tick: hazard zones update
   useEffect(() => {
@@ -630,6 +861,9 @@ export default function SolverMode({ level, onBack }) {
     }
   }, [playerPos, gameOver, level, showMessage, grid, gameState]);
 
+  // Calculate viewport bounds for dynamic canvas sizing
+  const viewportBounds = useMemo(() => calculateViewportBounds(grid), [grid]);
+
   const btnStyle = { padding: '10px 20px', background: '#2a3a2a', border: '1px solid #446644', borderRadius: 6, color: '#ccc', cursor: 'pointer', fontSize: 14 };
 
   // Get interaction label for progress bar
@@ -668,6 +902,9 @@ export default function SolverMode({ level, onBack }) {
           tick={tick}
           hazardZoneOverrides={hazardZones}
           revealedTiles={revealedTiles}
+          viewportBounds={viewportBounds}
+          onHoldStart={handleMouseInteraction}
+          onHoldEnd={() => setMouseHoldState(null)}
         />
 
         {/* Hold E progress bar */}
@@ -702,6 +939,42 @@ export default function SolverMode({ level, onBack }) {
             </div>
             <div style={{ color: '#888', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
               Hold E to continue
+            </div>
+          </div>
+        )}
+
+        {/* Mouse hold progress bar */}
+        {mouseHoldState && (
+          <div style={{
+            position: 'absolute',
+            bottom: -50,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.85)',
+            border: '2px solid #446644',
+            borderRadius: 8,
+            padding: '8px 12px',
+            minWidth: 200,
+          }}>
+            <div style={{ color: '#ccc', fontSize: 12, marginBottom: 4, textAlign: 'center' }}>
+              {getInteractionLabel(mouseHoldState.interactionType)}
+            </div>
+            <div style={{
+              width: '100%',
+              height: 8,
+              background: '#2a3a2a',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${mouseHoldState.progress * 100}%`,
+                height: '100%',
+                background: '#44ff44',
+                transition: 'width 16ms linear',
+              }} />
+            </div>
+            <div style={{ color: '#888', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+              Hold mouse button to continue
             </div>
           </div>
         )}
@@ -769,6 +1042,64 @@ export default function SolverMode({ level, onBack }) {
               style={{ ...btnStyle, marginTop: 12, width: '100%' }}
             >
               Cancel (Q or ESC)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Interaction choice menu */}
+      {interactionChoices && !gameOver && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.75)',
+          zIndex: 30,
+        }}
+        onClick={() => setInteractionChoices(null)}
+        >
+          <div
+            style={{
+              background: '#1a2a1a',
+              border: '2px solid #446644',
+              borderRadius: 8,
+              padding: 20,
+              minWidth: 300,
+              maxWidth: 400,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ color: '#ccc', margin: '0 0 12px 0', fontSize: 18 }}>
+              Choose Interaction
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {interactionChoices.choices.map((choice, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setInteractionChoices(null);
+                    choice.action();
+                  }}
+                  style={{
+                    ...btnStyle,
+                    textAlign: 'left',
+                    width: '100%',
+                    background: '#2a3a2a',
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#3a4a3a'}
+                  onMouseLeave={(e) => e.target.style.background = '#2a3a2a'}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setInteractionChoices(null)}
+              style={{ ...btnStyle, marginTop: 12, width: '100%' }}
+            >
+              Cancel (ESC)
             </button>
           </div>
         </div>
