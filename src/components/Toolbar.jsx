@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { TILE_TYPES, ITEM_TYPES } from '../utils/constants';
+import { useEffect, useRef, useContext } from 'react';
+import { ThemeContext } from '../App';
 
 const categories = [
   { id: 'basic', label: 'Terrain' },
@@ -70,7 +70,7 @@ function drawMiniWood(ctx, size) {
   ctx.fill();
 }
 
-function ToolbarIcon({ type }) {
+function ToolbarIcon({ type, theme, TILE_TYPES }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -105,13 +105,16 @@ function ToolbarIcon({ type }) {
 }
 
 export default function Toolbar({ selected, onSelect }) {
+  const theme = useContext(ThemeContext);
+  const TILE_TYPES = theme?.getTileTypes() || {};
+
   return (
     <div style={{
       width: 210,
-      background: 'linear-gradient(180deg, rgba(20, 40, 20, 0.95) 0%, rgba(10, 25, 10, 0.95) 100%)',
+      background: 'linear-gradient(180deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
       padding: 18,
       overflowY: 'auto',
-      borderRight: '2px solid rgba(68, 170, 68, 0.3)',
+      borderRight: `2px solid ${theme?.primaryColor ? `${theme.primaryColor}40` : 'rgba(100, 150, 200, 0.3)'}`,
       boxShadow: `
         inset -6px 0 20px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.05)
@@ -120,17 +123,17 @@ export default function Toolbar({ selected, onSelect }) {
     }}>
       <h3 style={{
         margin: '0 0 20px',
-        color: '#a8f0a8',
+        color: theme?.primaryColor || '#aaddff',
         fontSize: 18,
         fontWeight: '800',
         textShadow: `
-          0 0 20px rgba(136, 221, 136, 0.5),
+          0 0 20px ${theme?.primaryColor ? `${theme.primaryColor}80` : 'rgba(170, 221, 255, 0.5)'},
           0 2px 8px rgba(0, 0, 0, 0.8)
         `,
         letterSpacing: 1,
         textTransform: 'uppercase',
       }}>
-        🌲 Objects
+        {theme?.emoji || '🎯'} Objects
       </h3>
       {categories.map(cat => {
         const items = Object.entries(TILE_TYPES).filter(([, def]) => def.category === cat.id);
@@ -138,7 +141,7 @@ export default function Toolbar({ selected, onSelect }) {
         return (
           <div key={cat.id} style={{ marginBottom: 20 }}>
             <div style={{
-              color: '#a8f0a8',
+              color: theme?.primaryColor || '#aaddff',
               fontSize: 12,
               marginBottom: 10,
               textTransform: 'uppercase',
@@ -160,37 +163,37 @@ export default function Toolbar({ selected, onSelect }) {
                     padding: '11px 14px',
                     marginBottom: 6,
                     background: selected === type
-                      ? 'linear-gradient(145deg, #3a7a3a 0%, #2a5a2a 100%)'
-                      : 'linear-gradient(145deg, rgba(30, 55, 30, 0.6) 0%, rgba(20, 40, 20, 0.6) 100%)',
+                      ? 'linear-gradient(145deg, #4a4a4a 0%, #3a3a3a 100%)'
+                      : 'linear-gradient(145deg, rgba(40, 40, 40, 0.6) 0%, rgba(30, 30, 30, 0.6) 100%)',
                     border: 'none',
                     borderRadius: 10,
-                    color: selected === type ? '#ffffff' : '#c8e6c8',
+                    color: selected === type ? '#ffffff' : '#e8e8e8',
                     cursor: 'pointer',
                     fontSize: 14,
                     textAlign: 'left',
                     fontWeight: selected === type ? '700' : '500',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     boxShadow: selected === type
-                      ? '0 4px 16px rgba(102, 170, 102, 0.3), 0 0 0 2px rgba(68, 170, 68, 0.4), inset 0 2px 0 rgba(255,255,255,0.15)'
-                      : '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(68, 170, 68, 0.15)',
+                      ? `0 4px 16px rgba(100, 100, 100, 0.3), 0 0 0 2px ${theme?.primaryColor ? `${theme.primaryColor}66` : 'rgba(100, 150, 200, 0.4)'}, inset 0 2px 0 rgba(255,255,255,0.15)`
+                      : '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(100, 100, 100, 0.15)',
                     transform: selected === type ? 'translateX(4px)' : 'translateX(0)',
                   }}
                   onMouseEnter={(e) => {
                     if (selected !== type) {
-                      e.target.style.background = 'linear-gradient(145deg, rgba(40, 65, 40, 0.8) 0%, rgba(30, 50, 30, 0.8) 100%)';
+                      e.target.style.background = 'linear-gradient(145deg, rgba(50, 50, 50, 0.8) 0%, rgba(40, 40, 40, 0.8) 100%)';
                       e.target.style.transform = 'translateX(2px)';
-                      e.target.style.boxShadow = '0 4px 12px rgba(68, 170, 68, 0.2), 0 0 0 1px rgba(68, 170, 68, 0.25)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(100, 100, 100, 0.2), 0 0 0 1px rgba(100, 100, 100, 0.25)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (selected !== type) {
-                      e.target.style.background = 'linear-gradient(145deg, rgba(30, 55, 30, 0.6) 0%, rgba(20, 40, 20, 0.6) 100%)';
+                      e.target.style.background = 'linear-gradient(145deg, rgba(40, 40, 40, 0.6) 0%, rgba(30, 30, 30, 0.6) 100%)';
                       e.target.style.transform = 'translateX(0)';
-                      e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(68, 170, 68, 0.15)';
+                      e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(100, 100, 100, 0.15)';
                     }
                   }}
                 >
-                  <ToolbarIcon type={type} />
+                  <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} />
                   {def.label}
                 </button>
               );
@@ -199,17 +202,17 @@ export default function Toolbar({ selected, onSelect }) {
         );
       })}
       <div style={{
-        color: '#99cc99',
+        color: '#aaaaaa',
         fontSize: 12,
         marginTop: 20,
         padding: '12px 14px',
-        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(10, 20, 10, 0.3) 100%)',
+        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(20, 20, 20, 0.3) 100%)',
         borderRadius: 10,
-        border: '1px solid rgba(68, 170, 68, 0.2)',
+        border: `1px solid ${theme?.primaryColor ? `${theme.primaryColor}33` : 'rgba(100, 100, 100, 0.2)'}`,
         lineHeight: 1.8,
         fontFamily: 'monospace',
       }}>
-        <div style={{ color: '#a8f0a8', fontWeight: 'bold', marginBottom: 6, fontSize: 13 }}>Controls</div>
+        <div style={{ color: theme?.primaryColor || '#aaddff', fontWeight: 'bold', marginBottom: 6, fontSize: 13 }}>Controls</div>
         Left click: place<br />
         Right click: remove
       </div>

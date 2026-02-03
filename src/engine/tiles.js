@@ -1,4 +1,4 @@
-import { GRID_COLS, GRID_ROWS, TILE_TYPES } from '../utils/constants';
+import { GRID_COLS, GRID_ROWS } from '../utils/constants';
 
 export function createEmptyGrid() {
   const grid = [];
@@ -19,9 +19,14 @@ export function cloneGrid(grid) {
   })));
 }
 
-export function placeTile(grid, x, y, type) {
+export function placeTile(grid, x, y, type, TILE_TYPES = {}) {
   const def = TILE_TYPES[type];
-  if (!def) return grid;
+  if (!def) {
+    // If no definition, just place the tile
+    const newGrid = cloneGrid(grid);
+    newGrid[y][x] = { type, config: {} };
+    return newGrid;
+  }
   const newGrid = cloneGrid(grid);
   if (def.unique) {
     for (let gy = 0; gy < GRID_ROWS; gy++) {

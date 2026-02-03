@@ -6,8 +6,8 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  background: #0a1a0a;
-  color: #e8f8e8;
+  background: #1a1a1a;
+  color: #ffffff;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -24,7 +24,7 @@ button {
 }
 
 button:focus {
-  outline: 2px solid rgba(68, 170, 68, 0.5);
+  outline: 2px solid rgba(100, 150, 200, 0.5);
   outline-offset: 2px;
 }
 
@@ -33,12 +33,12 @@ button:hover {
 }
 
 select:focus, input:focus {
-  outline: 2px solid rgba(68, 170, 68, 0.5);
+  outline: 2px solid rgba(100, 150, 200, 0.5);
   outline-offset: 1px;
 }
 
 input::placeholder {
-  color: rgba(200, 230, 200, 0.5);
+  color: rgba(200, 200, 200, 0.5);
 }
 
 /* Smooth scrollbar styling */
@@ -53,10 +53,10 @@ input::placeholder {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(68, 170, 68, 0.4);
+  background: rgba(100, 150, 200, 0.4);
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(68, 170, 68, 0.6);
+  background: rgba(100, 150, 200, 0.6);
 }

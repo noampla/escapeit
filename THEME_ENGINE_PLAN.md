@@ -1790,4 +1790,482 @@ With this pattern, you can also implement:
 
 ---
 
+## UI/UX Flow: Branding and Theme Selection
+
+### Question: Where does theme selection happen? How does the main page change?
+
+**Answer: Theme selection happens BEFORE building/playing. Main page gets rebranded to "Escape It".**
+
+### Proposed User Flow
+
+```
+┌─────────────────────────────────────┐
+│   ESCAPE IT - Main Menu             │
+│   (Generic branding, no theme yet)  │
+│                                     │
+│   [Create New Escape Room]          │
+│   [Play Escape Rooms]               │
+│   [About]                           │
+└─────────────────────────────────────┘
+           │
+           ├─→ Create New Escape Room
+           │   ↓
+           │   ┌─────────────────────────────┐
+           │   │  Choose Theme               │
+           │   │  ┌───────┐  ┌───────┐       │
+           │   │  │ 🌲    │  │ 🏛️    │       │
+           │   │  │Forest │  │Mansion│       │
+           │   │  └───────┘  └───────┘       │
+           │   │  ┌───────┐  ┌───────┐       │
+           │   │  │ 🚀    │  │ 🏥    │       │
+           │   │  │Space  │  │Hospital│      │
+           │   │  └───────┘  └───────┘       │
+           │   └─────────────────────────────┘
+           │          ↓
+           │   ┌─────────────────────────────┐
+           │   │  Builder Mode (themed)      │
+           │   │  - Forest tiles/items       │
+           │   │  - Forest colors/style      │
+           │   └─────────────────────────────┘
+           │
+           └─→ Play Escape Rooms
+               ↓
+               ┌─────────────────────────────┐
+               │  Browse Levels              │
+               │  ┌───────────────────────┐  │
+               │  │ 🌲 Forest Escape      │  │
+               │  │ Theme: Forest         │  │
+               │  │ [Play] [Edit]         │  │
+               │  └───────────────────────┘  │
+               │  ┌───────────────────────┐  │
+               │  │ 🏛️ Haunted Mansion    │  │
+               │  │ Theme: Mansion        │  │
+               │  │ [Play] [Edit]         │  │
+               │  └───────────────────────┘  │
+               └─────────────────────────────┘
+                      ↓ [Play]
+               ┌─────────────────────────────┐
+               │  Solver Mode (themed)       │
+               │  - Loads level's theme      │
+               │  - Applies theme style      │
+               └─────────────────────────────┘
+```
+
+### Main Page Rebranding
+
+#### Current State (App.jsx)
+```javascript
+// Forest-specific branding
+<h1>Lost in the Forest</h1>
+<button>Build Forest</button>
+<button>Survive Forest</button>
+```
+
+#### New State (App.jsx) - Generic Branding
+```javascript
+<div className="main-menu">
+  <div className="logo">
+    <h1>ESCAPE IT</h1>
+    <p className="tagline">Create & Play Custom Escape Rooms</p>
+  </div>
+
+  <div className="menu-buttons">
+    <button onClick={() => setMode('theme-select-build')} className="primary">
+      <span className="icon">🎨</span>
+      Create New Escape Room
+    </button>
+
+    <button onClick={() => setMode('selectLevel')} className="secondary">
+      <span className="icon">🎮</span>
+      Play Escape Rooms
+    </button>
+
+    <button onClick={() => setMode('about')} className="tertiary">
+      <span className="icon">ℹ️</span>
+      About
+    </button>
+  </div>
+
+  <div className="theme-showcase">
+    <p>Available Themes:</p>
+    <div className="theme-badges">
+      {AVAILABLE_THEMES.map(theme => (
+        <span key={theme.id} className="theme-badge">
+          {theme.emoji || '🎯'} {theme.name}
+        </span>
+      ))}
+    </div>
+  </div>
+</div>
+```
+
+### Theme Selection Screens
+
+#### Option A: Theme Selection Before Builder (Recommended)
+
+```javascript
+// New component: ThemeSelect.jsx
+function ThemeSelect({ onSelectTheme, purpose }) {
+  return (
+    <div className="theme-select-screen">
+      <h2>
+        {purpose === 'build' ? 'Choose a Theme for Your Escape Room' : 'Filter by Theme'}
+      </h2>
+
+      <div className="theme-grid">
+        {AVAILABLE_THEMES.map(theme => (
+          <div
+            key={theme.id}
+            className="theme-card"
+            onClick={() => onSelectTheme(theme.id)}
+          >
+            <div className="theme-thumbnail">
+              {theme.thumbnail ? (
+                <img src={theme.thumbnail} alt={theme.name} />
+              ) : (
+                <div className="theme-emoji">{theme.emoji || '🎯'}</div>
+              )}
+            </div>
+
+            <div className="theme-info">
+              <h3>{theme.name}</h3>
+              <p className="theme-description">{theme.description}</p>
+
+              <div className="theme-meta">
+                <span className="difficulty">⭐ {theme.difficulty}</span>
+                {purpose === 'browse' && (
+                  <span className="level-count">
+                    {getLevelCountForTheme(theme.id)} levels
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button className="select-btn">
+              {purpose === 'build' ? 'Create with this theme' : 'View levels'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button onClick={() => history.back()} className="back-btn">
+        ← Back to Menu
+      </button>
+    </div>
+  );
+}
+```
+
+#### App.jsx Mode Flow
+
+```javascript
+function App() {
+  const [mode, setMode] = useState('menu');
+  const [selectedTheme, setSelectedTheme] = useState(null);
+  const [selectedLevel, setSelectedLevel] = useState(null);
+
+  // Mode states:
+  // - 'menu': Main menu
+  // - 'theme-select-build': Choose theme for building
+  // - 'build': Builder mode (needs selectedTheme)
+  // - 'selectLevel': Browse all levels (can filter by theme)
+  // - 'solve': Play a level (needs selectedLevel)
+  // - 'about': About page
+
+  const handleThemeSelect = (themeId) => {
+    setSelectedTheme(themeId);
+    setMode('build');
+  };
+
+  return (
+    <div className="app">
+      {mode === 'menu' && (
+        <MainMenu
+          onCreateNew={() => setMode('theme-select-build')}
+          onPlayLevels={() => setMode('selectLevel')}
+          onAbout={() => setMode('about')}
+        />
+      )}
+
+      {mode === 'theme-select-build' && (
+        <ThemeSelect
+          purpose="build"
+          onSelectTheme={handleThemeSelect}
+          onBack={() => setMode('menu')}
+        />
+      )}
+
+      {mode === 'build' && selectedTheme && (
+        <BuilderMode
+          themeId={selectedTheme}
+          onBack={() => setMode('menu')}
+          onTest={(level) => {
+            setSelectedLevel(level);
+            setMode('solve');
+          }}
+        />
+      )}
+
+      {mode === 'selectLevel' && (
+        <LevelSelect
+          onPlay={(level) => {
+            setSelectedLevel(level);
+            setSelectedTheme(level.themeId); // Load theme from level
+            setMode('solve');
+          }}
+          onEdit={(level) => {
+            setSelectedLevel(level);
+            setSelectedTheme(level.themeId);
+            setMode('build');
+          }}
+          onBack={() => setMode('menu')}
+        />
+      )}
+
+      {mode === 'solve' && selectedLevel && selectedTheme && (
+        <SolverMode
+          level={selectedLevel}
+          themeId={selectedTheme}
+          onBack={() => setMode('selectLevel')}
+        />
+      )}
+
+      {mode === 'about' && (
+        <AboutPage onBack={() => setMode('menu')} />
+      )}
+    </div>
+  );
+}
+```
+
+### Level Select with Theme Filtering
+
+```javascript
+// Updated LevelSelect.jsx
+function LevelSelect({ onPlay, onEdit, onBack }) {
+  const [levels] = useState(loadLevels());
+  const [filterTheme, setFilterTheme] = useState(null);
+
+  const filteredLevels = filterTheme
+    ? levels.filter(l => l.themeId === filterTheme)
+    : levels;
+
+  return (
+    <div className="level-select">
+      <div className="header">
+        <button onClick={onBack} className="back-btn">← Back</button>
+        <h2>Play Escape Rooms</h2>
+
+        {/* Theme filter */}
+        <div className="theme-filter">
+          <button
+            className={!filterTheme ? 'active' : ''}
+            onClick={() => setFilterTheme(null)}
+          >
+            All Themes
+          </button>
+          {AVAILABLE_THEMES.map(theme => (
+            <button
+              key={theme.id}
+              className={filterTheme === theme.id ? 'active' : ''}
+              onClick={() => setFilterTheme(theme.id)}
+            >
+              {theme.emoji} {theme.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="level-grid">
+        {filteredLevels.map(level => (
+          <LevelCard
+            key={level.id}
+            level={level}
+            theme={getThemeById(level.themeId)}
+            onPlay={() => onPlay(level)}
+            onEdit={() => onEdit(level)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LevelCard({ level, theme, onPlay, onEdit }) {
+  return (
+    <div className="level-card" style={{ borderColor: theme.primaryColor }}>
+      {/* Theme badge */}
+      <div className="theme-badge" style={{ backgroundColor: theme.primaryColor }}>
+        {theme.emoji} {theme.name}
+      </div>
+
+      <h3>{level.name}</h3>
+
+      <div className="level-stats">
+        <span>❤️ Lives: {level.lives}</span>
+        <span>🎒 Capacity: {level.inventoryCapacity}</span>
+        <span>🎯 Missions: {level.missions.length}</span>
+      </div>
+
+      <div className="level-actions">
+        <button onClick={onPlay} className="play-btn">
+          ▶️ Play
+        </button>
+        <button onClick={onEdit} className="edit-btn">
+          ✏️ Edit
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+### Builder Mode - Theme Locked
+
+Once in builder mode, the theme is **locked** for that level:
+
+```javascript
+function BuilderMode({ themeId, levelToEdit, onBack, onTest }) {
+  const [theme, setTheme] = useState(null);
+
+  useEffect(() => {
+    // Load theme on mount
+    const loader = new ThemeLoader(themeId);
+    loader.load().then(setTheme);
+  }, [themeId]);
+
+  if (!theme) return <div>Loading theme...</div>;
+
+  return (
+    <div className="builder-mode" data-theme={themeId}>
+      <div className="builder-header">
+        <button onClick={onBack}>← Exit</button>
+
+        {/* Show which theme we're using */}
+        <div className="current-theme-indicator">
+          <span>Theme: {theme.theme.name}</span>
+          <span className="theme-emoji">{theme.theme.emoji}</span>
+        </div>
+
+        <input
+          type="text"
+          placeholder="Level name..."
+          value={levelName}
+          onChange={(e) => setLevelName(e.target.value)}
+        />
+
+        <button onClick={handleSave}>💾 Save</button>
+        <button onClick={() => onTest(currentLevel)}>▶️ Test</button>
+      </div>
+
+      {/* Rest of builder UI - uses theme's tiles/items */}
+      <Toolbar theme={theme} selectedTool={selectedTool} onSelectTool={setSelectedTool} />
+      <Grid theme={theme} grid={grid} ... />
+      <PropertiesPanel theme={theme} ... />
+      <MissionEditor missions={missions} ... />
+    </div>
+  );
+}
+```
+
+### Styling Strategy
+
+#### Generic App Styles (index.css)
+- Neutral colors for main menu (grays, whites)
+- Generic button styles
+- Layout/structure only
+
+#### Theme-Specific Styles (themes/*/style.css)
+- Loaded dynamically when theme is active
+- Applied via data attribute: `[data-theme="forest"]`
+- Only affects builder/solver screens
+
+```css
+/* index.css - Generic */
+.app {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+.main-menu {
+  /* Neutral styling */
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+}
+
+/* themes/forest/style.css - Theme-specific */
+[data-theme="forest"] {
+  --theme-primary: #68aa44;
+  --theme-bg: #0a1f0a;
+  --theme-accent: #a8f0a8;
+}
+
+[data-theme="forest"] .builder-mode,
+[data-theme="forest"] .solver-mode {
+  background-color: var(--theme-bg);
+  color: var(--theme-accent);
+}
+
+[data-theme="forest"] button {
+  background: linear-gradient(135deg, #68aa44, #44aa44);
+  box-shadow: 0 0 20px rgba(104, 170, 68, 0.4);
+}
+```
+
+### Summary of Changes
+
+| Component | Current | After Refactor |
+|-----------|---------|----------------|
+| **Main Menu** | "Lost in the Forest" branding | "Escape It" generic branding |
+| **Create Button** | Goes directly to builder | Goes to theme selection screen |
+| **Builder Mode** | Uses hardcoded forest theme | Receives themeId prop, loads theme |
+| **Level List** | Shows all levels | Shows all levels + theme filter |
+| **Level Card** | Generic styling | Shows theme badge, themed colors |
+| **Solver Mode** | Uses hardcoded forest theme | Loads theme from level.themeId |
+
+### Migration for Existing Levels
+
+```javascript
+// src/utils/storage.js
+export function migrateLevels() {
+  const levels = loadLevels();
+  let needsSave = false;
+
+  levels.forEach(level => {
+    if (!level.themeId) {
+      level.themeId = 'forest'; // Default to forest
+      needsSave = true;
+    }
+  });
+
+  if (needsSave) {
+    saveLevels(levels);
+  }
+}
+
+// Call on app startup
+// App.jsx
+useEffect(() => {
+  migrateLevels();
+}, []);
+```
+
+---
+
+## Final Architecture Decision
+
+### ✅ Recommended Flow:
+
+1. **Main Menu**: Generic "Escape It" branding, no theme loaded
+2. **Create New**: Shows theme selection grid → loads theme → enters builder
+3. **Play**: Shows level list with theme badges → click level → loads theme → enters solver
+4. **Theme Locked Per Level**: Once a level is created with a theme, it stays with that theme
+5. **Theme Change**: Only way to change theme is to create a new level
+
+### Alternative Considered (Not Recommended):
+
+- Let users switch themes mid-build: Too complex, breaks existing levels, confusing UX
+- Default theme: Removes choice, defeats purpose of multi-theme system
+
+---
+
 **End of Plan Document**

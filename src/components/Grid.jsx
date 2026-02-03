@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, GRID_COLS, GRID_ROWS, TILE_TYPES, ITEM_TYPES } from '../utils/constants';
+import { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, GRID_COLS, GRID_ROWS } from '../utils/constants';
 import { getAllHazardZones } from '../engine/hazards';
 
 const TILE_EMOJIS = {
@@ -132,7 +132,7 @@ function drawWood(ctx, cx, cy, size) {
   ctx.fill();
 }
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0 }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, theme }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -173,7 +173,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
         }
 
         const cell = grid[y][x];
-        const def = TILE_TYPES[cell.type] || TILE_TYPES.empty;
+        const TILE_TYPES = theme?.getTileTypes() || {};
+        const def = TILE_TYPES[cell.type] || TILE_TYPES.empty || { color: '#333' };
         const px = (x - offsetX) * TILE_SIZE, py = (y - offsetY) * TILE_SIZE;
         const cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
 
@@ -186,24 +187,31 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
 
         // Draw item tiles
         if (cell.type.startsWith('item-')) {
-          const emoji = TILE_EMOJIS[cell.type];
-          if (cell.type === 'item-bucket') {
-            drawBucket(ctx, cx, cy, TILE_SIZE);
-          } else if (cell.type === 'item-wood') {
-            drawWood(ctx, cx, cy, TILE_SIZE);
-          } else if (emoji) {
-            ctx.font = '22px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(emoji, cx, cy);
+          const itemType = cell.type.replace('item-', '');
+          // Try theme's custom rendering first (pass top-left corner, not center)
+          const rendered = theme?.renderItem?.(ctx, itemType, px, py, TILE_SIZE, cell.config);
+          if (!rendered) {
+            // Fallback to emoji (use center coordinates)
+            const emoji = theme?.getItemEmoji?.(itemType) || TILE_EMOJIS[cell.type];
+            if (emoji) {
+              ctx.font = '22px serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(emoji, cx, cy);
+            }
           }
         } else {
-          const emoji = TILE_EMOJIS[cell.type];
-          if (emoji) {
-            ctx.font = '22px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(emoji, cx, cy);
+          // Try theme's custom tile rendering first
+          const rendered = theme?.renderTile?.(ctx, cell, cx, cy, TILE_SIZE);
+          if (!rendered) {
+            // Fallback to emoji
+            const emoji = theme?.getTileEmoji?.(cell.type) || TILE_EMOJIS[cell.type];
+            if (emoji) {
+              ctx.font = '22px serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(emoji, cx, cy);
+            }
           }
         }
       }
@@ -339,6 +347,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
     const pos = getTileAt(e);
     if (!pos) { setTooltip(null); return; }
     const cell = grid[pos.y][pos.x];
+    const TILE_TYPES = theme?.getTileTypes() || {};
     const def = TILE_TYPES[cell.type];
     if (def && def.tooltip && cell.type !== 'empty' && cell.type !== 'ground') {
       const rect = canvasRef.current.getBoundingClientRect();

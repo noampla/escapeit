@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useContext } from 'react';
 import Grid from './Grid';
 import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
@@ -7,8 +7,10 @@ import SolverMode from './SolverMode';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid } from '../engine/tiles';
 import { saveLevel, generateId, loadLevels } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { ThemeContext } from '../App';
 
-export default function BuilderMode({ onBack, editLevel }) {
+export default function BuilderMode({ onBack, editLevel, themeId }) {
+  const theme = useContext(ThemeContext);
   const [grid, setGrid] = useState(() => {
     if (editLevel) {
       return editLevel.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } })));
@@ -60,7 +62,8 @@ export default function BuilderMode({ onBack, editLevel }) {
       return;
     }
     pushUndo(grid);
-    const newGrid = placeTile(grid, x, y, selectedTool);
+    const TILE_TYPES = theme?.getTileTypes() || {};
+    const newGrid = placeTile(grid, x, y, selectedTool, TILE_TYPES);
     setGrid(newGrid);
     setSelectedCell({ x, y });
     setSaved(false);
@@ -72,7 +75,8 @@ export default function BuilderMode({ onBack, editLevel }) {
     const key = `${x},${y}`;
     if (lastDragPos.current === key) return;
     lastDragPos.current = key;
-    setGrid(prev => placeTile(prev, x, y, selectedTool));
+    const TILE_TYPES = theme?.getTileTypes() || {};
+    setGrid(prev => placeTile(prev, x, y, selectedTool, TILE_TYPES));
     setSaved(false);
   };
 
@@ -104,6 +108,7 @@ export default function BuilderMode({ onBack, editLevel }) {
       lives,
       inventoryCapacity,
       fixedOrder,
+      themeId: themeId,
       createdAt: editLevel?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
@@ -148,25 +153,25 @@ export default function BuilderMode({ onBack, editLevel }) {
 
   const barBtn = {
     padding: '10px 20px',
-    background: 'linear-gradient(145deg, #2a5a2a 0%, #1a4a1a 100%)',
+    background: 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)',
     border: 'none',
     borderRadius: 10,
-    color: '#c8e6c8',
+    color: '#e8e8e8',
     cursor: 'pointer',
     fontSize: 14,
     fontWeight: '600',
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(100, 100, 100, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
   };
   const activeBarBtn = (active) => ({
     ...barBtn,
     background: active
-      ? 'linear-gradient(145deg, #3a7a3a 0%, #2a5a2a 100%)'
-      : 'linear-gradient(145deg, #2a5a2a 0%, #1a4a1a 100%)',
-    color: active ? '#ffffff' : '#c8e6c8',
+      ? 'linear-gradient(145deg, #4a4a4a 0%, #3a3a3a 100%)'
+      : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)',
+    color: active ? '#ffffff' : '#e8e8e8',
     boxShadow: active
-      ? '0 4px 16px rgba(102, 170, 102, 0.3), 0 0 0 2px rgba(68, 170, 68, 0.4), inset 0 2px 0 rgba(255,255,255,0.15)'
-      : '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
+      ? '0 4px 16px rgba(100, 100, 100, 0.3), 0 0 0 2px rgba(100, 100, 100, 0.4), inset 0 2px 0 rgba(255,255,255,0.15)'
+      : '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(100, 100, 100, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
     transform: active ? 'translateY(-1px)' : 'translateY(0)',
   });
 
@@ -180,11 +185,12 @@ export default function BuilderMode({ onBack, editLevel }) {
       lives,
       inventoryCapacity,
       fixedOrder,
+      themeId: themeId,
     };
     return (
       <div>
         <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
-          <button onClick={() => setTestMode(false)} style={{ ...barBtn, background: '#4a3a2a', padding: '10px 20px' }}>
+          <button onClick={() => setTestMode(false)} style={{ ...barBtn, background: 'linear-gradient(145deg, #4a4a3a 0%, #3a3a2a 100%)', padding: '10px 20px' }}>
             ← Exit Test
           </button>
         </div>
@@ -198,7 +204,7 @@ export default function BuilderMode({ onBack, editLevel }) {
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
-      background: 'linear-gradient(135deg, #0a1f0a 0%, #071507 25%, #0a1a0a 50%, #050f05 100%)',
+      background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 50%, #0a0a0a 100%)',
       position: 'relative',
     }}>
       {/* Background pattern overlay */}
@@ -206,8 +212,8 @@ export default function BuilderMode({ onBack, editLevel }) {
         position: 'absolute',
         inset: 0,
         backgroundImage: `
-          radial-gradient(circle at 20% 30%, rgba(68, 170, 68, 0.03) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(68, 170, 68, 0.02) 0%, transparent 50%)
+          radial-gradient(circle at 20% 30%, rgba(100, 150, 200, 0.03) 0%, transparent 50%),
+          radial-gradient(circle at 80% 70%, rgba(100, 150, 200, 0.02) 0%, transparent 50%)
         `,
         pointerEvents: 'none',
       }} />
@@ -218,8 +224,8 @@ export default function BuilderMode({ onBack, editLevel }) {
         alignItems: 'center',
         gap: 12,
         padding: '14px 20px',
-        background: 'linear-gradient(180deg, rgba(20, 40, 20, 0.95) 0%, rgba(15, 30, 15, 0.95) 100%)',
-        borderBottom: '2px solid rgba(68, 170, 68, 0.3)',
+        background: 'linear-gradient(180deg, rgba(30, 30, 30, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%)',
+        borderBottom: `2px solid ${theme?.primaryColor ? `${theme.primaryColor}40` : 'rgba(100, 150, 200, 0.3)'}`,
         flexWrap: 'wrap',
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
         backdropFilter: 'blur(10px)',
@@ -229,16 +235,16 @@ export default function BuilderMode({ onBack, editLevel }) {
         <input
           value={levelName}
           onChange={e => setLevelName(e.target.value)}
-          placeholder="Forest name..."
+          placeholder="Level name..."
           style={{
             padding: '10px 16px',
-            background: 'linear-gradient(135deg, rgba(20, 35, 20, 0.9) 0%, rgba(15, 25, 15, 0.9) 100%)',
+            background: 'linear-gradient(135deg, rgba(30, 30, 30, 0.9) 0%, rgba(20, 20, 20, 0.9) 100%)',
             border: 'none',
             borderRadius: 10,
             color: '#ffffff',
             fontSize: 14,
             width: 240,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(68, 170, 68, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.4)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(100, 100, 100, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.4)',
             outline: 'none',
             fontWeight: '500',
           }}
@@ -250,8 +256,8 @@ export default function BuilderMode({ onBack, editLevel }) {
           Load
         </button>
 
-        <div style={{ display: 'flex', border: '1px solid #446644', borderRadius: 4, overflow: 'hidden', marginLeft: 4 }}>
-          <button onClick={() => setSubMode('build')} style={{ ...activeBarBtn(subMode === 'build'), borderRadius: 0, border: 'none', borderRight: '1px solid #446644' }}>
+        <div style={{ display: 'flex', border: '1px solid #666', borderRadius: 4, overflow: 'hidden', marginLeft: 4 }}>
+          <button onClick={() => setSubMode('build')} style={{ ...activeBarBtn(subMode === 'build'), borderRadius: 0, border: 'none', borderRight: '1px solid #666' }}>
             Build
           </button>
           <button onClick={() => setSubMode('edit')} style={{ ...activeBarBtn(subMode === 'edit'), borderRadius: 0, border: 'none' }}>
@@ -261,26 +267,26 @@ export default function BuilderMode({ onBack, editLevel }) {
 
         <button onClick={handleUndo} style={barBtn} disabled={undoStack.length === 0}>Undo</button>
         <button onClick={handleRedo} style={barBtn} disabled={redoStack.length === 0}>Redo</button>
-        <button onClick={() => setShowHazardZones(!showHazardZones)} style={{ ...barBtn, background: showHazardZones ? '#4a3a2a' : '#2a3a2a' }}>
+        <button onClick={() => setShowHazardZones(!showHazardZones)} style={{ ...barBtn, background: showHazardZones ? 'linear-gradient(145deg, #4a4a3a 0%, #3a3a2a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }}>
           {showHazardZones ? 'Zones ON' : 'Zones OFF'}
         </button>
-        <button onClick={() => setShowTooltips(!showTooltips)} style={{ ...barBtn, background: showTooltips ? '#2a4a4a' : '#2a3a2a' }}>
+        <button onClick={() => setShowTooltips(!showTooltips)} style={{ ...barBtn, background: showTooltips ? 'linear-gradient(145deg, #3a4a4a 0%, #2a3a3a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }}>
           {showTooltips ? 'Tips ON' : 'Tips OFF'}
         </button>
-        <button onClick={handleTest} style={{ ...barBtn, background: '#2a4a3a' }}>▶ Test</button>
-        <button onClick={handleClear} style={{ ...barBtn, background: '#4a2a2a' }}>Clear</button>
+        <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ Test</button>
+        <button onClick={handleClear} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}>Clear</button>
         <span style={{
-          color: '#a8f0a8',
+          color: theme?.primaryColor || '#aaaaaa',
           fontSize: 13,
           marginLeft: 'auto',
           padding: '8px 16px',
-          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(10, 20, 10, 0.3) 100%)',
+          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(20, 20, 20, 0.3) 100%)',
           borderRadius: 10,
-          border: '1px solid rgba(68, 170, 68, 0.2)',
+          border: `1px solid ${theme?.primaryColor ? `${theme.primaryColor}33` : 'rgba(100, 100, 100, 0.2)'}`,
           fontWeight: '500',
           fontFamily: 'monospace',
         }}>
-          {subMode === 'build' ? '🎨 Build Mode' : '✏️ Edit Mode'} • Tool: {selectedTool}
+          {theme?.emoji || '🎯'} {theme?.name || 'Theme'} • {subMode === 'build' ? '🎨 Build' : '✏️ Edit'} • {selectedTool}
         </span>
       </div>
 
@@ -295,6 +301,7 @@ export default function BuilderMode({ onBack, editLevel }) {
             onRightClick={subMode === 'build' ? handleGridRightClick : undefined}
             showHazardZones={showHazardZones}
             showTooltips={showTooltips}
+            theme={theme}
           />
         </div>
         <PropertiesPanel
@@ -333,8 +340,8 @@ export default function BuilderMode({ onBack, editLevel }) {
         >
           <div
             style={{
-              background: 'linear-gradient(160deg, rgba(20, 40, 20, 0.98) 0%, rgba(10, 25, 10, 0.98) 100%)',
-              border: '2px solid rgba(68, 170, 68, 0.4)',
+              background: 'linear-gradient(160deg, rgba(30, 30, 30, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%)',
+              border: `2px solid ${theme?.primaryColor ? `${theme.primaryColor}66` : 'rgba(100, 150, 200, 0.4)'}`,
               borderRadius: 20,
               padding: 40,
               minWidth: 500,
@@ -343,7 +350,7 @@ export default function BuilderMode({ onBack, editLevel }) {
               overflow: 'auto',
               boxShadow: `
                 0 25px 80px rgba(0, 0, 0, 0.9),
-                0 0 0 1px rgba(68, 170, 68, 0.2),
+                0 0 0 1px ${theme?.primaryColor ? `${theme.primaryColor}33` : 'rgba(100, 150, 200, 0.2)'},
                 inset 0 2px 0 rgba(255, 255, 255, 0.08)
               `,
               backdropFilter: 'blur(20px)',
@@ -351,17 +358,17 @@ export default function BuilderMode({ onBack, editLevel }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{
-              color: '#a8f0a8',
+              color: theme?.primaryColor || '#aaddff',
               margin: '0 0 28px 0',
               fontSize: 28,
               fontWeight: '800',
               textShadow: `
-                0 0 20px rgba(136, 221, 136, 0.5),
+                0 0 20px ${theme?.primaryColor ? `${theme.primaryColor}80` : 'rgba(170, 221, 255, 0.5)'},
                 0 4px 12px rgba(0, 0, 0, 0.8)
               `,
               letterSpacing: 1,
             }}>
-              🌲 Load Forest Level
+              {theme?.emoji || '📂'} Load {theme?.name || 'Level'}
             </h2>
             {(() => {
               const levels = loadLevels();
@@ -382,25 +389,25 @@ export default function BuilderMode({ onBack, editLevel }) {
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         padding: '16px 20px',
-                        background: 'linear-gradient(145deg, rgba(30, 55, 30, 0.6) 0%, rgba(20, 40, 20, 0.6) 100%)',
+                        background: 'linear-gradient(145deg, rgba(40, 40, 40, 0.6) 0%, rgba(30, 30, 30, 0.6) 100%)',
                         borderRadius: 12,
                         border: 'none',
                         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(100, 100, 100, 0.2)',
                         cursor: 'pointer',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(68, 170, 68, 0.25), 0 0 0 2px rgba(68, 170, 68, 0.4)';
+                        e.currentTarget.style.boxShadow = `0 8px 20px rgba(0, 0, 0, 0.5), 0 0 0 2px ${theme?.primaryColor ? `${theme.primaryColor}66` : 'rgba(100, 150, 200, 0.4)'}`;
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(100, 100, 100, 0.2)';
                       }}
                     >
                       <div>
                         <div style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', marginBottom: 4 }}>{level.name || 'Unnamed Level'}</div>
-                        <div style={{ color: '#99bb99', fontSize: 12, fontFamily: 'monospace' }}>
+                        <div style={{ color: '#aaaaaa', fontSize: 12, fontFamily: 'monospace' }}>
                           {level.missions?.length || 0} missions • {level.lives || 3} lives • {new Date(level.updatedAt || level.createdAt).toLocaleDateString()}
                         </div>
                       </div>
@@ -408,11 +415,11 @@ export default function BuilderMode({ onBack, editLevel }) {
                         onClick={() => handleLoadLevel(level)}
                         style={{
                           ...barBtn,
-                          background: '#2a4a3a',
+                          background: 'linear-gradient(145deg, #3a4a4a 0%, #2a3a3a 100%)',
                           padding: '8px 16px',
                         }}
-                        onMouseEnter={(e) => e.target.style.background = '#3a5a4a'}
-                        onMouseLeave={(e) => e.target.style.background = '#2a4a3a'}
+                        onMouseEnter={(e) => e.target.style.background = 'linear-gradient(145deg, #4a5a5a 0%, #3a4a4a 100%)'}
+                        onMouseLeave={(e) => e.target.style.background = 'linear-gradient(145deg, #3a4a4a 0%, #2a3a3a 100%)'}
                       >
                         Load
                       </button>

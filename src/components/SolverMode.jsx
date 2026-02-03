@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react';
 import Grid from './Grid';
 import { findTile, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
 import { getAllHazardZones, floodFillWater } from '../engine/hazards';
 import { checkAllMissions } from '../engine/missions';
-import { DIRECTIONS, GRID_COLS, GRID_ROWS, DEFAULT_INVENTORY_CAPACITY, ITEM_TYPES } from '../utils/constants';
+import { DIRECTIONS, GRID_COLS, GRID_ROWS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { ThemeContext } from '../App';
+import { InteractionEngine } from '../engine/interactionEngine';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -102,38 +104,38 @@ function BucketIcon({ size = 24, filled = false }) {
 
     ctx.clearRect(0, 0, size, size);
 
-    // Bucket body (trapezoid) - main fill
-    ctx.fillStyle = '#6699cc';
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-    ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-    ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-    ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
-    ctx.closePath();
-    ctx.fill();
-
-    // Shadow/depth on right side
-    ctx.fillStyle = '#4477aa';
-    ctx.beginPath();
-    ctx.moveTo(cx + s * 0.3, cy - s * 0.6);
-    ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-    ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-    ctx.lineTo(cx + s * 0.3, cy + s * 0.7);
-    ctx.closePath();
-    ctx.fill();
-
-    // Highlight on left side
-    ctx.fillStyle = '#88bbee';
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-    ctx.lineTo(cx - s * 0.3, cy - s * 0.6);
-    ctx.lineTo(cx - s * 0.2, cy + s * 0.3);
-    ctx.lineTo(cx - s * 0.6, cy + s * 0.3);
-    ctx.closePath();
-    ctx.fill();
-
-    // Water if filled
     if (filled) {
+      // FILLED BUCKET - Blue with water
+      ctx.fillStyle = '#6699cc';
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+      ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
+      ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
+      ctx.closePath();
+      ctx.fill();
+
+      // Shadow/depth on right side
+      ctx.fillStyle = '#4477aa';
+      ctx.beginPath();
+      ctx.moveTo(cx + s * 0.3, cy - s * 0.6);
+      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+      ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
+      ctx.lineTo(cx + s * 0.3, cy + s * 0.7);
+      ctx.closePath();
+      ctx.fill();
+
+      // Highlight on left side
+      ctx.fillStyle = '#88bbee';
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+      ctx.lineTo(cx - s * 0.3, cy - s * 0.6);
+      ctx.lineTo(cx - s * 0.2, cy + s * 0.3);
+      ctx.lineTo(cx - s * 0.6, cy + s * 0.3);
+      ctx.closePath();
+      ctx.fill();
+
+      // Water
       ctx.fillStyle = 'rgba(100, 180, 255, 0.6)';
       ctx.beginPath();
       ctx.moveTo(cx - s * 0.7, cy - s * 0.3);
@@ -142,31 +144,59 @@ function BucketIcon({ size = 24, filled = false }) {
       ctx.lineTo(cx - s * 0.55, cy + s * 0.6);
       ctx.closePath();
       ctx.fill();
+
+      // Rim (top edge)
+      ctx.strokeStyle = '#334455';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+      ctx.stroke();
+
+      // Handle
+      ctx.strokeStyle = '#556677';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
+      ctx.stroke();
+
+      // Handle connection points
+      ctx.fillStyle = '#556677';
+      ctx.beginPath();
+      ctx.arc(cx - s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx + s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // EMPTY BUCKET - Simple gray outline
+      ctx.strokeStyle = '#888888';
+      ctx.lineWidth = 2;
+
+      // Bucket outline (trapezoid)
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+      ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
+      ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Handle
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
+      ctx.stroke();
+
+      // Handle connection points
+      ctx.fillStyle = '#888888';
+      ctx.beginPath();
+      ctx.arc(cx - s * 0.4, cy - s * 0.6, s * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx + s * 0.4, cy - s * 0.6, s * 0.1, 0, Math.PI * 2);
+      ctx.fill();
     }
-
-    // Rim (top edge)
-    ctx.strokeStyle = '#334455';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-    ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-    ctx.stroke();
-
-    // Handle
-    ctx.strokeStyle = '#556677';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
-    ctx.stroke();
-
-    // Handle connection points
-    ctx.fillStyle = '#556677';
-    ctx.beginPath();
-    ctx.arc(cx - s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx + s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
-    ctx.fill();
   }, [size, filled]);
 
   return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
@@ -250,6 +280,9 @@ function isMissionDone(mission, gs, grid) {
 }
 
 export default function SolverMode({ level, onBack }) {
+  const theme = useContext(ThemeContext);
+  const interactionEngine = useMemo(() => theme ? new InteractionEngine(theme) : null, [theme]);
+
   const [grid, setGrid] = useState(() => convertLegacyItems(level.grid));
   const startPos = findTile(level.grid, 'campfire') || { x: 1, y: 1 };
   const [playerPos, setPlayerPos] = useState(() => ({ ...startPos }));
@@ -360,10 +393,11 @@ export default function SolverMode({ level, onBack }) {
       ...prev,
       inventory: prev.inventory.filter((_, i) => i !== index),
     }));
+    const ITEM_TYPES = theme?.getItemTypes() || {};
     const itemDef = ITEM_TYPES[dropped.itemType];
     showMessage(`Dropped: ${itemDef?.emoji || ''} ${itemDef?.label || dropped.itemType}`);
     setDropMenuOpen(false);
-  }, [showMessage]);
+  }, [showMessage, theme]);
 
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;
@@ -384,6 +418,7 @@ export default function SolverMode({ level, onBack }) {
       inventory: [...prev.inventory, itemObj],
       collectedItems: [...prev.collectedItems, itemType],
     }));
+    const ITEM_TYPES = theme?.getItemTypes() || {};
     const itemDef = ITEM_TYPES[itemType];
     // Show custom canvas icons for wood and bucket
     if (itemType === 'wood') {
@@ -1253,6 +1288,7 @@ export default function SolverMode({ level, onBack }) {
                 Inv:
               </div>
               {gameState.inventory.slice(0, 5).map((item, i) => {
+                const ITEM_TYPES = theme?.getItemTypes() || {};
                 const def = ITEM_TYPES[item.itemType];
                 const isWood = item.itemType === 'wood';
                 const isBucket = item.itemType === 'bucket';
@@ -1370,6 +1406,7 @@ export default function SolverMode({ level, onBack }) {
             onHoldEnd={() => setMouseHoldState(null)}
             interactionTarget={(interactionState || mouseHoldState)?.targetPos}
             interactionProgress={(interactionState || mouseHoldState)?.progress || 0}
+            theme={theme}
           />
 
           {/* Inline interaction menu next to player */}
@@ -1514,6 +1551,7 @@ export default function SolverMode({ level, onBack }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {gameState.inventory.map((item, idx) => {
+                  const ITEM_TYPES = theme?.getItemTypes() || {};
                   const itemDef = ITEM_TYPES[item.itemType];
                   const label = itemDef?.label || item.itemType;
                   const isWood = item.itemType === 'wood';

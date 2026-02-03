@@ -1,13 +1,17 @@
-import { TILE_TYPES, CONFIG_HELP } from '../utils/constants';
+import { useContext } from 'react';
+import { ThemeContext } from '../App';
 
-const HelpText = ({ type, field, show }) => {
+const HelpText = ({ type, field, show, CONFIG_HELP }) => {
   if (!show) return null;
-  const help = CONFIG_HELP[type]?.[field];
+  const help = CONFIG_HELP?.[type]?.[field];
   if (!help) return null;
   return <p style={{ color: '#556644', fontSize: 10, margin: '2px 0 0', lineHeight: 1.3 }}>{help}</p>;
 };
 
 export default function PropertiesPanel({ grid, selectedCell, onConfigChange, showHelp = true }) {
+  const theme = useContext(ThemeContext);
+  const TILE_TYPES = theme?.getTileTypes() || {};
+  const CONFIG_HELP = theme?.getConfigHelp() || {};
   if (!selectedCell) {
     return (
       <div style={{ width: 220, background: '#1a2a1a', padding: 10, borderLeft: '2px solid #335533' }}>
@@ -50,13 +54,13 @@ export default function PropertiesPanel({ grid, selectedCell, onConfigChange, sh
           <input type="checkbox" checked={config.needsKey !== false} onChange={e => update('needsKey', e.target.checked)} />
           {' '}Requires Key
         </label>
-        <HelpText type="car" field="needsKey" show={showHelp} />
+        <HelpText type="car" field="needsKey" show={showHelp} CONFIG_HELP={CONFIG_HELP} />
       </>)}
 
       {cell.type === 'friend' && (<>
         <label style={labelStyle}>Friend Name</label>
         <input style={inputStyle} value={config.name || ''} onChange={e => update('name', e.target.value)} placeholder="e.g. Alice" />
-        <HelpText type="friend" field="name" show={showHelp} />
+        <HelpText type="friend" field="name" show={showHelp} CONFIG_HELP={CONFIG_HELP} />
       </>)}
     </div>
   );

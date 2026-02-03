@@ -29,3 +29,21 @@ export function deleteLevel(id) {
 export function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
+
+// Migrate old levels to add themeId
+export function migrateLevels() {
+  const levels = loadLevels();
+  let needsSave = false;
+
+  levels.forEach(level => {
+    if (!level.themeId) {
+      level.themeId = 'forest'; // Default to forest theme
+      needsSave = true;
+    }
+  });
+
+  if (needsSave) {
+    saveLevels(levels);
+    console.log('Migrated', levels.length, 'levels to include themeId');
+  }
+}

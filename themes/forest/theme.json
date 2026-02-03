@@ -1,0 +1,11 @@
+{
+  "id": "forest",
+  "name": "Lost in the Forest",
+  "description": "Escape the mystical forest",
+  "emoji": "🌲",
+  "version": "1.0.0",
+  "author": "Original",
+  "primaryColor": "#68aa44",
+  "backgroundColor": "#0a1f0a",
+  "accentColor": "#a8f0a8"
+}
