@@ -361,13 +361,11 @@ export default function BuilderMode({ onBack, editLevel }) {
                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.border = '2px solid #66aa66';
-                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.borderColor = '#66aa66';
                         e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 170, 102, 0.2)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.border = '2px solid #446644';
-                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.borderColor = '#446644';
                         e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
                       }}
                     >

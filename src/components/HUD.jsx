@@ -16,22 +16,30 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
         </span>
       </div>
 
-      {/* Message */}
-      {message && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(68, 170, 68, 0.95) 0%, rgba(42, 122, 42, 0.95) 100%)',
-          padding: '10px 20px',
-          borderRadius: 8,
-          color: '#fff',
-          fontSize: 15,
-          fontWeight: 'bold',
-          border: '2px solid #66aa66',
-          boxShadow: '0 4px 16px rgba(68, 170, 68, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-          textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
-        }}>
-          {message}
-        </div>
-      )}
+      {/* Message - Fixed space to prevent layout shift */}
+      <div style={{
+        minWidth: 300,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: 43,
+      }}>
+        {message && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(68, 170, 68, 0.95) 0%, rgba(42, 122, 42, 0.95) 100%)',
+            padding: '10px 20px',
+            borderRadius: 8,
+            color: '#fff',
+            fontSize: 15,
+            fontWeight: 'bold',
+            border: '2px solid #66aa66',
+            boxShadow: '0 4px 16px rgba(68, 170, 68, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+          }}>
+            {message}
+          </div>
+        )}
+      </div>
 
       {/* Missions */}
       <div style={{

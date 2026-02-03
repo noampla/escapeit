@@ -41,11 +41,9 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
         style={{ ...btnStyle, marginBottom: 30 }}
         onMouseEnter={(e) => {
           e.target.style.background = 'linear-gradient(135deg, #3a5a3a 0%, #2a4a2a 100%)';
-          e.target.style.transform = 'translateY(-2px)';
         }}
         onMouseLeave={(e) => {
           e.target.style.background = 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)';
-          e.target.style.transform = 'translateY(0)';
         }}
       >
         ← Back to Menu
@@ -87,13 +85,11 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
             }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.border = '2px solid #66aa66';
-                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.borderColor = '#66aa66';
                 e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 170, 102, 0.2)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.border = '2px solid #446644';
-                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.borderColor = '#446644';
                 e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
               }}
             >

@@ -168,13 +168,11 @@ export default function Toolbar({ selected, onSelect }) {
                   onMouseEnter={(e) => {
                     if (selected !== type) {
                       e.target.style.background = 'linear-gradient(135deg, #3a4a3a 0%, #2a3a2a 100%)';
-                      e.target.style.transform = 'translateX(2px)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (selected !== type) {
                       e.target.style.background = 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)';
-                      e.target.style.transform = 'translateX(0)';
                     }
                   }}
                 >
