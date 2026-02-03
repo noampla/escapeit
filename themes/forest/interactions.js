@@ -61,8 +61,11 @@ export const INTERACTIONS = {
 
   'build-raft': {
     label: 'Build Raft',
-    duration: 1500,
-    requirements: { inventory: ['rope', 'wood'], tile: 'water' },
+    duration: 2000,
+    requirements: {
+      inventory: ['rope', 'wood'],
+      tileAny: ['ground', 'campfire', 'raft']  // Can build on these tiles
+    },
     execute: (gameState, grid, x, y) => {
       const ropeIdx = findItemIndex(gameState.inventory, 'rope');
       const woodIdx = findItemIndex(gameState.inventory, 'wood');
@@ -71,21 +74,59 @@ export const INTERACTIONS = {
         return { success: false, message: 'Need rope and wood!' };
       }
 
-      // Find all connected water tiles
-      const waterCells = floodFillWater(grid, x, y);
-
-      // Convert all water to raft
-      for (const cell of waterCells) {
-        grid[cell.y][cell.x] = { type: 'raft', config: {} };
-      }
-
-      // Remove rope and wood from inventory
+      // Remove rope and wood, add raft to inventory
       const newInventory = gameState.inventory.filter((_, i) => i !== ropeIdx && i !== woodIdx);
+      newInventory.push({ itemType: 'raft', filled: false });
       gameState.inventory = newInventory;
 
       return {
         success: true,
-        message: `Built a raft! (${waterCells.length} tiles)`,
+        message: 'Built a raft! You can now place it on water.',
+        modifyInventory: true
+      };
+    }
+  },
+
+  'place-raft': {
+    label: 'Place Raft',
+    duration: 1000,
+    requirements: { inventory: ['raft'], tile: 'water' },
+    execute: (gameState, grid, x, y) => {
+      const raftIdx = findItemIndex(gameState.inventory, 'raft');
+
+      if (raftIdx === -1) {
+        return { success: false, message: 'No raft in inventory!' };
+      }
+
+      // Place raft on water
+      grid[y][x] = { type: 'raft', config: {} };
+
+      // Remove raft from inventory
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== raftIdx);
+
+      return {
+        success: true,
+        message: 'Raft placed! You can walk on it.',
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
+  'pickup-raft': {
+    label: 'Pick Up Raft',
+    duration: 1000,
+    requirements: { tile: 'raft' },
+    execute: (gameState, grid, x, y) => {
+      // Remove raft from grid
+      grid[y][x] = { type: 'water', config: {} };
+
+      // Add raft to inventory
+      gameState.inventory.push({ itemType: 'raft', filled: false });
+
+      return {
+        success: true,
+        message: 'Picked up raft!',
         modifyGrid: true,
         modifyInventory: true
       };

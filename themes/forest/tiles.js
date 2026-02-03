@@ -127,6 +127,15 @@ export const TILE_TYPES = {
     tooltip: 'Collectible wood. Press F to pick up. Combine with rope to build raft.',
     walkable: true
   },
+  'item-raft': {
+    label: 'Raft',
+    color: '#8b6914',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'raft',
+    tooltip: 'Collectible raft. Press F to pick up. Place on water to travel.',
+    walkable: true
+  },
 
   friend: {
     label: 'Lost Friend',

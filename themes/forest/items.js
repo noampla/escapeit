@@ -49,6 +49,12 @@ export const ITEM_TYPES = {
     draw: 'wood',
     description: 'Combine with rope to build rafts'
   },
+  raft: {
+    label: 'Raft',
+    emoji: '🛶',
+    color: '#8b6914',
+    description: 'Place on water to travel across'
+  },
 };
 
 // Custom rendering for bucket

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'r
 import Grid from './Grid';
 import { findTile, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
-import { getAllHazardZones, floodFillWater } from '../engine/hazards';
+import { getAllHazardZones } from '../engine/hazards';
 import { checkAllMissions } from '../engine/missions';
 import { DIRECTIONS, GRID_COLS, GRID_ROWS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 import { ThemeContext } from '../App';
@@ -319,6 +319,7 @@ export default function SolverMode({ level, onBack }) {
   const lastDirRef = useRef('right');
   const playerDirectionRef = useRef('down');
   const keysDown = useRef(new Set());
+  const keyPressOrder = useRef([]); // Track order of key presses
   const exitMessageShownRef = useRef(false);
   const interactionStateRef = useRef(interactionState);
 
@@ -370,6 +371,7 @@ export default function SolverMode({ level, onBack }) {
     setStartTime(Date.now());
     setElapsedTime(0);
     keysDown.current.clear();
+    keyPressOrder.current = [];
     exitMessageShownRef.current = false;
   }, [level, startPos]);
 
@@ -402,7 +404,7 @@ export default function SolverMode({ level, onBack }) {
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;
     if (currentGS.inventory.length >= maxInventory) {
-      showMessage('Inventory full! Drop an item first (Q).');
+      showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
       return false;
     }
 
@@ -444,7 +446,7 @@ export default function SolverMode({ level, onBack }) {
     const currentGrid = gridRef.current;
     const lastDir = lastDirRef.current;
 
-    const interactable = ['tree', 'water', 'raft', 'fire', 'friend'];
+    const interactable = ['tree', 'water', 'raft', 'fire', 'friend', 'bear'];
     const itemTilePattern = /^item-/;
 
     const adjacent = Object.entries(DIRECTIONS).map(([dir, dd]) => ({
@@ -620,17 +622,36 @@ export default function SolverMode({ level, onBack }) {
     else if (interactionType === 'build-raft') {
       const ropeIdx = findItemIndex(currentGS.inventory, 'rope');
       const woodIdx = findItemIndex(currentGS.inventory, 'wood');
-      const newGrid = cloneGrid(currentGrid);
-      const waterCells = floodFillWater(newGrid, targetPos.x, targetPos.y);
-      for (const wc of waterCells) {
-        newGrid[wc.y][wc.x] = { type: 'raft', config: {} };
-      }
-      setGrid(newGrid);
       setGameState(prev => {
         const newInv = prev.inventory.filter((_, i) => i !== ropeIdx && i !== woodIdx);
+        newInv.push({ itemType: 'raft', filled: false });
         return { ...prev, inventory: newInv };
       });
-      showMessage(`Built a raft! (${waterCells.length} tiles)`);
+      showMessage('Built a raft! You can now place it on water.');
+    }
+
+    else if (interactionType === 'place-raft') {
+      const raftIdx = findItemIndex(currentGS.inventory, 'raft');
+      const newGrid = cloneGrid(currentGrid);
+      newGrid[targetPos.y][targetPos.x] = { type: 'raft', config: {} };
+      setGrid(newGrid);
+      setGameState(prev => {
+        const newInv = prev.inventory.filter((_, i) => i !== raftIdx);
+        return { ...prev, inventory: newInv };
+      });
+      showMessage('Raft placed! You can walk on it.');
+    }
+
+    else if (interactionType === 'pickup-raft') {
+      const newGrid = cloneGrid(currentGrid);
+      newGrid[targetPos.y][targetPos.x] = { type: 'water', config: {} };
+      setGrid(newGrid);
+      setGameState(prev => {
+        const newInv = [...prev.inventory];
+        newInv.push({ itemType: 'raft', filled: false });
+        return { ...prev, inventory: newInv };
+      });
+      showMessage('Picked up raft!');
     }
 
     else if (interactionType === 'extinguish-fire') {
@@ -659,8 +680,25 @@ export default function SolverMode({ level, onBack }) {
       showMessage(`Rescued: ${friendName}!`);
     }
 
+    else if (interactionType === 'defeat-bear') {
+      const knifeIdx = findItemIndex(currentGS.inventory, 'knife');
+      const newGrid = cloneGrid(currentGrid);
+      newGrid[targetPos.y][targetPos.x] = { type: 'ground', config: {} };
+      setGrid(newGrid);
+      setGameState(prev => {
+        const newInv = prev.inventory.filter((_, i) => i !== knifeIdx);
+        newInv.push({ itemType: 'sweater' });
+        return {
+          ...prev,
+          inventory: newInv,
+          collectedItems: [...prev.collectedItems, 'sweater'],
+        };
+      });
+      showMessage('Defeated the bear! Got a sweater.');
+    }
+
     cancelInteraction();
-  }, [showMessage, maxInventory, cancelInteraction]);
+  }, [showMessage, cancelInteraction]);
 
   const doPickup = useCallback(() => {
     const currentGrid = gridRef.current;
@@ -679,7 +717,7 @@ export default function SolverMode({ level, onBack }) {
     }
 
     showMessage('No item here to pick up. Stand on an item and press F.');
-  }, [showMessage, pickUpItem, maxInventory]);
+  }, [showMessage, pickUpItem]);
 
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;
@@ -708,6 +746,16 @@ export default function SolverMode({ level, onBack }) {
     // Collect all possible actions for this tile
     const possibleActions = [];
 
+    // First check current tile for building raft
+    const currentTile = currentGrid[playerPosRef.current.y][playerPosRef.current.x];
+    if ((currentTile.type === 'ground' || currentTile.type === 'campfire' || currentTile.type === 'raft') &&
+        hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
+      possibleActions.push({
+        label: 'Build raft',
+        action: () => startInteraction('build-raft', { x: playerPosRef.current.x, y: playerPosRef.current.y }),
+      });
+    }
+
     if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
       possibleActions.push({
         label: 'Cut tree',
@@ -715,7 +763,7 @@ export default function SolverMode({ level, onBack }) {
       });
     }
 
-    if (c.type === 'water' || c.type === 'raft') {
+    if (c.type === 'water') {
       const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
       if (bucketIdx >= 0) {
         possibleActions.push({
@@ -723,12 +771,28 @@ export default function SolverMode({ level, onBack }) {
           action: () => startInteraction('fill-bucket', p),
         });
       }
-      if (c.type === 'water' && hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
+      // Place raft on water
+      if (hasItemType(currentGS.inventory, 'raft')) {
         possibleActions.push({
-          label: 'Build raft',
-          action: () => startInteraction('build-raft', p),
+          label: 'Place raft',
+          action: () => startInteraction('place-raft', p),
         });
       }
+    }
+
+    if (c.type === 'raft') {
+      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
+      if (bucketIdx >= 0) {
+        possibleActions.push({
+          label: 'Fill bucket',
+          action: () => startInteraction('fill-bucket', p),
+        });
+      }
+      // Pick up raft
+      possibleActions.push({
+        label: 'Pick up raft',
+        action: () => startInteraction('pickup-raft', p),
+      });
     }
 
     if (c.type === 'fire') {
@@ -745,6 +809,13 @@ export default function SolverMode({ level, onBack }) {
       possibleActions.push({
         label: 'Rescue friend',
         action: () => startInteraction('rescue-friend', p),
+      });
+    }
+
+    if (c.type === 'bear' && hasItemType(currentGS.inventory, 'knife')) {
+      possibleActions.push({
+        label: 'Defeat bear',
+        action: () => startInteraction('defeat-bear', p),
       });
     }
 
@@ -802,27 +873,10 @@ export default function SolverMode({ level, onBack }) {
     const currentGS = gameStateRef.current;
 
     if (targetCell.type === 'bear') {
-      if (hasItemType(currentGS.inventory, 'knife')) {
-        const knifeIdx = findItemIndex(currentGS.inventory, 'knife');
-        const newGrid = cloneGrid(currentGrid);
-        newGrid[ny][nx] = { type: 'ground', config: {} };
-        setGrid(newGrid);
-        setGameState(prev => {
-          const newInv = prev.inventory.filter((_, i) => i !== knifeIdx);
-          newInv.push({ itemType: 'sweater' });
-          return {
-            ...prev,
-            inventory: newInv,
-            collectedItems: [...prev.collectedItems, 'sweater'],
-          };
-        });
-        showMessage('Defeated the bear! Got a sweater.');
-        setPlayerPos({ x: nx, y: ny });
-      } else {
-        const remaining = loseLife();
-        if (remaining > 0) {
-          showMessage(`A bear blocks your path! You need a knife. Lives: ${remaining}`);
-        }
+      // Bear always blocks movement - must be defeated with interaction (hold E)
+      const remaining = loseLife();
+      if (remaining > 0) {
+        showMessage(`A bear attacks! Hold E near the bear with a knife to defeat it. Lives: ${remaining}`);
       }
       return;
     }
@@ -845,8 +899,29 @@ export default function SolverMode({ level, onBack }) {
     }
 
     if (targetCell.type === 'water') {
-      showMessage("Can't swim! Build a raft (Rope + Wood) nearby.");
-      return;
+      // Check if standing on a raft - if so, move the raft with you
+      const currentCell = currentGrid[prev.y][prev.x];
+      if (currentCell.type === 'raft') {
+        const newGrid = cloneGrid(currentGrid);
+        // Move raft from current position to water
+        newGrid[prev.y][prev.x] = { type: 'water', config: {} };
+        newGrid[ny][nx] = { type: 'raft', config: {} };
+        setGrid(newGrid);
+        setPlayerPos({ x: nx, y: ny });
+        setMoveCount(prev => prev + 1);
+
+        setRevealedTiles(prev => {
+          const newRevealed = new Set(prev);
+          newRevealed.add(`${nx},${ny}`);
+          const adjacent = getAdjacentPositions(nx, ny);
+          adjacent.forEach(pos => newRevealed.add(pos.key));
+          return newRevealed;
+        });
+        return;
+      } else {
+        showMessage("Can't swim! Place a raft on the water.");
+        return;
+      }
     }
 
     if (targetCell.type === 'fire') {
@@ -858,7 +933,14 @@ export default function SolverMode({ level, onBack }) {
     }
 
     if (canMoveTo(currentGrid, nx, ny)) {
-      setPlayerPos({ x: nx, y: ny });
+      // Check if moving from raft to non-water tile - leave raft behind
+      const currentCell = currentGrid[prev.y][prev.x];
+      if (currentCell.type === 'raft' && targetCell.type !== 'water') {
+        // Moving from raft to ground/other - raft stays as raft
+        setPlayerPos({ x: nx, y: ny });
+      } else {
+        setPlayerPos({ x: nx, y: ny });
+      }
       setMoveCount(prev => prev + 1);
 
       setRevealedTiles(prev => {
@@ -885,6 +967,14 @@ export default function SolverMode({ level, onBack }) {
       }
 
       keysDown.current.add(key);
+
+      // Track order of arrow/WASD keys for movement priority
+      const movementKeys = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'];
+      if (movementKeys.includes(key)) {
+        // Remove if already in list, then add to end (most recent)
+        keyPressOrder.current = keyPressOrder.current.filter(k => k !== key);
+        keyPressOrder.current.push(key);
+      }
 
       // Handle inline menu number selection
       if (inlineMenu && ['1', '2', '3', '4', '5'].includes(key)) {
@@ -923,11 +1013,24 @@ export default function SolverMode({ level, onBack }) {
         setDropMenuOpen(prev => !prev);
         return;
       }
+
+      // Number keys to drop items when drop menu is open
+      if (dropMenuOpen && ['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(key)) {
+        const currentGS = gameStateRef.current;
+        const itemIndex = parseInt(key) - 1;
+        if (itemIndex < currentGS.inventory.length) {
+          dropItem(itemIndex);
+        }
+        return;
+      }
     };
 
     const onKeyUp = (e) => {
       const key = e.key.toLowerCase();
       keysDown.current.delete(key);
+
+      // Remove from key press order
+      keyPressOrder.current = keyPressOrder.current.filter(k => k !== key);
 
       // Handle inline menu action release
       if (inlineMenu && ['1', '2', '3', '4', '5'].includes(key)) {
@@ -1010,21 +1113,38 @@ export default function SolverMode({ level, onBack }) {
       // Skip item pickups
       if (c.type.startsWith('item-')) return;
 
-      // Collect possible actions
+      // Collect possible actions - MUST MATCH ORDER IN doInteract()
       const possibleActions = [];
+
+      // First check current tile for building raft
+      const currentTile = currentGrid[pos.y][pos.x];
+      if ((currentTile.type === 'ground' || currentTile.type === 'campfire' || currentTile.type === 'raft') &&
+          hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
+        possibleActions.push(() => startInteraction('build-raft', { x: pos.x, y: pos.y }));
+      }
 
       if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
         possibleActions.push(() => startInteraction('cut-tree', p));
       }
 
-      if (c.type === 'water' || c.type === 'raft') {
+      if (c.type === 'water') {
         const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
         if (bucketIdx >= 0) {
           possibleActions.push(() => startInteraction('fill-bucket', p));
         }
-        if (c.type === 'water' && hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
-          possibleActions.push(() => startInteraction('build-raft', p));
+        // Place raft on water
+        if (hasItemType(currentGS.inventory, 'raft')) {
+          possibleActions.push(() => startInteraction('place-raft', p));
         }
+      }
+
+      if (c.type === 'raft') {
+        const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
+        if (bucketIdx >= 0) {
+          possibleActions.push(() => startInteraction('fill-bucket', p));
+        }
+        // Pick up raft
+        possibleActions.push(() => startInteraction('pickup-raft', p));
       }
 
       if (c.type === 'fire') {
@@ -1036,6 +1156,10 @@ export default function SolverMode({ level, onBack }) {
 
       if (c.type === 'friend') {
         possibleActions.push(() => startInteraction('rescue-friend', p));
+      }
+
+      if (c.type === 'bear' && hasItemType(currentGS.inventory, 'knife')) {
+        possibleActions.push(() => startInteraction('defeat-bear', p));
       }
 
       // Only proceed if there are multiple actions
@@ -1062,11 +1186,30 @@ export default function SolverMode({ level, onBack }) {
       if (now - lastMoveRef.current < MOVE_COOLDOWN) return;
 
       const keys = keysDown.current;
+
+      // Find the most recently pressed direction key that's still held
       let dir = null;
-      if (keys.has('arrowup') || keys.has('w')) dir = 'up';
-      else if (keys.has('arrowdown') || keys.has('s')) dir = 'down';
-      else if (keys.has('arrowleft') || keys.has('a')) dir = 'left';
-      else if (keys.has('arrowright') || keys.has('d')) dir = 'right';
+      const order = keyPressOrder.current;
+
+      // Check from most recent to oldest
+      for (let i = order.length - 1; i >= 0; i--) {
+        const key = order[i];
+        if (keys.has(key)) {
+          if (key === 'arrowup' || key === 'w') {
+            dir = 'up';
+            break;
+          } else if (key === 'arrowdown' || key === 's') {
+            dir = 'down';
+            break;
+          } else if (key === 'arrowleft' || key === 'a') {
+            dir = 'left';
+            break;
+          } else if (key === 'arrowright' || key === 'd') {
+            dir = 'right';
+            break;
+          }
+        }
+      }
 
       if (dir) {
         doMove(dir);
@@ -1513,16 +1656,12 @@ export default function SolverMode({ level, onBack }) {
       {dropMenuOpen && !gameOver && (
         <div style={{
           position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(8px)',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           zIndex: 200,
-        }}
-        onClick={() => setDropMenuOpen(false)}
-        >
+          pointerEvents: 'auto',
+        }}>
           <div
             style={{
               background: 'linear-gradient(160deg, rgba(30, 45, 30, 0.98) 0%, rgba(20, 35, 20, 0.98) 100%)',
@@ -1533,17 +1672,25 @@ export default function SolverMode({ level, onBack }) {
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9), 0 0 0 2px rgba(68, 170, 68, 0.4)',
               backdropFilter: 'blur(20px)',
             }}
-            onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{
               color: '#a8f0a8',
-              margin: '0 0 20px 0',
+              margin: '0 0 8px 0',
               fontSize: 20,
               fontWeight: '800',
               textAlign: 'center',
             }}>
               Drop Item
             </h2>
+            <div style={{
+              color: '#88cc88',
+              fontSize: 12,
+              textAlign: 'center',
+              marginBottom: 16,
+              fontWeight: '500',
+            }}>
+              Click or press number key
+            </div>
             {gameState.inventory.length === 0 ? (
               <div style={{ color: '#a8e8a8', fontSize: 14, padding: 20, textAlign: 'center' }}>
                 Inventory is empty
@@ -1579,16 +1726,28 @@ export default function SolverMode({ level, onBack }) {
                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                       }}
                       onMouseEnter={(e) => {
-                        e.target.style.background = 'rgba(50, 75, 50, 0.8)';
-                        e.target.style.transform = 'translateX(4px)';
+                        e.currentTarget.style.background = 'rgba(50, 75, 50, 0.8)';
+                        e.currentTarget.style.transform = 'translateX(4px)';
                       }}
                       onMouseLeave={(e) => {
-                        e.target.style.background = 'rgba(40, 55, 40, 0.6)';
-                        e.target.style.transform = 'translateX(0)';
+                        e.currentTarget.style.background = 'rgba(40, 55, 40, 0.6)';
+                        e.currentTarget.style.transform = 'translateX(0)';
                       }}
                     >
+                      <span style={{
+                        background: 'rgba(100, 150, 100, 0.4)',
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 'bold',
+                        color: '#d0f0d0',
+                        minWidth: 24,
+                        textAlign: 'center',
+                      }}>
+                        {idx + 1}
+                      </span>
                       {isWood ? <WoodIcon size={24} /> : isBucket ? <BucketIcon size={24} filled={item.filled} /> : <span style={{ fontSize: 18 }}>{emoji}</span>}
-                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flex: 1 }}>
                         <span>{label}</span>
                         {isBucket && (
                           <span style={{
