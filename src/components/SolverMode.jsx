@@ -88,6 +88,90 @@ function WoodIcon({ size = 24 }) {
   return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
 }
 
+// Canvas component to draw bucket icon matching the map
+function BucketIcon({ size = 24, filled = false }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const cx = size / 2;
+    const cy = size / 2;
+    const s = size * 0.35;
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Bucket body (trapezoid) - main fill
+    ctx.fillStyle = '#6699cc';
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+    ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+    ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
+    ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
+    ctx.closePath();
+    ctx.fill();
+
+    // Shadow/depth on right side
+    ctx.fillStyle = '#4477aa';
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.3, cy - s * 0.6);
+    ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+    ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
+    ctx.lineTo(cx + s * 0.3, cy + s * 0.7);
+    ctx.closePath();
+    ctx.fill();
+
+    // Highlight on left side
+    ctx.fillStyle = '#88bbee';
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+    ctx.lineTo(cx - s * 0.3, cy - s * 0.6);
+    ctx.lineTo(cx - s * 0.2, cy + s * 0.3);
+    ctx.lineTo(cx - s * 0.6, cy + s * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Water if filled
+    if (filled) {
+      ctx.fillStyle = 'rgba(100, 180, 255, 0.6)';
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.7, cy - s * 0.3);
+      ctx.lineTo(cx + s * 0.7, cy - s * 0.3);
+      ctx.lineTo(cx + s * 0.55, cy + s * 0.6);
+      ctx.lineTo(cx - s * 0.55, cy + s * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Rim (top edge)
+    ctx.strokeStyle = '#334455';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
+    ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
+    ctx.stroke();
+
+    // Handle
+    ctx.strokeStyle = '#556677';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
+    ctx.stroke();
+
+    // Handle connection points
+    ctx.fillStyle = '#556677';
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  }, [size, filled]);
+
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
+}
+
 function convertLegacyItems(grid) {
   const newGrid = cloneGrid(grid);
   for (let y = 0; y < GRID_ROWS; y++) {
@@ -190,6 +274,7 @@ export default function SolverMode({ level, onBack }) {
   const [moveCount, setMoveCount] = useState(0);
   const [startTime, setStartTime] = useState(Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [inlineMenu, setInlineMenu] = useState(null); // { actions: [{label, action, key}] }
 
   const messageTimerRef = useRef(null);
   const gridRef = useRef(grid);
@@ -300,11 +385,17 @@ export default function SolverMode({ level, onBack }) {
       collectedItems: [...prev.collectedItems, itemType],
     }));
     const itemDef = ITEM_TYPES[itemType];
-    // For wood, show custom canvas icon in message
+    // Show custom canvas icons for wood and bucket
     if (itemType === 'wood') {
       showMessage(
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           Picked up: <WoodIcon size={20} /> {itemDef?.label || itemType}
+        </span>
+      );
+    } else if (itemType === 'bucket') {
+      showMessage(
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          Picked up: <BucketIcon size={20} filled={false} /> {itemDef?.label || itemType}
         </span>
       );
     } else {
@@ -579,45 +670,77 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    if (c.type === 'tree') {
-      if (hasItemType(currentGS.inventory, 'axe')) {
-        startInteraction('cut-tree', p);
-      } else {
-        showMessage('Need an axe to cut trees.');
-      }
-      return;
+    // Collect all possible actions for this tile
+    const possibleActions = [];
+
+    if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
+      possibleActions.push({
+        label: 'Cut tree',
+        action: () => startInteraction('cut-tree', p),
+      });
     }
 
     if (c.type === 'water' || c.type === 'raft') {
       const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
       if (bucketIdx >= 0) {
-        startInteraction('fill-bucket', p);
-        return;
+        possibleActions.push({
+          label: 'Fill bucket',
+          action: () => startInteraction('fill-bucket', p),
+        });
       }
       if (c.type === 'water' && hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
-        startInteraction('build-raft', p);
-        return;
+        possibleActions.push({
+          label: 'Build raft',
+          action: () => startInteraction('build-raft', p),
+        });
       }
-      showMessage('Nothing to do with this water.');
-      return;
     }
 
     if (c.type === 'fire') {
       const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
       if (filledBucketIdx >= 0) {
-        startInteraction('extinguish-fire', p);
-      } else {
-        showMessage('Need a filled bucket to extinguish fire.');
+        possibleActions.push({
+          label: 'Extinguish fire',
+          action: () => startInteraction('extinguish-fire', p),
+        });
       }
-      return;
     }
 
     if (c.type === 'friend') {
-      startInteraction('rescue-friend', p);
+      possibleActions.push({
+        label: 'Rescue friend',
+        action: () => startInteraction('rescue-friend', p),
+      });
+    }
+
+    if (possibleActions.length === 0) {
+      showMessage('Nothing to interact with here.');
       return;
     }
 
-    showMessage('Nothing to interact with here.');
+    // If only one action, do it immediately
+    if (possibleActions.length === 1) {
+      possibleActions[0].action();
+      return;
+    }
+
+    // Multiple actions - check if number key already held
+    const actionsWithKeys = possibleActions.map((action, idx) => ({
+      ...action,
+      key: (idx + 1).toString(),
+    }));
+
+    // If user is already holding a number key, execute that action immediately
+    const keys = keysDown.current;
+    for (let i = 0; i < actionsWithKeys.length; i++) {
+      if (keys.has(actionsWithKeys[i].key)) {
+        actionsWithKeys[i].action();
+        return;
+      }
+    }
+
+    // Otherwise show inline menu
+    setInlineMenu({ actions: actionsWithKeys });
   }, [showMessage, getInteractTargets, startInteraction, maxInventory]);
 
   const doMove = useCallback((dir) => {
@@ -626,6 +749,9 @@ export default function SolverMode({ level, onBack }) {
     if (interactionStateRef.current) {
       cancelInteraction();
     }
+
+    // Clear inline menu when moving
+    setInlineMenu(null);
 
     lastDirRef.current = dir;
     playerDirectionRef.current = dir;
@@ -711,7 +837,7 @@ export default function SolverMode({ level, onBack }) {
   }, [showMessage, loseLife, respawn, cancelInteraction]);
 
   useEffect(() => {
-    const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'f', 'r', 'q']);
+    const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'f', 'r', 'q', '1', '2', '3', '4', '5']);
 
     const onKeyDown = (e) => {
       const key = e.key.toLowerCase();
@@ -725,7 +851,20 @@ export default function SolverMode({ level, onBack }) {
 
       keysDown.current.add(key);
 
+      // Handle inline menu number selection
+      if (inlineMenu && ['1', '2', '3', '4', '5'].includes(key)) {
+        const actionIndex = parseInt(key) - 1;
+        if (actionIndex < inlineMenu.actions.length) {
+          // Number key just pressed, wait for hold to start action
+          return;
+        }
+      }
+
       if (key === 'escape') {
+        if (inlineMenu) {
+          setInlineMenu(null);
+          return;
+        }
         if (dropMenuOpen) {
           setDropMenuOpen(false);
           return;
@@ -735,12 +874,12 @@ export default function SolverMode({ level, onBack }) {
       }
       if (key === 'r') { restart(); return; }
 
-      if (key === 'e' && !interactionStateRef.current) {
+      if (key === 'e' && !interactionStateRef.current && !inlineMenu) {
         doInteract();
         return;
       }
 
-      if (key === 'f' && !interactionStateRef.current) {
+      if (key === 'f' && !interactionStateRef.current && !inlineMenu) {
         doPickup();
         return;
       }
@@ -755,7 +894,22 @@ export default function SolverMode({ level, onBack }) {
       const key = e.key.toLowerCase();
       keysDown.current.delete(key);
 
+      // Handle inline menu action release
+      if (inlineMenu && ['1', '2', '3', '4', '5'].includes(key)) {
+        const actionIndex = parseInt(key) - 1;
+        if (actionIndex < inlineMenu.actions.length && interactionStateRef.current) {
+          // Action was held and completed, clear menu
+          setInlineMenu(null);
+        }
+      }
+
       if (key === 'e' && interactionStateRef.current) {
+        cancelInteraction();
+        showMessage('Interaction cancelled.');
+      }
+
+      // Also cancel on number key release if interaction in progress
+      if (['1', '2', '3', '4', '5'].includes(key) && interactionStateRef.current) {
         cancelInteraction();
         showMessage('Interaction cancelled.');
       }
@@ -767,7 +921,104 @@ export default function SolverMode({ level, onBack }) {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
     };
-  }, [onBack, restart, doInteract, doPickup, cancelInteraction, showMessage, dropMenuOpen]);
+  }, [onBack, restart, doInteract, doPickup, cancelInteraction, showMessage, dropMenuOpen, inlineMenu]);
+
+  // Check for number key holds when inline menu is active
+  useEffect(() => {
+    if (gameOver || !inlineMenu) return;
+    const interval = setInterval(() => {
+      if (interactionStateRef.current) return; // Already in an interaction
+
+      const keys = keysDown.current;
+      // Check which number key is being held
+      for (let i = 0; i < inlineMenu.actions.length && i < 5; i++) {
+        const keyNum = (i + 1).toString();
+        if (keys.has(keyNum)) {
+          // Hide menu immediately when starting interaction
+          setInlineMenu(null);
+          inlineMenu.actions[i].action();
+          break;
+        }
+      }
+    }, 16);
+    return () => clearInterval(interval);
+  }, [gameOver, inlineMenu]);
+
+  // Check if player is holding a number key while facing multi-action tile
+  useEffect(() => {
+    if (gameOver) return;
+
+    const interval = setInterval(() => {
+      // Don't check if already in interaction or menu is open
+      if (interactionStateRef.current || inlineMenu) return;
+
+      const keys = keysDown.current;
+      const currentGrid = gridRef.current;
+      const currentGS = gameStateRef.current;
+      const pos = playerPosRef.current;
+      const playerDir = playerDirectionRef.current;
+
+      // Get adjacent tiles
+      const adjacent = Object.entries(DIRECTIONS).map(([dir, dd]) => ({
+        x: pos.x + dd.dx,
+        y: pos.y + dd.dy,
+        dir,
+      })).filter(p => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS);
+
+      // Find the tile we're facing
+      const facingTile = adjacent.find(t => t.dir === playerDir);
+      if (!facingTile) return;
+
+      const c = currentGrid[facingTile.y][facingTile.x];
+      const p = { x: facingTile.x, y: facingTile.y };
+
+      // Skip item pickups
+      if (c.type.startsWith('item-')) return;
+
+      // Collect possible actions
+      const possibleActions = [];
+
+      if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
+        possibleActions.push(() => startInteraction('cut-tree', p));
+      }
+
+      if (c.type === 'water' || c.type === 'raft') {
+        const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
+        if (bucketIdx >= 0) {
+          possibleActions.push(() => startInteraction('fill-bucket', p));
+        }
+        if (c.type === 'water' && hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
+          possibleActions.push(() => startInteraction('build-raft', p));
+        }
+      }
+
+      if (c.type === 'fire') {
+        const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
+        if (filledBucketIdx >= 0) {
+          possibleActions.push(() => startInteraction('extinguish-fire', p));
+        }
+      }
+
+      if (c.type === 'friend') {
+        possibleActions.push(() => startInteraction('rescue-friend', p));
+      }
+
+      // Only proceed if there are multiple actions
+      if (possibleActions.length < 2) return;
+
+      // Check if any number key is held (1-5 for up to 5 actions)
+      for (let i = 0; i < possibleActions.length && i < 5; i++) {
+        const keyNum = (i + 1).toString();
+        if (keys.has(keyNum)) {
+          // Execute the action
+          possibleActions[i]();
+          return; // Stop checking after executing
+        }
+      }
+    }, 50); // Check every 50ms (less frequent than 16ms to avoid spam)
+
+    return () => clearInterval(interval);
+  }, [gameOver, inlineMenu, startInteraction]);
 
   useEffect(() => {
     if (gameOver) return;
@@ -1004,8 +1255,8 @@ export default function SolverMode({ level, onBack }) {
               {gameState.inventory.slice(0, 5).map((item, i) => {
                 const def = ITEM_TYPES[item.itemType];
                 const isWood = item.itemType === 'wood';
+                const isBucket = item.itemType === 'bucket';
                 let emoji = def?.emoji || '';
-                if (item.itemType === 'bucket') emoji = item.filled ? '🪣' : '🪣';
 
                 return (
                   <div key={i} style={{
@@ -1018,7 +1269,7 @@ export default function SolverMode({ level, onBack }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                    {isWood ? <WoodIcon size={20} /> : emoji}
+                    {isWood ? <WoodIcon size={20} /> : isBucket ? <BucketIcon size={20} filled={item.filled} /> : emoji}
                   </div>
                 );
               })}
@@ -1120,6 +1371,75 @@ export default function SolverMode({ level, onBack }) {
             interactionTarget={(interactionState || mouseHoldState)?.targetPos}
             interactionProgress={(interactionState || mouseHoldState)?.progress || 0}
           />
+
+          {/* Inline interaction menu next to player */}
+          {inlineMenu && !gameOver && (
+            <div style={{
+              position: 'absolute',
+              left: `${(playerPos.x + 1) * 40 + 10}px`,
+              top: `${playerPos.y * 40}px`,
+              background: 'linear-gradient(145deg, rgba(30, 45, 30, 0.98), rgba(20, 35, 20, 0.98))',
+              borderRadius: 12,
+              padding: '10px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(68, 170, 68, 0.6)',
+              backdropFilter: 'blur(12px)',
+              zIndex: 150,
+              minWidth: 160,
+            }}>
+              <div style={{
+                fontSize: 9,
+                color: '#88ff88',
+                marginBottom: 8,
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+                textAlign: 'center',
+              }}>
+                Hold key to interact
+              </div>
+              {inlineMenu.actions.map((action, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 10px',
+                    background: keysDown.current.has(action.key)
+                      ? 'rgba(68, 170, 68, 0.4)'
+                      : 'rgba(40, 55, 40, 0.6)',
+                    borderRadius: 8,
+                    marginBottom: idx < inlineMenu.actions.length - 1 ? 6 : 0,
+                    border: '1px solid rgba(68, 170, 68, 0.3)',
+                    transition: 'background 0.1s',
+                  }}
+                >
+                  <div style={{
+                    width: 20,
+                    height: 20,
+                    background: 'rgba(68, 170, 68, 0.8)',
+                    borderRadius: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    color: '#ffffff',
+                    fontFamily: 'monospace',
+                  }}>
+                    {action.key}
+                  </div>
+                  <div style={{
+                    fontSize: 12,
+                    color: '#ffffff',
+                    fontWeight: '600',
+                  }}>
+                    {action.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1197,9 +1517,10 @@ export default function SolverMode({ level, onBack }) {
                   const itemDef = ITEM_TYPES[item.itemType];
                   const label = itemDef?.label || item.itemType;
                   const isWood = item.itemType === 'wood';
+                  const isBucket = item.itemType === 'bucket';
                   let emoji = itemDef?.emoji || '';
-                  if (item.itemType === 'bucket') emoji = '🪣';
-                  const filledText = item.filled ? ' (filled)' : '';
+                  // Show bucket status clearly
+                  const statusText = isBucket ? (item.filled ? ' (Full)' : ' (Empty)') : '';
                   return (
                     <button
                       key={idx}
@@ -1228,8 +1549,19 @@ export default function SolverMode({ level, onBack }) {
                         e.target.style.transform = 'translateX(0)';
                       }}
                     >
-                      {isWood ? <WoodIcon size={24} /> : <span style={{ fontSize: 18 }}>{emoji}</span>}
-                      {label}{filledText}
+                      {isWood ? <WoodIcon size={24} /> : isBucket ? <BucketIcon size={24} filled={item.filled} /> : <span style={{ fontSize: 18 }}>{emoji}</span>}
+                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <span>{label}</span>
+                        {isBucket && (
+                          <span style={{
+                            fontSize: 11,
+                            color: item.filled ? '#88ccff' : '#ffaa66',
+                            fontWeight: 'bold',
+                          }}>
+                            {item.filled ? 'Full' : 'Empty'}
+                          </span>
+                        )}
+                      </span>
                     </button>
                   );
                 })}
