@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Grid from './Grid';
-import HUD from './HUD';
 import { findTile, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
 import { getAllHazardZones, floodFillWater } from '../engine/hazards';
@@ -8,7 +7,7 @@ import { checkAllMissions } from '../engine/missions';
 import { DIRECTIONS, GRID_COLS, GRID_ROWS, DEFAULT_INVENTORY_CAPACITY, ITEM_TYPES } from '../utils/constants';
 
 const MOVE_COOLDOWN = 150;
-const INTERACTION_DURATION = 1500; // 1.5 seconds for hold E interactions
+const INTERACTION_DURATION = 1500;
 
 function hasItemType(inventory, itemType) {
   return inventory.some(item => item.itemType === itemType);
@@ -18,7 +17,77 @@ function findItemIndex(inventory, itemType) {
   return inventory.findIndex(item => item.itemType === itemType);
 }
 
-// Convert old 'item' tiles to new 'item-*' tiles
+// Canvas component to draw wood icon matching the map
+function WoodIcon({ size = 24 }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const cx = size / 2;
+    const cy = size / 2;
+    const s = size * 0.32;
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Bottom log - darker
+    ctx.fillStyle = '#6b4910';
+    ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 1.5, s * 0.55);
+
+    // Bottom log - bark texture
+    ctx.fillStyle = '#5a3808';
+    ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 0.08, s * 0.55);
+    ctx.fillRect(cx - s * 0.3, cy + s * 0.25, s * 0.08, s * 0.55);
+    ctx.fillRect(cx + s * 0.2, cy + s * 0.25, s * 0.08, s * 0.55);
+
+    // Bottom log - end cut rings
+    ctx.fillStyle = '#8b6914';
+    ctx.beginPath();
+    ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#6b4910';
+    ctx.beginPath();
+    ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#a07818';
+    ctx.beginPath();
+    ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Top log - lighter
+    ctx.fillStyle = '#8b6914';
+    ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.6);
+
+    // Top log - highlight
+    ctx.fillStyle = '#a58420';
+    ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.18);
+
+    // Top log - bark lines
+    ctx.fillStyle = '#6b4910';
+    ctx.fillRect(cx - s * 0.85, cy - s * 0.35, s * 0.08, s * 0.6);
+    ctx.fillRect(cx - s * 0.3, cy - s * 0.35, s * 0.08, s * 0.6);
+    ctx.fillRect(cx + s * 0.35, cy - s * 0.35, s * 0.08, s * 0.6);
+    ctx.fillRect(cx + s * 0.85, cy - s * 0.35, s * 0.08, s * 0.6);
+
+    // Top log - end cut rings
+    ctx.fillStyle = '#a58420';
+    ctx.beginPath();
+    ctx.arc(cx - s * 1.05, cy - s * 0.05, s * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8b6914';
+    ctx.beginPath();
+    ctx.arc(cx - s * 1.05, cy - s * 0.05, s * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c09828';
+    ctx.beginPath();
+    ctx.arc(cx - s * 1.05, cy - s * 0.05, s * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+  }, [size]);
+
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
+}
+
 function convertLegacyItems(grid) {
   const newGrid = cloneGrid(grid);
   for (let y = 0; y < GRID_ROWS; y++) {
@@ -32,7 +101,6 @@ function convertLegacyItems(grid) {
   return newGrid;
 }
 
-// Calculate viewport bounds from grid (bounding box of non-empty tiles + padding)
 function calculateViewportBounds(grid) {
   let minX = GRID_COLS, minY = GRID_ROWS, maxX = -1, maxY = -1;
 
@@ -48,12 +116,10 @@ function calculateViewportBounds(grid) {
     }
   }
 
-  // If no non-empty tiles found, return full grid
   if (maxX === -1) {
     return { minX: 0, minY: 0, maxX: GRID_COLS - 1, maxY: GRID_ROWS - 1 };
   }
 
-  // Add padding (2 tiles on each side, clamped to grid bounds)
   const padding = 2;
   minX = Math.max(0, minX - padding);
   minY = Math.max(0, minY - padding);
@@ -63,7 +129,6 @@ function calculateViewportBounds(grid) {
   return { minX, minY, maxX, maxY };
 }
 
-// Get adjacent tile positions
 function getAdjacentPositions(x, y) {
   const adjacent = [];
   if (y > 0) adjacent.push({ x, y: y - 1, key: `${x},${y - 1}` });
@@ -73,13 +138,31 @@ function getAdjacentPositions(x, y) {
   return adjacent;
 }
 
-// Initialize revealed tiles with starting position and adjacent tiles
 function initializeRevealedTiles(startX, startY) {
   const revealed = new Set();
   revealed.add(`${startX},${startY}`);
   const adjacent = getAdjacentPositions(startX, startY);
   adjacent.forEach(pos => revealed.add(pos.key));
   return revealed;
+}
+
+function isMissionDone(mission, gs, grid) {
+  switch (mission.type) {
+    case 'collect': return gs.collectedItems.includes(mission.targetId);
+    case 'rescue': return gs.rescuedFriends > 0 || gs.collectedItems.includes('friend');
+    case 'extinguish': {
+      if (!grid) return false;
+      for (let y = 0; y < grid.length; y++) {
+        for (let x = 0; x < grid[y].length; x++) {
+          if (grid[y][x].type === 'fire') return false;
+        }
+      }
+      return true;
+    }
+    case 'reach': return gs.reachedLocations.includes(mission.targetId);
+    case 'escape': return gs.reachedExit;
+    default: return false;
+  }
 }
 
 export default function SolverMode({ level, onBack }) {
@@ -100,10 +183,13 @@ export default function SolverMode({ level, onBack }) {
   const [message, setMessage] = useState(null);
   const [gameOver, setGameOver] = useState(null);
   const [hazardZones, setHazardZones] = useState([]);
-  const [interactionState, setInteractionState] = useState(null); // { type, startTime, targetPos, progress }
+  const [interactionState, setInteractionState] = useState(null);
   const [dropMenuOpen, setDropMenuOpen] = useState(false);
-  const [interactionChoices, setInteractionChoices] = useState(null); // { choices: [{label, action}] }
-  const [mouseHoldState, setMouseHoldState] = useState(null); // { startTime, targetPos, progress }
+  const [mouseHoldState, setMouseHoldState] = useState(null);
+  const [playerDirection, setPlayerDirection] = useState('down');
+  const [moveCount, setMoveCount] = useState(0);
+  const [startTime, setStartTime] = useState(Date.now());
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   const messageTimerRef = useRef(null);
   const gridRef = useRef(grid);
@@ -113,6 +199,7 @@ export default function SolverMode({ level, onBack }) {
   const gameOverRef = useRef(gameOver);
   const lastMoveRef = useRef(0);
   const lastDirRef = useRef('right');
+  const playerDirectionRef = useRef('down');
   const keysDown = useRef(new Set());
   const exitMessageShownRef = useRef(false);
   const interactionStateRef = useRef(interactionState);
@@ -161,11 +248,13 @@ export default function SolverMode({ level, onBack }) {
     setMessage(null);
     setInteractionState(null);
     setDropMenuOpen(false);
+    setMoveCount(0);
+    setStartTime(Date.now());
+    setElapsedTime(0);
     keysDown.current.clear();
     exitMessageShownRef.current = false;
   }, [level, startPos]);
 
-  // Drop item from menu
   const dropItem = useCallback((index) => {
     const inv = gameStateRef.current.inventory;
     if (index < 0 || index >= inv.length) return;
@@ -191,7 +280,6 @@ export default function SolverMode({ level, onBack }) {
     setDropMenuOpen(false);
   }, [showMessage]);
 
-  // Pick up an item tile (requires E press)
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;
     if (currentGS.inventory.length >= maxInventory) {
@@ -199,7 +287,6 @@ export default function SolverMode({ level, onBack }) {
       return false;
     }
 
-    // Extract item type from tile type (item-axe -> axe)
     const itemType = cell.type.replace('item-', '');
 
     const newGrid = cloneGrid(gridRef.current);
@@ -213,11 +300,19 @@ export default function SolverMode({ level, onBack }) {
       collectedItems: [...prev.collectedItems, itemType],
     }));
     const itemDef = ITEM_TYPES[itemType];
-    showMessage(`Picked up: ${itemDef?.emoji || ''} ${itemDef?.label || itemType}`);
+    // For wood, show custom canvas icon in message
+    if (itemType === 'wood') {
+      showMessage(
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          Picked up: <WoodIcon size={20} /> {itemDef?.label || itemType}
+        </span>
+      );
+    } else {
+      showMessage(`Picked up: ${itemDef?.emoji || ''} ${itemDef?.label || itemType}`);
+    }
     return true;
   }, [showMessage, maxInventory]);
 
-  // Get adjacent interactable positions sorted by direction priority
   const getInteractTargets = useCallback(() => {
     const pos = playerPosRef.current;
     const currentGrid = gridRef.current;
@@ -230,17 +325,13 @@ export default function SolverMode({ level, onBack }) {
       x: pos.x + dd.dx, y: pos.y + dd.dy, dir,
     })).filter(p => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS);
 
-    // Check current position only for items (pickup)
-    // Check adjacent for hold-E interactions (tree, water, fire, friend)
     const targets = [];
 
-    // Current tile - only for item pickup
     const currentCell = currentGrid[pos.y][pos.x];
     if (itemTilePattern.test(currentCell.type)) {
       targets.push({ x: pos.x, y: pos.y, dir: 'self' });
     }
 
-    // Adjacent tiles - for hold-E interactions (no items)
     for (const adj of adjacent) {
       const c = currentGrid[adj.y][adj.x];
       if (interactable.includes(c.type)) {
@@ -250,12 +341,10 @@ export default function SolverMode({ level, onBack }) {
 
     const valid = targets;
 
-    // Sort: last movement direction first, then others
     valid.sort((a, b) => {
       const aMatch = a.dir === lastDir ? 0 : 1;
       const bMatch = b.dir === lastDir ? 0 : 1;
       if (aMatch !== bMatch) return aMatch - bMatch;
-      // Then by distance (self = 0)
       const aDist = a.dir === 'self' ? 0 : 1;
       const bDist = b.dir === 'self' ? 0 : 1;
       return aDist - bDist;
@@ -264,7 +353,6 @@ export default function SolverMode({ level, onBack }) {
     return valid;
   }, []);
 
-  // Start an interaction that requires holding E
   const startInteraction = useCallback((type, targetPos) => {
     setInteractionState({
       type,
@@ -274,40 +362,42 @@ export default function SolverMode({ level, onBack }) {
     });
   }, []);
 
-  // Cancel interaction
   const cancelInteraction = useCallback(() => {
     setInteractionState(null);
   }, []);
 
-  // Mouse hold handlers for interactions
   const handleMouseInteraction = useCallback((x, y) => {
-    // Check if tile is adjacent to player
     const pos = playerPosRef.current;
-    const dx = Math.abs(x - pos.x);
-    const dy = Math.abs(y - pos.y);
-    const isAdjacent = (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+    const dx = x - pos.x;
+    const dy = y - pos.y;
+    const isAdjacent = (Math.abs(dx) === 1 && dy === 0) || (dx === 0 && Math.abs(dy) === 1);
 
     if (!isAdjacent) {
       showMessage('Too far away!');
       return;
     }
 
+    // Determine direction
+    let dir = '';
+    if (dy === -1) dir = 'UP';
+    else if (dy === 1) dir = 'DOWN';
+    else if (dx === -1) dir = 'LEFT';
+    else if (dx === 1) dir = 'RIGHT';
+
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
     const c = currentGrid[y][x];
 
-    // Collect possible actions for this tile
     const possibleActions = [];
 
-    // Cut tree with axe
     if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
       possibleActions.push({
         type: 'cut-tree',
         targetPos: { x, y },
+        dir,
       });
     }
 
-    // Fill bucket or build raft (water)
     if (c.type === 'water') {
       const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
       if (bucketIdx >= 0) {
@@ -324,7 +414,6 @@ export default function SolverMode({ level, onBack }) {
       }
     }
 
-    // Fill bucket from raft
     if (c.type === 'raft') {
       const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
       if (bucketIdx >= 0) {
@@ -335,7 +424,6 @@ export default function SolverMode({ level, onBack }) {
       }
     }
 
-    // Extinguish fire
     if (c.type === 'fire') {
       const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
       if (filledBucketIdx >= 0) {
@@ -346,7 +434,6 @@ export default function SolverMode({ level, onBack }) {
       }
     }
 
-    // Rescue friend
     if (c.type === 'friend') {
       possibleActions.push({
         type: 'rescue-friend',
@@ -359,50 +446,41 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    // If multiple actions, show choice menu
     if (possibleActions.length > 1) {
       setInteractionChoices({
-        choices: possibleActions.map(action => ({
-          label: getInteractionLabel(action.type).replace('...', ''),
-          action: () => setMouseHoldState({ startTime: Date.now(), targetPos: action.targetPos, interactionType: action.type, progress: 0 }),
-        })),
+        choices: possibleActions.map(action => {
+          let label = getInteractionLabel(action.type).replace('...', '');
+          if (action.dir) {
+            label = `${label} (${action.dir})`;
+          }
+          return {
+            label,
+            action: () => {
+              setInteractionChoices(null);
+              startInteraction(action.type, action.targetPos);
+            },
+          };
+        }),
       });
       return;
     }
 
-    // Single action - start hold interaction
     const action = possibleActions[0];
-    setMouseHoldState({ startTime: Date.now(), targetPos: action.targetPos, interactionType: action.type, progress: 0 });
+    startInteraction(action.type, action.targetPos);
   }, [showMessage]);
 
-  // Complete interaction after holding E
   const completeInteraction = useCallback((interactionType, targetPos) => {
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
     const c = currentGrid[targetPos.y][targetPos.x];
 
-    // Cut cuttable tree with axe
     if (interactionType === 'cut-tree') {
       const newGrid = cloneGrid(currentGrid);
-      newGrid[targetPos.y][targetPos.x] = { type: 'ground', config: {} };
+      newGrid[targetPos.y][targetPos.x] = { type: 'item-wood', config: {} };
       setGrid(newGrid);
-
-      if (currentGS.inventory.length < maxInventory) {
-        setGameState(prev => ({
-          ...prev,
-          inventory: [...prev.inventory, { itemType: 'wood' }],
-          collectedItems: [...prev.collectedItems, 'wood'],
-        }));
-        showMessage('Tree chopped! Got wood.');
-      } else {
-        // Place wood on ground
-        newGrid[targetPos.y][targetPos.x] = { type: 'item-wood', config: {} };
-        setGrid(newGrid);
-        showMessage('Tree chopped! Inventory full, wood dropped here.');
-      }
+      showMessage('🪓 Tree chopped! Wood left on ground.');
     }
 
-    // Fill bucket
     else if (interactionType === 'fill-bucket') {
       const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
       setGameState(prev => {
@@ -413,7 +491,6 @@ export default function SolverMode({ level, onBack }) {
       showMessage('Filled bucket with water!');
     }
 
-    // Build raft
     else if (interactionType === 'build-raft') {
       const ropeIdx = findItemIndex(currentGS.inventory, 'rope');
       const woodIdx = findItemIndex(currentGS.inventory, 'wood');
@@ -430,7 +507,6 @@ export default function SolverMode({ level, onBack }) {
       showMessage(`Built a raft! (${waterCells.length} tiles)`);
     }
 
-    // Extinguish fire
     else if (interactionType === 'extinguish-fire') {
       const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
       const newGrid = cloneGrid(currentGrid);
@@ -444,7 +520,6 @@ export default function SolverMode({ level, onBack }) {
       showMessage('Fire extinguished!');
     }
 
-    // Rescue friend
     else if (interactionType === 'rescue-friend') {
       const friendName = c.config.name || 'Friend';
       const newGrid = cloneGrid(currentGrid);
@@ -461,129 +536,100 @@ export default function SolverMode({ level, onBack }) {
     cancelInteraction();
   }, [showMessage, maxInventory, cancelInteraction]);
 
-  // Interaction logic - press E to pick up items, start hold E for other interactions
+  const doPickup = useCallback(() => {
+    const currentGrid = gridRef.current;
+    const currentGS = gameStateRef.current;
+    const pos = playerPosRef.current;
+    const currentCell = currentGrid[pos.y][pos.x];
+
+    // Check if standing on an item
+    if (currentCell.type.startsWith('item-')) {
+      if (currentGS.inventory.length >= maxInventory) {
+        showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+        return;
+      }
+      pickUpItem(currentCell, pos.x, pos.y);
+      return;
+    }
+
+    showMessage('No item here to pick up. Stand on an item and press F.');
+  }, [showMessage, pickUpItem, maxInventory]);
+
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
     const targets = getInteractTargets();
+    const playerDir = playerDirectionRef.current;
 
-    const possibleActions = [];
+    // Filter targets: only include the one we're facing, or all if standing on something
+    const facingTarget = targets.find(t => t.dir === playerDir);
+    const relevantTargets = facingTarget ? [facingTarget] : targets.filter(t => t.dir === 'self');
 
-    for (const p of targets) {
-      const c = currentGrid[p.y][p.x];
-
-      // Pick up items - instant with E press
-      if (c.type.startsWith('item-')) {
-        const itemType = c.config.itemType || c.type.replace('item-', '');
-        const itemDef = ITEM_TYPES[itemType];
-        const itemLabel = itemDef?.label || itemType;
-        // Check inventory space
-        if (currentGS.inventory.length >= maxInventory) {
-          // Don't add to actions, but continue checking other interactions
-          continue;
-        }
-        possibleActions.push({
-          label: `Pick up ${itemLabel}`,
-          action: () => pickUpItem(c, p.x, p.y),
-        });
-        continue;
-      }
-
-      // Cut tree with axe - requires holding E (all trees are cuttable now)
-      if (c.type === 'tree') {
-        if (hasItemType(currentGS.inventory, 'axe')) {
-          possibleActions.push({
-            label: 'Cut tree with axe',
-            action: () => startInteraction('cut-tree', p),
-          });
-        }
-        continue;
-      }
-
-      // Interact with water: fill bucket or build raft - requires holding E
-      if (c.type === 'water') {
-        const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-        if (bucketIdx >= 0) {
-          possibleActions.push({
-            label: 'Fill bucket with water',
-            action: () => startInteraction('fill-bucket', p),
-          });
-        }
-        if (hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
-          possibleActions.push({
-            label: 'Build raft (Rope + Wood)',
-            action: () => startInteraction('build-raft', p),
-          });
-        }
-        continue;
-      }
-
-      // Interact with raft: fill bucket - requires holding E
-      if (c.type === 'raft') {
-        const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-        if (bucketIdx >= 0) {
-          possibleActions.push({
-            label: 'Fill bucket with water',
-            action: () => startInteraction('fill-bucket', p),
-          });
-        }
-        continue;
-      }
-
-      // Extinguish fire with filled bucket - requires holding E
-      if (c.type === 'fire') {
-        const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
-        if (filledBucketIdx >= 0) {
-          possibleActions.push({
-            label: 'Extinguish fire with bucket',
-            action: () => startInteraction('extinguish-fire', p),
-          });
-        }
-        continue;
-      }
-
-      // Rescue friend - requires holding E
-      if (c.type === 'friend') {
-        const friendName = c.config.name || 'Friend';
-        possibleActions.push({
-          label: `Rescue ${friendName}`,
-          action: () => startInteraction('rescue-friend', p),
-        });
-        continue;
-      }
+    if (relevantTargets.length === 0) {
+      showMessage('Nothing to interact with in that direction.');
+      return;
     }
 
-    // If no actions available, show message
-    if (possibleActions.length === 0) {
-      const hasItemOnTile = currentGrid[playerPosRef.current.y][playerPosRef.current.x].type.startsWith('item-');
-      if (hasItemOnTile && currentGS.inventory.length >= maxInventory) {
-        showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+    const p = relevantTargets[0];
+    const c = currentGrid[p.y][p.x];
+
+    // Skip item pickups - those use F key now
+    if (c.type.startsWith('item-')) {
+      showMessage('Press F to pick up items.');
+      return;
+    }
+
+    if (c.type === 'tree') {
+      if (hasItemType(currentGS.inventory, 'axe')) {
+        startInteraction('cut-tree', p);
       } else {
-        showMessage('Nothing to interact with here.');
+        showMessage('Need an axe to cut trees.');
       }
       return;
     }
 
-    // If only one action, execute it immediately
-    if (possibleActions.length === 1) {
-      possibleActions[0].action();
+    if (c.type === 'water' || c.type === 'raft') {
+      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
+      if (bucketIdx >= 0) {
+        startInteraction('fill-bucket', p);
+        return;
+      }
+      if (c.type === 'water' && hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
+        startInteraction('build-raft', p);
+        return;
+      }
+      showMessage('Nothing to do with this water.');
       return;
     }
 
-    // Multiple actions - show choice menu
-    setInteractionChoices({ choices: possibleActions });
-  }, [showMessage, pickUpItem, getInteractTargets, startInteraction, maxInventory]);
+    if (c.type === 'fire') {
+      const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
+      if (filledBucketIdx >= 0) {
+        startInteraction('extinguish-fire', p);
+      } else {
+        showMessage('Need a filled bucket to extinguish fire.');
+      }
+      return;
+    }
 
-  // Movement logic
+    if (c.type === 'friend') {
+      startInteraction('rescue-friend', p);
+      return;
+    }
+
+    showMessage('Nothing to interact with here.');
+  }, [showMessage, getInteractTargets, startInteraction, maxInventory]);
+
   const doMove = useCallback((dir) => {
     if (gameOverRef.current) return;
 
-    // Cancel interaction on movement
     if (interactionStateRef.current) {
       cancelInteraction();
     }
 
     lastDirRef.current = dir;
+    playerDirectionRef.current = dir;
+    setPlayerDirection(dir);
     const d = DIRECTIONS[dir];
     const prev = playerPosRef.current;
     const nx = prev.x + d.dx, ny = prev.y + d.dy;
@@ -594,7 +640,6 @@ export default function SolverMode({ level, onBack }) {
     const targetCell = currentGrid[ny][nx];
     const currentGS = gameStateRef.current;
 
-    // Bear encounter
     if (targetCell.type === 'bear') {
       if (hasItemType(currentGS.inventory, 'knife')) {
         const knifeIdx = findItemIndex(currentGS.inventory, 'knife');
@@ -621,9 +666,7 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    // Snow - needs sweater
     if (targetCell.type === 'snow') {
-      // Reveal the snow tile and adjacent tiles even if blocked
       setRevealedTiles(prev => {
         const newRevealed = new Set(prev);
         newRevealed.add(`${nx},${ny}`);
@@ -640,27 +683,23 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    // Water - always blocks
     if (targetCell.type === 'water') {
       showMessage("Can't swim! Build a raft (Rope + Wood) nearby.");
       return;
     }
 
-    // Fire - stepping on it damages and pushes back
     if (targetCell.type === 'fire') {
       const remaining = loseLife();
       if (remaining > 0) {
         showMessage(`Burned by fire! Lives: ${remaining}`);
-        // Stay at current position (pushed back), don't move to fire tile
       }
       return;
     }
 
-    // Normal movement
     if (canMoveTo(currentGrid, nx, ny)) {
       setPlayerPos({ x: nx, y: ny });
+      setMoveCount(prev => prev + 1);
 
-      // Reveal adjacent tiles
       setRevealedTiles(prev => {
         const newRevealed = new Set(prev);
         newRevealed.add(`${nx},${ny}`);
@@ -671,9 +710,8 @@ export default function SolverMode({ level, onBack }) {
     }
   }, [showMessage, loseLife, respawn, cancelInteraction]);
 
-  // Keyboard
   useEffect(() => {
-    const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'r', 'q']);
+    const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'f', 'r', 'q']);
 
     const onKeyDown = (e) => {
       const key = e.key.toLowerCase();
@@ -688,29 +726,25 @@ export default function SolverMode({ level, onBack }) {
       keysDown.current.add(key);
 
       if (key === 'escape') {
-        // Close interaction choice menu if open
-        if (interactionChoices) {
-          setInteractionChoices(null);
-          return;
-        }
-        // Close drop menu if open
         if (dropMenuOpen) {
           setDropMenuOpen(false);
           return;
         }
-        // Otherwise go back to menu
         onBack();
         return;
       }
       if (key === 'r') { restart(); return; }
 
-      // E key - start interaction or pick up item
       if (key === 'e' && !interactionStateRef.current) {
         doInteract();
         return;
       }
 
-      // Q key - toggle drop menu
+      if (key === 'f' && !interactionStateRef.current) {
+        doPickup();
+        return;
+      }
+
       if (key === 'q') {
         setDropMenuOpen(prev => !prev);
         return;
@@ -721,7 +755,6 @@ export default function SolverMode({ level, onBack }) {
       const key = e.key.toLowerCase();
       keysDown.current.delete(key);
 
-      // Release E - cancel interaction if in progress
       if (key === 'e' && interactionStateRef.current) {
         cancelInteraction();
         showMessage('Interaction cancelled.');
@@ -734,9 +767,8 @@ export default function SolverMode({ level, onBack }) {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
     };
-  }, [onBack, restart, doInteract, cancelInteraction, showMessage, interactionChoices, dropMenuOpen]);
+  }, [onBack, restart, doInteract, doPickup, cancelInteraction, showMessage, dropMenuOpen]);
 
-  // Movement loop
   useEffect(() => {
     if (gameOver) return;
     const interval = setInterval(() => {
@@ -758,7 +790,6 @@ export default function SolverMode({ level, onBack }) {
     return () => clearInterval(interval);
   }, [gameOver, doMove]);
 
-  // Hold E interaction progress
   useEffect(() => {
     if (!interactionState || gameOver) return;
 
@@ -771,7 +802,6 @@ export default function SolverMode({ level, onBack }) {
         return { ...prev, progress };
       });
 
-      // Complete interaction when progress reaches 100%
       if (progress >= 1) {
         completeInteraction(interactionState.type, interactionState.targetPos);
       }
@@ -780,7 +810,6 @@ export default function SolverMode({ level, onBack }) {
     return () => clearInterval(interval);
   }, [interactionState, gameOver, completeInteraction]);
 
-  // Mouse hold interaction progress
   useEffect(() => {
     if (!mouseHoldState || gameOver) return;
 
@@ -793,7 +822,6 @@ export default function SolverMode({ level, onBack }) {
         return { ...prev, progress };
       });
 
-      // Complete interaction when progress reaches 100%
       if (progress >= 1) {
         completeInteraction(mouseHoldState.interactionType, mouseHoldState.targetPos);
         setMouseHoldState(null);
@@ -803,7 +831,6 @@ export default function SolverMode({ level, onBack }) {
     return () => clearInterval(interval);
   }, [mouseHoldState, gameOver, completeInteraction]);
 
-  // Tick: hazard zones update
   useEffect(() => {
     if (gameOver) return;
     const interval = setInterval(() => {
@@ -816,7 +843,6 @@ export default function SolverMode({ level, onBack }) {
     return () => clearInterval(interval);
   }, [gameOver]);
 
-  // Reach location tracking
   useEffect(() => {
     if (gameOver) return;
     const locKey = `${playerPos.x},${playerPos.y}`;
@@ -828,7 +854,15 @@ export default function SolverMode({ level, onBack }) {
     }
   }, [playerPos, gameOver]);
 
-  // Exit check (car) - check for key requirement
+  // Timer for elapsed time
+  useEffect(() => {
+    if (gameOver) return;
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+    }, 100);
+    return () => clearInterval(interval);
+  }, [gameOver, startTime]);
+
   useEffect(() => {
     if (gameOver) return;
     const exitPos = findTile(level.grid, 'car');
@@ -837,9 +871,8 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    // Check if car requires key
     const carCell = level.grid[exitPos.y][exitPos.x];
-    const needsKey = carCell.config?.needsKey !== false; // Default true
+    const needsKey = carCell.config?.needsKey !== false;
 
     if (needsKey && !hasItemType(gameState.inventory, 'key')) {
       if (!exitMessageShownRef.current) {
@@ -861,23 +894,9 @@ export default function SolverMode({ level, onBack }) {
     }
   }, [playerPos, gameOver, level, showMessage, grid, gameState]);
 
-  // Calculate viewport bounds for dynamic canvas sizing
-  const viewportBounds = useMemo(() => calculateViewportBounds(grid), [grid]);
+  // Removed viewport bounds for open-world feel
+  const viewportBounds = null;
 
-  const btnStyle = {
-    padding: '12px 24px',
-    background: 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
-    border: '2px solid #446644',
-    borderRadius: 8,
-    color: '#eee',
-    cursor: 'pointer',
-    fontSize: 15,
-    fontWeight: '600',
-    transition: 'all 0.2s ease',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-  };
-
-  // Get interaction label for progress bar
   const getInteractionLabel = (type) => {
     switch (type) {
       case 'cut-tree': return 'Cutting tree...';
@@ -890,148 +909,250 @@ export default function SolverMode({ level, onBack }) {
   };
 
   return (
-    <div
-      style={{
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      width: '100vw',
+      background: 'linear-gradient(135deg, #0a1f0a 0%, #071507 25%, #0a1a0a 50%, #050f05 100%)',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* Top HUD Bar - Fixed height, no jumping */}
+      <div style={{
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: 'radial-gradient(ellipse at center, #0f2a0f 0%, #0a1a0a 60%, #050f05 100%)',
-        position: 'relative',
-      }}
-      tabIndex={0}
-      ref={el => el && el.focus()}
-    >
-      <div style={{ position: 'relative' }}>
-        <HUD
-          lives={lives}
-          maxLives={level.lives || 3}
-          missions={level.missions || []}
-          gameState={gameState}
-          fixedOrder={level.fixedOrder}
-          message={message}
-          inventory={gameState.inventory}
-          grid={grid}
-        />
-        <Grid
-          grid={grid}
-          playerPos={playerPos}
-          showHazardZones={true}
-          tick={tick}
-          hazardZoneOverrides={hazardZones}
-          revealedTiles={revealedTiles}
-          viewportBounds={viewportBounds}
-          onHoldStart={handleMouseInteraction}
-          onHoldEnd={() => setMouseHoldState(null)}
-        />
-
-        {/* Hold E progress bar */}
-        {interactionState && (
+        justifyContent: 'space-between',
+        padding: '16px 24px',
+        background: 'linear-gradient(180deg, rgba(15, 25, 15, 0.95) 0%, rgba(10, 20, 10, 0.95) 100%)',
+        borderBottom: '2px solid rgba(68, 170, 68, 0.2)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0 2px 20px rgba(0, 0, 0, 0.5)',
+        zIndex: 100,
+        height: '80px',
+        flexShrink: 0,
+      }}>
+        {/* Left: Lives */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+        }}>
           <div style={{
-            position: 'absolute',
-            bottom: -50,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'linear-gradient(180deg, rgba(26, 42, 26, 0.95) 0%, rgba(10, 26, 10, 0.95) 100%)',
-            border: '3px solid #66aa66',
-            borderRadius: 10,
+            background: 'rgba(60, 20, 20, 0.6)',
             padding: '10px 16px',
-            minWidth: 220,
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            borderRadius: 10,
+            border: '1px solid rgba(255, 68, 68, 0.3)',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
           }}>
-            <div style={{
-              color: '#eeffee',
-              fontSize: 13,
-              marginBottom: 6,
-              textAlign: 'center',
-              fontWeight: 'bold',
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
-            }}>
-              {getInteractionLabel(interactionState.type)}
+            <div style={{ fontSize: 10, color: '#ff9999', fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Lives
             </div>
-            <div style={{
-              width: '100%',
-              height: 10,
-              background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: 5,
-              overflow: 'hidden',
-              border: '1px solid #335533',
-              boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.5)',
-            }}>
-              <div style={{
-                width: `${interactionState.progress * 100}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #44ff44 0%, #66ff88 100%)',
-                transition: 'width 16ms linear',
-                boxShadow: '0 0 10px rgba(68, 255, 68, 0.5)',
-              }} />
-            </div>
-            <div style={{
-              color: '#99bb99',
-              fontSize: 11,
-              marginTop: 4,
-              textAlign: 'center',
-            }}>
-              Hold E to continue
+            <div style={{ fontSize: 18 }}>
+              {'❤️'.repeat(lives)}{'🖤'.repeat(Math.max(0, (level.lives || 3) - lives))}
             </div>
           </div>
-        )}
 
-        {/* Mouse hold progress bar */}
-        {mouseHoldState && (
+          {/* Statistics - Time & Moves */}
           <div style={{
-            position: 'absolute',
-            bottom: -50,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'linear-gradient(180deg, rgba(26, 42, 26, 0.95) 0%, rgba(10, 26, 10, 0.95) 100%)',
-            border: '3px solid #66aa66',
-            borderRadius: 10,
-            padding: '10px 16px',
-            minWidth: 220,
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            gap: 12,
           }}>
+            {/* Time */}
             <div style={{
-              color: '#eeffee',
-              fontSize: 13,
-              marginBottom: 6,
-              textAlign: 'center',
-              fontWeight: 'bold',
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+              background: 'linear-gradient(145deg, rgba(30, 45, 60, 0.8), rgba(20, 35, 50, 0.8))',
+              padding: '10px 16px',
+              borderRadius: 10,
+              border: '2px solid rgba(100, 180, 255, 0.5)',
+              boxShadow: '0 4px 15px rgba(100, 180, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
             }}>
-              {getInteractionLabel(mouseHoldState.interactionType)}
+              <div style={{ fontSize: 9, color: '#a8d8ff', fontWeight: 'bold', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+                ⏱ Time
+              </div>
+              <div style={{ fontSize: 20, color: '#ffffff', fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1 }}>
+                {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
+              </div>
             </div>
+
+            {/* Moves */}
             <div style={{
-              width: '100%',
-              height: 10,
-              background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: 5,
-              overflow: 'hidden',
-              border: '1px solid #335533',
-              boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.5)',
+              background: 'linear-gradient(145deg, rgba(60, 30, 60, 0.8), rgba(50, 20, 50, 0.8))',
+              padding: '10px 16px',
+              borderRadius: 10,
+              border: '2px solid rgba(200, 120, 255, 0.5)',
+              boxShadow: '0 4px 15px rgba(200, 120, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
             }}>
-              <div style={{
-                width: `${mouseHoldState.progress * 100}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #44ff44 0%, #66ff88 100%)',
-                transition: 'width 16ms linear',
-                boxShadow: '0 0 10px rgba(68, 255, 68, 0.5)',
-              }} />
-            </div>
-            <div style={{
-              color: '#99bb99',
-              fontSize: 11,
-              marginTop: 4,
-              textAlign: 'center',
-            }}>
-              Hold mouse button to continue
+              <div style={{ fontSize: 9, color: '#e8b8ff', fontWeight: 'bold', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+                🚶 Moves
+              </div>
+              <div style={{ fontSize: 20, color: '#ffffff', fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1 }}>
+                {moveCount}
+              </div>
             </div>
           </div>
-        )}
+
+          {/* Inventory Preview */}
+          {gameState.inventory.length > 0 && (
+            <div style={{
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+            }}>
+              <div style={{ fontSize: 11, color: '#ccbb99', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Inv:
+              </div>
+              {gameState.inventory.slice(0, 5).map((item, i) => {
+                const def = ITEM_TYPES[item.itemType];
+                const isWood = item.itemType === 'wood';
+                let emoji = def?.emoji || '';
+                if (item.itemType === 'bucket') emoji = item.filled ? '🪣' : '🪣';
+
+                return (
+                  <div key={i} style={{
+                    background: 'rgba(60, 45, 30, 0.6)',
+                    padding: '6px',
+                    borderRadius: 6,
+                    fontSize: 16,
+                    border: '1px solid rgba(200, 150, 100, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    {isWood ? <WoodIcon size={20} /> : emoji}
+                  </div>
+                );
+              })}
+              {gameState.inventory.length > 5 && (
+                <div style={{ fontSize: 11, color: '#ccbb99', fontWeight: 'bold' }}>
+                  +{gameState.inventory.length - 5}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Center: Message (Fixed space) */}
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          height: '48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: '300px',
+        }}>
+          {message && (
+            <div style={{
+              background: 'linear-gradient(145deg, rgba(58, 122, 58, 0.95) 0%, rgba(42, 90, 42, 0.95) 100%)',
+              padding: '10px 24px',
+              borderRadius: 10,
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: '700',
+              boxShadow: '0 4px 16px rgba(68, 170, 68, 0.4), 0 0 0 2px rgba(68, 170, 68, 0.3)',
+              backdropFilter: 'blur(10px)',
+              textAlign: 'center',
+            }}>
+              {message}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Missions */}
+        <div style={{
+          background: 'rgba(30, 45, 60, 0.6)',
+          padding: '10px 14px',
+          borderRadius: 10,
+          maxWidth: '280px',
+          border: '1px solid rgba(100, 150, 200, 0.3)',
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
+        }}>
+          <div style={{ fontSize: 10, color: '#a8d8f8', fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Missions {level.fixedOrder ? '(Ordered)' : ''}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {(level.missions || []).map((m, i) => {
+              const complete = isMissionDone(m, gameState, grid);
+              const isCurrent = level.fixedOrder && !complete && (level.missions || []).slice(0, i).every(prev => isMissionDone(prev, gameState, grid));
+              return (
+                <div key={i} style={{
+                  color: complete ? '#88ff88' : isCurrent ? '#ffee66' : '#99aabb',
+                  fontSize: 11,
+                  textDecoration: complete ? 'line-through' : 'none',
+                  fontWeight: isCurrent ? '600' : '400',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <span style={{ fontSize: 12 }}>{complete ? '✓' : isCurrent ? '▶' : '○'}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {m.description || `${m.type}: ${m.targetId || ''}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Drop menu (Q) */}
+      {/* Main Game Area - Flexible, centered */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        position: 'relative',
+      }}>
+        <div style={{ position: 'relative' }}>
+          <Grid
+            grid={grid}
+            playerPos={playerPos}
+            playerDirection={playerDirection}
+            showHazardZones={true}
+            tick={tick}
+            hazardZoneOverrides={hazardZones}
+            revealedTiles={revealedTiles}
+            viewportBounds={viewportBounds}
+            onHoldStart={handleMouseInteraction}
+            onHoldEnd={() => setMouseHoldState(null)}
+            interactionTarget={(interactionState || mouseHoldState)?.targetPos}
+            interactionProgress={(interactionState || mouseHoldState)?.progress || 0}
+          />
+        </div>
+      </div>
+
+      {/* Bottom Controls Bar */}
+      <div style={{
+        padding: '12px 24px',
+        background: 'linear-gradient(180deg, rgba(10, 20, 10, 0.95) 0%, rgba(15, 25, 15, 0.95) 100%)',
+        borderTop: '2px solid rgba(68, 170, 68, 0.2)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0 -2px 20px rgba(0, 0, 0, 0.5)',
+        zIndex: 100,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 20,
+      }}>
+        <div style={{
+          color: '#a8e8a8',
+          fontSize: 12,
+          fontFamily: 'monospace',
+          display: 'flex',
+          gap: 20,
+        }}>
+          <span><strong>WASD/Arrows:</strong> Move</span>
+          <span><strong>E:</strong> Interact</span>
+          <span><strong>F:</strong> Pick up</span>
+          <span><strong>Q:</strong> Drop Item</span>
+          <span><strong>R:</strong> Restart</span>
+        </div>
+      </div>
+
+      {/* Drop menu */}
       {dropMenuOpen && !gameOver && (
         <div style={{
           position: 'absolute',
@@ -1039,57 +1160,76 @@ export default function SolverMode({ level, onBack }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'rgba(0,0,0,0.75)',
-          zIndex: 30,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 200,
         }}
         onClick={() => setDropMenuOpen(false)}
         >
           <div
             style={{
-              background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
-              border: '3px solid #66aa66',
-              borderRadius: 12,
-              padding: 24,
-              minWidth: 340,
-              maxWidth: 440,
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              background: 'linear-gradient(160deg, rgba(30, 45, 30, 0.98) 0%, rgba(20, 35, 20, 0.98) 100%)',
+              borderRadius: 16,
+              padding: 28,
+              minWidth: 320,
+              maxWidth: 400,
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9), 0 0 0 2px rgba(68, 170, 68, 0.4)',
+              backdropFilter: 'blur(20px)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{
-              color: '#88dd88',
-              margin: '0 0 16px 0',
+              color: '#a8f0a8',
+              margin: '0 0 20px 0',
               fontSize: 20,
-              fontWeight: 'bold',
-              textShadow: '0 2px 8px rgba(136, 221, 136, 0.3)',
+              fontWeight: '800',
+              textAlign: 'center',
             }}>
-              Drop Item (Q)
+              Drop Item
             </h2>
             {gameState.inventory.length === 0 ? (
-              <div style={{ color: '#888', fontSize: 14, padding: 10 }}>
+              <div style={{ color: '#a8e8a8', fontSize: 14, padding: 20, textAlign: 'center' }}>
                 Inventory is empty
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {gameState.inventory.map((item, idx) => {
                   const itemDef = ITEM_TYPES[item.itemType];
                   const label = itemDef?.label || item.itemType;
-                  const emoji = itemDef?.emoji || '';
+                  const isWood = item.itemType === 'wood';
+                  let emoji = itemDef?.emoji || '';
+                  if (item.itemType === 'bucket') emoji = '🪣';
                   const filledText = item.filled ? ' (filled)' : '';
                   return (
                     <button
                       key={idx}
                       onClick={() => dropItem(idx)}
                       style={{
-                        ...btnStyle,
-                        textAlign: 'left',
-                        width: '100%',
-                        background: '#2a3a2a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '12px 16px',
+                        background: 'rgba(40, 55, 40, 0.6)',
+                        border: 'none',
+                        borderRadius: 10,
+                        color: '#ffffff',
+                        fontSize: 14,
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                       }}
-                      onMouseEnter={(e) => e.target.style.background = '#3a4a3a'}
-                      onMouseLeave={(e) => e.target.style.background = '#2a3a2a'}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = 'rgba(50, 75, 50, 0.8)';
+                        e.target.style.transform = 'translateX(4px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = 'rgba(40, 55, 40, 0.6)';
+                        e.target.style.transform = 'translateX(0)';
+                      }}
                     >
-                      {emoji} {label}{filledText}
+                      {isWood ? <WoodIcon size={24} /> : <span style={{ fontSize: 18 }}>{emoji}</span>}
+                      {label}{filledText}
                     </button>
                   );
                 })}
@@ -1097,7 +1237,21 @@ export default function SolverMode({ level, onBack }) {
             )}
             <button
               onClick={() => setDropMenuOpen(false)}
-              style={{ ...btnStyle, marginTop: 12, width: '100%' }}
+              style={{
+                marginTop: 16,
+                width: '100%',
+                padding: '10px',
+                background: 'rgba(30, 40, 30, 0.6)',
+                border: 'none',
+                borderRadius: 10,
+                color: '#c8e6c8',
+                fontSize: 13,
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => e.target.style.background = 'rgba(40, 55, 40, 0.8)'}
+              onMouseLeave={(e) => e.target.style.background = 'rgba(30, 40, 30, 0.6)'}
             >
               Cancel (Q or ESC)
             </button>
@@ -1105,71 +1259,8 @@ export default function SolverMode({ level, onBack }) {
         </div>
       )}
 
-      {/* Interaction choice menu */}
-      {interactionChoices && !gameOver && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.75)',
-          zIndex: 30,
-        }}
-        onClick={() => setInteractionChoices(null)}
-        >
-          <div
-            style={{
-              background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
-              border: '3px solid #66aa66',
-              borderRadius: 12,
-              padding: 24,
-              minWidth: 340,
-              maxWidth: 440,
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{
-              color: '#88dd88',
-              margin: '0 0 16px 0',
-              fontSize: 20,
-              fontWeight: 'bold',
-              textShadow: '0 2px 8px rgba(136, 221, 136, 0.3)',
-            }}>
-              Choose Interaction
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {interactionChoices.choices.map((choice, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setInteractionChoices(null);
-                    choice.action();
-                  }}
-                  style={{
-                    ...btnStyle,
-                    textAlign: 'left',
-                    width: '100%',
-                    background: '#2a3a2a',
-                  }}
-                  onMouseEnter={(e) => e.target.style.background = '#3a4a3a'}
-                  onMouseLeave={(e) => e.target.style.background = '#2a3a2a'}
-                >
-                  {choice.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setInteractionChoices(null)}
-              style={{ ...btnStyle, marginTop: 12, width: '100%' }}
-            >
-              Cancel (ESC)
-            </button>
-          </div>
-        </div>
-      )}
 
+      {/* Game Over Screen */}
       {gameOver && (
         <div style={{
           position: 'absolute',
@@ -1178,41 +1269,185 @@ export default function SolverMode({ level, onBack }) {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(8px)',
-          zIndex: 20,
+          background: 'rgba(0,0,0,0.9)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 300,
         }}>
           <h1 style={{
-            color: gameOver === 'win' ? '#44ff44' : '#ff4444',
+            color: gameOver === 'win' ? '#88ff88' : '#ff6666',
             fontSize: 56,
-            marginBottom: 30,
+            marginBottom: 20,
             fontWeight: '900',
             textShadow: gameOver === 'win'
-              ? '0 0 20px rgba(68, 255, 68, 0.8), 0 4px 16px rgba(68, 255, 68, 0.5)'
-              : '0 0 20px rgba(255, 68, 68, 0.8), 0 4px 16px rgba(255, 68, 68, 0.5)',
-            letterSpacing: 2,
+              ? '0 0 40px rgba(68, 255, 68, 0.8), 0 0 80px rgba(68, 255, 68, 0.4)'
+              : '0 0 40px rgba(255, 68, 68, 0.8), 0 0 80px rgba(255, 68, 68, 0.4)',
+            letterSpacing: 4,
+            textTransform: 'uppercase',
           }}>
-            {gameOver === 'win' ? '🎉 YOU ESCAPED! 🎉' : '💀 GAME OVER 💀'}
+            {gameOver === 'win' ? '🎉 You Escaped! 🎉' : '💀 Game Over 💀'}
           </h1>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={restart} style={btnStyle}>Restart (R)</button>
-            <button onClick={onBack} style={btnStyle}>Back to Menu (ESC)</button>
+
+          {/* Final Statistics */}
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(30, 45, 60, 0.95), rgba(20, 35, 50, 0.95))',
+            padding: '28px 48px',
+            borderRadius: 20,
+            marginBottom: 32,
+            border: '3px solid rgba(100, 180, 255, 0.6)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8), 0 0 60px rgba(100, 180, 255, 0.2)',
+            minWidth: 400,
+          }}>
+            <div style={{
+              fontSize: 16,
+              color: '#a8d8ff',
+              fontWeight: '800',
+              marginBottom: 20,
+              textAlign: 'center',
+              textTransform: 'uppercase',
+              letterSpacing: 3,
+            }}>
+              📊 Final Statistics
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-around', gap: 40 }}>
+              {/* Time */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontSize: 14,
+                  color: '#88ccff',
+                  marginBottom: 8,
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  letterSpacing: 2,
+                }}>
+                  ⏱ Time
+                </div>
+                <div style={{
+                  fontSize: 48,
+                  color: '#ffffff',
+                  fontWeight: '900',
+                  fontFamily: 'monospace',
+                  textShadow: '0 2px 20px rgba(100, 180, 255, 0.6)',
+                  letterSpacing: 2,
+                }}>
+                  {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  color: '#6699cc',
+                  marginTop: 4,
+                }}>
+                  minutes:seconds
+                </div>
+              </div>
+
+              {/* Moves */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontSize: 14,
+                  color: '#e8b8ff',
+                  marginBottom: 8,
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  letterSpacing: 2,
+                }}>
+                  🚶 Moves
+                </div>
+                <div style={{
+                  fontSize: 48,
+                  color: '#ffffff',
+                  fontWeight: '900',
+                  fontFamily: 'monospace',
+                  textShadow: '0 2px 20px rgba(200, 120, 255, 0.6)',
+                  letterSpacing: 2,
+                }}>
+                  {moveCount}
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  color: '#9966cc',
+                  marginTop: 4,
+                }}>
+                  total steps
+                </div>
+              </div>
+            </div>
+
+            {gameOver === 'win' && (
+              <div style={{
+                marginTop: 24,
+                padding: '12px 20px',
+                background: 'rgba(68, 255, 68, 0.15)',
+                borderRadius: 10,
+                border: '1px solid rgba(68, 255, 68, 0.3)',
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  fontSize: 13,
+                  color: '#88ff88',
+                  fontWeight: '700',
+                  letterSpacing: 1,
+                }}>
+                  🏆 Score: {Math.max(0, 10000 - (elapsedTime * 10) - (moveCount * 5))} pts
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 16 }}>
+            <button
+              onClick={restart}
+              style={{
+                padding: '14px 28px',
+                background: 'linear-gradient(145deg, #2a5a2a 0%, #1a4a1a 100%)',
+                border: 'none',
+                borderRadius: 12,
+                color: '#ffffff',
+                fontSize: 16,
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 8px 28px rgba(68, 170, 68, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.5)';
+              }}
+            >
+              Restart (R)
+            </button>
+            <button
+              onClick={onBack}
+              style={{
+                padding: '14px 28px',
+                background: 'linear-gradient(145deg, #2a4a2a 0%, #1a3a1a 100%)',
+                border: 'none',
+                borderRadius: 12,
+                color: '#ffffff',
+                fontSize: 16,
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 8px 28px rgba(68, 170, 68, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.5)';
+              }}
+            >
+              Back to Menu (ESC)
+            </button>
           </div>
         </div>
       )}
-
-      <div style={{
-        marginTop: 16,
-        color: '#88aa88',
-        fontSize: 12,
-        padding: '8px 16px',
-        background: 'rgba(0, 0, 0, 0.4)',
-        borderRadius: 8,
-        border: '1px solid #335533',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
-      }}>
-        WASD/Arrows: Move | E: Pick up / Hold to interact | Q: Drop Item Menu | R: Restart | ESC: Menu
-      </div>
     </div>
   );
 }

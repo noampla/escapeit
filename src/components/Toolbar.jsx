@@ -107,19 +107,28 @@ function ToolbarIcon({ type }) {
 export default function Toolbar({ selected, onSelect }) {
   return (
     <div style={{
-      width: 190,
-      background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
-      padding: 14,
+      width: 210,
+      background: 'linear-gradient(180deg, rgba(20, 40, 20, 0.95) 0%, rgba(10, 25, 10, 0.95) 100%)',
+      padding: 18,
       overflowY: 'auto',
-      borderRight: '3px solid #446644',
-      boxShadow: 'inset -4px 0 12px rgba(0, 0, 0, 0.3)',
+      borderRight: '2px solid rgba(68, 170, 68, 0.3)',
+      boxShadow: `
+        inset -6px 0 20px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05)
+      `,
+      backdropFilter: 'blur(10px)',
     }}>
       <h3 style={{
-        margin: '0 0 14px',
-        color: '#88dd88',
-        fontSize: 16,
-        fontWeight: 'bold',
-        textShadow: '0 2px 6px rgba(136, 221, 136, 0.3)',
+        margin: '0 0 20px',
+        color: '#a8f0a8',
+        fontSize: 18,
+        fontWeight: '800',
+        textShadow: `
+          0 0 20px rgba(136, 221, 136, 0.5),
+          0 2px 8px rgba(0, 0, 0, 0.8)
+        `,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
       }}>
         🌲 Objects
       </h3>
@@ -127,14 +136,14 @@ export default function Toolbar({ selected, onSelect }) {
         const items = Object.entries(TILE_TYPES).filter(([, def]) => def.category === cat.id);
         if (items.length === 0) return null;
         return (
-          <div key={cat.id} style={{ marginBottom: 16 }}>
+          <div key={cat.id} style={{ marginBottom: 20 }}>
             <div style={{
-              color: '#99bb99',
-              fontSize: 11,
-              marginBottom: 6,
+              color: '#a8f0a8',
+              fontSize: 12,
+              marginBottom: 10,
               textTransform: 'uppercase',
-              fontWeight: 'bold',
-              letterSpacing: 0.5,
+              fontWeight: '700',
+              letterSpacing: 1,
             }}>
               {cat.label}
             </div>
@@ -146,33 +155,38 @@ export default function Toolbar({ selected, onSelect }) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 10,
                     width: '100%',
-                    padding: '8px 10px',
-                    marginBottom: 4,
+                    padding: '11px 14px',
+                    marginBottom: 6,
                     background: selected === type
-                      ? 'linear-gradient(135deg, #3a5a3a 0%, #2a4a2a 100%)'
-                      : 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
-                    border: selected === type ? '2px solid #66aa66' : '2px solid transparent',
-                    borderRadius: 6,
-                    color: selected === type ? '#eeffee' : '#ddd',
+                      ? 'linear-gradient(145deg, #3a7a3a 0%, #2a5a2a 100%)'
+                      : 'linear-gradient(145deg, rgba(30, 55, 30, 0.6) 0%, rgba(20, 40, 20, 0.6) 100%)',
+                    border: 'none',
+                    borderRadius: 10,
+                    color: selected === type ? '#ffffff' : '#c8e6c8',
                     cursor: 'pointer',
-                    fontSize: 13,
+                    fontSize: 14,
                     textAlign: 'left',
-                    fontWeight: selected === type ? '600' : '400',
-                    transition: 'all 0.15s ease',
+                    fontWeight: selected === type ? '700' : '500',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     boxShadow: selected === type
-                      ? '0 4px 12px rgba(102, 170, 102, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
-                      : '0 2px 6px rgba(0, 0, 0, 0.2)',
+                      ? '0 4px 16px rgba(102, 170, 102, 0.3), 0 0 0 2px rgba(68, 170, 68, 0.4), inset 0 2px 0 rgba(255,255,255,0.15)'
+                      : '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(68, 170, 68, 0.15)',
+                    transform: selected === type ? 'translateX(4px)' : 'translateX(0)',
                   }}
                   onMouseEnter={(e) => {
                     if (selected !== type) {
-                      e.target.style.background = 'linear-gradient(135deg, #3a4a3a 0%, #2a3a2a 100%)';
+                      e.target.style.background = 'linear-gradient(145deg, rgba(40, 65, 40, 0.8) 0%, rgba(30, 50, 30, 0.8) 100%)';
+                      e.target.style.transform = 'translateX(2px)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(68, 170, 68, 0.2), 0 0 0 1px rgba(68, 170, 68, 0.25)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (selected !== type) {
-                      e.target.style.background = 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)';
+                      e.target.style.background = 'linear-gradient(145deg, rgba(30, 55, 30, 0.6) 0%, rgba(20, 40, 20, 0.6) 100%)';
+                      e.target.style.transform = 'translateX(0)';
+                      e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(68, 170, 68, 0.15)';
                     }
                   }}
                 >
@@ -185,16 +199,17 @@ export default function Toolbar({ selected, onSelect }) {
         );
       })}
       <div style={{
-        color: '#99bb99',
-        fontSize: 11,
-        marginTop: 16,
-        padding: '8px',
-        background: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: 6,
-        border: '1px solid #335533',
-        lineHeight: 1.6,
+        color: '#99cc99',
+        fontSize: 12,
+        marginTop: 20,
+        padding: '12px 14px',
+        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(10, 20, 10, 0.3) 100%)',
+        borderRadius: 10,
+        border: '1px solid rgba(68, 170, 68, 0.2)',
+        lineHeight: 1.8,
+        fontFamily: 'monospace',
       }}>
-        <strong>Controls:</strong><br />
+        <div style={{ color: '#a8f0a8', fontWeight: 'bold', marginBottom: 6, fontSize: 13 }}>Controls</div>
         Left click: place<br />
         Right click: remove
       </div>

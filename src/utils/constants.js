@@ -11,7 +11,7 @@ export const ITEM_TYPES = {
   rope: { label: 'Rope', emoji: '🧵', color: '#aa8855' },
   knife: { label: 'Knife', emoji: '🔪', color: '#cccccc' },
   sweater: { label: 'Sweater', emoji: '🧥', color: '#cc4466' },
-  wood: { label: 'Wood', emoji: null, color: '#8b6914', draw: 'wood' },
+  wood: { label: 'Wood', emoji: '🪵', color: '#8b6914', draw: 'wood' },
 };
 
 export const TILE_TYPES = {

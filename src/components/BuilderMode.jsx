@@ -147,26 +147,27 @@ export default function BuilderMode({ onBack, editLevel }) {
   };
 
   const barBtn = {
-    padding: '8px 16px',
-    background: 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
-    border: '2px solid #446644',
-    borderRadius: 6,
-    color: '#ddd',
+    padding: '10px 20px',
+    background: 'linear-gradient(145deg, #2a5a2a 0%, #1a4a1a 100%)',
+    border: 'none',
+    borderRadius: 10,
+    color: '#c8e6c8',
     cursor: 'pointer',
-    fontSize: 13,
-    fontWeight: '500',
-    transition: 'all 0.2s ease',
-    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+    fontSize: 14,
+    fontWeight: '600',
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
   };
   const activeBarBtn = (active) => ({
     ...barBtn,
     background: active
-      ? 'linear-gradient(135deg, #3a5a3a 0%, #2a4a2a 100%)'
-      : 'linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%)',
-    border: active ? '2px solid #66aa66' : '2px solid #446644',
+      ? 'linear-gradient(145deg, #3a7a3a 0%, #2a5a2a 100%)'
+      : 'linear-gradient(145deg, #2a5a2a 0%, #1a4a1a 100%)',
+    color: active ? '#ffffff' : '#c8e6c8',
     boxShadow: active
-      ? '0 4px 12px rgba(102, 170, 102, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
-      : '0 2px 6px rgba(0, 0, 0, 0.3)',
+      ? '0 4px 16px rgba(102, 170, 102, 0.3), 0 0 0 2px rgba(68, 170, 68, 0.4), inset 0 2px 0 rgba(255,255,255,0.15)'
+      : '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
+    transform: active ? 'translateY(-1px)' : 'translateY(0)',
   });
 
   // Test mode - render SolverMode
@@ -197,18 +198,32 @@ export default function BuilderMode({ onBack, editLevel }) {
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
-      background: 'radial-gradient(ellipse at center, #0f2a0f 0%, #0a1a0a 60%, #050f05 100%)',
+      background: 'linear-gradient(135deg, #0a1f0a 0%, #071507 25%, #0a1a0a 50%, #050f05 100%)',
+      position: 'relative',
     }}>
+      {/* Background pattern overlay */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `
+          radial-gradient(circle at 20% 30%, rgba(68, 170, 68, 0.03) 0%, transparent 50%),
+          radial-gradient(circle at 80% 70%, rgba(68, 170, 68, 0.02) 0%, transparent 50%)
+        `,
+        pointerEvents: 'none',
+      }} />
+
       {/* Top bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        padding: '12px 16px',
-        background: 'linear-gradient(180deg, #1a3a1a 0%, #162a16 100%)',
-        borderBottom: '3px solid #446644',
+        padding: '14px 20px',
+        background: 'linear-gradient(180deg, rgba(20, 40, 20, 0.95) 0%, rgba(15, 30, 15, 0.95) 100%)',
+        borderBottom: '2px solid rgba(68, 170, 68, 0.3)',
         flexWrap: 'wrap',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(10px)',
+        zIndex: 10,
       }}>
         <button onClick={onBack} style={barBtn}>← Menu</button>
         <input
@@ -216,14 +231,16 @@ export default function BuilderMode({ onBack, editLevel }) {
           onChange={e => setLevelName(e.target.value)}
           placeholder="Forest name..."
           style={{
-            padding: '8px 14px',
-            background: 'rgba(26, 42, 26, 0.8)',
-            border: '2px solid #446644',
-            borderRadius: 6,
-            color: '#eee',
+            padding: '10px 16px',
+            background: 'linear-gradient(135deg, rgba(20, 35, 20, 0.9) 0%, rgba(15, 25, 15, 0.9) 100%)',
+            border: 'none',
+            borderRadius: 10,
+            color: '#ffffff',
             fontSize: 14,
-            width: 220,
-            boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.3)',
+            width: 240,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(68, 170, 68, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.4)',
+            outline: 'none',
+            fontWeight: '500',
           }}
         />
         <button onClick={handleSave} style={{ ...barBtn, background: saved ? '#2a4a2a' : '#2a3a4a' }}>
@@ -253,15 +270,17 @@ export default function BuilderMode({ onBack, editLevel }) {
         <button onClick={handleTest} style={{ ...barBtn, background: '#2a4a3a' }}>▶ Test</button>
         <button onClick={handleClear} style={{ ...barBtn, background: '#4a2a2a' }}>Clear</button>
         <span style={{
-          color: '#88aa88',
-          fontSize: 12,
+          color: '#a8f0a8',
+          fontSize: 13,
           marginLeft: 'auto',
-          padding: '4px 12px',
-          background: 'rgba(0, 0, 0, 0.3)',
-          borderRadius: 4,
-          border: '1px solid #335533',
+          padding: '8px 16px',
+          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(10, 20, 10, 0.3) 100%)',
+          borderRadius: 10,
+          border: '1px solid rgba(68, 170, 68, 0.2)',
+          fontWeight: '500',
+          fontFamily: 'monospace',
         }}>
-          {subMode === 'build' ? 'Build (click+drag to paint, Shift+click to edit)' : 'Edit (click to select)'} | Tool: {selectedTool}
+          {subMode === 'build' ? '🎨 Build Mode' : '✏️ Edit Mode'} • Tool: {selectedTool}
         </span>
       </div>
 
@@ -314,24 +333,33 @@ export default function BuilderMode({ onBack, editLevel }) {
         >
           <div
             style={{
-              background: 'linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%)',
-              border: '3px solid #66aa66',
-              borderRadius: 12,
-              padding: 30,
+              background: 'linear-gradient(160deg, rgba(20, 40, 20, 0.98) 0%, rgba(10, 25, 10, 0.98) 100%)',
+              border: '2px solid rgba(68, 170, 68, 0.4)',
+              borderRadius: 20,
+              padding: 40,
               minWidth: 500,
               maxWidth: 700,
               maxHeight: '80vh',
               overflow: 'auto',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              boxShadow: `
+                0 25px 80px rgba(0, 0, 0, 0.9),
+                0 0 0 1px rgba(68, 170, 68, 0.2),
+                inset 0 2px 0 rgba(255, 255, 255, 0.08)
+              `,
+              backdropFilter: 'blur(20px)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{
-              color: '#88dd88',
-              margin: '0 0 20px 0',
-              fontSize: 24,
-              fontWeight: 'bold',
-              textShadow: '0 2px 8px rgba(136, 221, 136, 0.3)',
+              color: '#a8f0a8',
+              margin: '0 0 28px 0',
+              fontSize: 28,
+              fontWeight: '800',
+              textShadow: `
+                0 0 20px rgba(136, 221, 136, 0.5),
+                0 4px 12px rgba(0, 0, 0, 0.8)
+              `,
+              letterSpacing: 1,
             }}>
               🌲 Load Forest Level
             </h2>
@@ -353,26 +381,27 @@ export default function BuilderMode({ onBack, editLevel }) {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '14px 18px',
-                        background: 'linear-gradient(135deg, rgba(42, 74, 42, 0.5) 0%, rgba(26, 58, 26, 0.5) 100%)',
-                        borderRadius: 8,
-                        border: '2px solid #446644',
-                        transition: 'all 0.2s ease',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                        padding: '16px 20px',
+                        background: 'linear-gradient(145deg, rgba(30, 55, 30, 0.6) 0%, rgba(20, 40, 20, 0.6) 100%)',
+                        borderRadius: 12,
+                        border: 'none',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2)',
+                        cursor: 'pointer',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#66aa66';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 170, 102, 0.2)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(68, 170, 68, 0.25), 0 0 0 2px rgba(68, 170, 68, 0.4)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = '#446644';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(68, 170, 68, 0.2)';
                       }}
                     >
                       <div>
-                        <div style={{ color: '#ddd', fontSize: 15, fontWeight: 'bold' }}>{level.name || 'Unnamed Level'}</div>
-                        <div style={{ color: '#668866', fontSize: 11 }}>
-                          {level.missions?.length || 0} missions · {level.lives || 3} lives · {new Date(level.updatedAt || level.createdAt).toLocaleDateString()}
+                        <div style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', marginBottom: 4 }}>{level.name || 'Unnamed Level'}</div>
+                        <div style={{ color: '#99bb99', fontSize: 12, fontFamily: 'monospace' }}>
+                          {level.missions?.length || 0} missions • {level.lives || 3} lives • {new Date(level.updatedAt || level.createdAt).toLocaleDateString()}
                         </div>
                       </div>
                       <button

@@ -132,7 +132,7 @@ function drawWood(ctx, cx, cy, size) {
   ctx.fill();
 }
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0 }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -224,6 +224,35 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
       ctx.globalAlpha = 1;
     }
 
+    // Interaction progress overlay on target tile
+    if (interactionTarget && interactionProgress > 0) {
+      const itx = (interactionTarget.x - offsetX) * TILE_SIZE;
+      const ity = (interactionTarget.y - offsetY) * TILE_SIZE;
+
+      // Semi-transparent overlay
+      ctx.fillStyle = 'rgba(68, 170, 68, 0.3)';
+      ctx.fillRect(itx, ity, TILE_SIZE, TILE_SIZE);
+
+      // Progress bar at bottom of tile
+      const barHeight = 6;
+      const barY = ity + TILE_SIZE - barHeight - 2;
+      const barX = itx + 2;
+      const barWidth = TILE_SIZE - 4;
+
+      // Background
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+
+      // Progress fill
+      ctx.fillStyle = '#44ff44';
+      ctx.fillRect(barX, barY, barWidth * interactionProgress, barHeight);
+
+      // Border
+      ctx.strokeStyle = 'rgba(68, 170, 68, 0.8)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barX, barY, barWidth, barHeight);
+    }
+
     // Player
     if (playerPos) {
       const ppx = (playerPos.x - offsetX) * TILE_SIZE, ppy = (playerPos.y - offsetY) * TILE_SIZE;
@@ -231,8 +260,46 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('🧑', ppx + TILE_SIZE / 2, ppy + TILE_SIZE / 2);
+
+      // Direction indicator
+      const dirOffsets = {
+        up: { x: 0, y: -8 },
+        down: { x: 0, y: 8 },
+        left: { x: -8, y: 0 },
+        right: { x: 8, y: 0 },
+      };
+      const offset = dirOffsets[playerDirection] || dirOffsets.down;
+      const arrowX = ppx + TILE_SIZE / 2 + offset.x;
+      const arrowY = ppy + TILE_SIZE / 2 + offset.y;
+
+      ctx.fillStyle = 'rgba(255, 255, 100, 0.9)';
+      ctx.beginPath();
+      if (playerDirection === 'up') {
+        ctx.moveTo(arrowX, arrowY - 3);
+        ctx.lineTo(arrowX - 3, arrowY + 2);
+        ctx.lineTo(arrowX + 3, arrowY + 2);
+      } else if (playerDirection === 'down') {
+        ctx.moveTo(arrowX, arrowY + 3);
+        ctx.lineTo(arrowX - 3, arrowY - 2);
+        ctx.lineTo(arrowX + 3, arrowY - 2);
+      } else if (playerDirection === 'left') {
+        ctx.moveTo(arrowX - 3, arrowY);
+        ctx.lineTo(arrowX + 2, arrowY - 3);
+        ctx.lineTo(arrowX + 2, arrowY + 3);
+      } else if (playerDirection === 'right') {
+        ctx.moveTo(arrowX + 3, arrowY);
+        ctx.lineTo(arrowX - 2, arrowY - 3);
+        ctx.lineTo(arrowX - 2, arrowY + 3);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Arrow outline
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
-  }, [grid, playerPos, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress]);
 
   useEffect(() => {
     draw();
@@ -325,20 +392,31 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
         onContextMenu={handleRightClick}
         onMouseLeave={handleMouseLeave}
         style={{
-          border: '4px solid #66aa66',
-          borderRadius: 8,
+          border: 'none',
+          borderRadius: 4,
           cursor: 'crosshair',
           display: 'block',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.05)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
         }}
         tabIndex={-1}
       />
       {tooltip && (
         <div style={{
-          position: 'absolute', left: tooltip.x, top: tooltip.y,
-          background: 'rgba(0,0,0,0.85)', color: '#eee', padding: '4px 8px',
-          borderRadius: 4, fontSize: 11, pointerEvents: 'none', zIndex: 50,
-          maxWidth: 220, whiteSpace: 'pre-wrap',
+          position: 'absolute',
+          left: tooltip.x,
+          top: tooltip.y,
+          background: 'linear-gradient(145deg, rgba(20, 30, 20, 0.98) 0%, rgba(10, 20, 10, 0.98) 100%)',
+          color: '#e8f8e8',
+          padding: '8px 12px',
+          borderRadius: 8,
+          fontSize: 12,
+          pointerEvents: 'none',
+          zIndex: 50,
+          maxWidth: 240,
+          whiteSpace: 'pre-wrap',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(68, 170, 68, 0.3)',
+          fontWeight: '500',
+          backdropFilter: 'blur(8px)',
         }}>
           {tooltip.text}
         </div>

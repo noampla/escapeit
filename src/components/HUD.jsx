@@ -2,39 +2,53 @@ import { ITEM_TYPES } from '../utils/constants';
 
 export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, message, inventory = [], grid }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 12, pointerEvents: 'none' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 14, pointerEvents: 'none' }}>
       {/* Lives */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(26, 42, 26, 0.95) 0%, rgba(10, 26, 10, 0.95) 100%)',
-        padding: '10px 16px',
-        borderRadius: 8,
-        border: '2px solid #446644',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        background: 'linear-gradient(145deg, rgba(30, 20, 20, 0.95) 0%, rgba(20, 10, 10, 0.95) 100%)',
+        padding: '12px 18px',
+        borderRadius: 12,
+        border: 'none',
+        boxShadow: `
+          0 6px 20px rgba(0, 0, 0, 0.6),
+          0 0 0 2px rgba(255, 68, 68, 0.3),
+          inset 0 2px 0 rgba(255, 255, 255, 0.08)
+        `,
+        backdropFilter: 'blur(10px)',
       }}>
-        <span style={{ color: '#ff6666', fontSize: 18 }}>
+        <div style={{ color: '#ff9999', fontSize: 10, fontWeight: 'bold', marginBottom: 4, letterSpacing: 1, textTransform: 'uppercase' }}>
+          Lives
+        </div>
+        <span style={{ color: '#ff6666', fontSize: 20 }}>
           {'❤️'.repeat(lives)}{'🖤'.repeat(Math.max(0, maxLives - lives))}
         </span>
       </div>
 
       {/* Message - Fixed space to prevent layout shift */}
       <div style={{
-        minWidth: 300,
+        minWidth: 350,
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: 43,
+        minHeight: 56,
       }}>
         {message && (
           <div style={{
-            background: 'linear-gradient(135deg, rgba(68, 170, 68, 0.95) 0%, rgba(42, 122, 42, 0.95) 100%)',
-            padding: '10px 20px',
-            borderRadius: 8,
-            color: '#fff',
-            fontSize: 15,
-            fontWeight: 'bold',
-            border: '2px solid #66aa66',
-            boxShadow: '0 4px 16px rgba(68, 170, 68, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-            textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+            background: 'linear-gradient(145deg, rgba(58, 122, 58, 0.98) 0%, rgba(42, 90, 42, 0.98) 100%)',
+            padding: '14px 28px',
+            borderRadius: 14,
+            color: '#ffffff',
+            fontSize: 16,
+            fontWeight: '700',
+            border: 'none',
+            boxShadow: `
+              0 6px 24px rgba(68, 170, 68, 0.5),
+              0 0 0 2px rgba(68, 170, 68, 0.4),
+              inset 0 2px 0 rgba(255, 255, 255, 0.2)
+            `,
+            textShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(10px)',
+            letterSpacing: 0.5,
           }}>
             {message}
           </div>
@@ -43,33 +57,44 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
 
       {/* Missions */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(26, 42, 26, 0.95) 0%, rgba(10, 26, 10, 0.95) 100%)',
-        padding: '12px 16px',
-        borderRadius: 8,
-        maxWidth: 280,
-        border: '2px solid #446644',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        background: 'linear-gradient(145deg, rgba(30, 45, 60, 0.95) 0%, rgba(20, 30, 40, 0.95) 100%)',
+        padding: '14px 18px',
+        borderRadius: 12,
+        maxWidth: 300,
+        border: 'none',
+        boxShadow: `
+          0 6px 20px rgba(0, 0, 0, 0.6),
+          0 0 0 2px rgba(100, 150, 200, 0.3),
+          inset 0 2px 0 rgba(255, 255, 255, 0.08)
+        `,
+        backdropFilter: 'blur(10px)',
       }}>
         <div style={{
-          color: '#88dd88',
-          fontSize: 12,
-          marginBottom: 6,
-          fontWeight: 'bold',
+          color: '#a8d8f8',
+          fontSize: 11,
+          marginBottom: 8,
+          fontWeight: '700',
           textTransform: 'uppercase',
-          letterSpacing: 1,
+          letterSpacing: 1.5,
         }}>
-          MISSIONS{fixedOrder ? ' (ordered)' : ''}
+          Missions{fixedOrder ? ' (Ordered)' : ''}
         </div>
         {missions.map((m, i) => {
           const complete = isMissionDone(m, gameState, grid);
           const isCurrent = fixedOrder && !complete && missions.slice(0, i).every(prev => isMissionDone(prev, gameState, grid));
           return (
             <div key={i} style={{
-              color: complete ? '#44ff44' : isCurrent ? '#ffdd00' : '#888',
-              fontSize: 12,
+              color: complete ? '#88ff88' : isCurrent ? '#ffee66' : '#99aabb',
+              fontSize: 13,
               textDecoration: complete ? 'line-through' : 'none',
+              fontWeight: isCurrent ? '600' : '500',
+              marginBottom: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
             }}>
-              {complete ? '✓' : isCurrent ? '▶' : '○'} {m.description || `${m.type}: ${m.targetId || ''}`}
+              <span style={{ fontSize: 14 }}>{complete ? '✓' : isCurrent ? '▶' : '○'}</span>
+              {m.description || `${m.type}: ${m.targetId || ''}`}
             </div>
           );
         })}
@@ -78,21 +103,26 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
       {/* Inventory */}
       {inventory.length > 0 && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(26, 42, 26, 0.95) 0%, rgba(10, 26, 10, 0.95) 100%)',
-          padding: '10px 16px',
-          borderRadius: 8,
-          border: '2px solid #446644',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          background: 'linear-gradient(145deg, rgba(60, 45, 30, 0.95) 0%, rgba(40, 30, 20, 0.95) 100%)',
+          padding: '14px 18px',
+          borderRadius: 12,
+          border: 'none',
+          boxShadow: `
+            0 6px 20px rgba(0, 0, 0, 0.6),
+            0 0 0 2px rgba(200, 150, 100, 0.3),
+            inset 0 2px 0 rgba(255, 255, 255, 0.08)
+          `,
+          backdropFilter: 'blur(10px)',
         }}>
           <div style={{
-            color: '#88dd88',
-            fontSize: 12,
-            marginBottom: 4,
-            fontWeight: 'bold',
+            color: '#f8d8a8',
+            fontSize: 11,
+            marginBottom: 8,
+            fontWeight: '700',
             textTransform: 'uppercase',
-            letterSpacing: 1,
+            letterSpacing: 1.5,
           }}>
-            INVENTORY
+            Inventory
           </div>
           {inventory.map((item, i) => {
             const def = ITEM_TYPES[item.itemType];
@@ -100,26 +130,35 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
             let emoji = def?.emoji || '';
             // Manual rendering for bucket/wood
             if (item.itemType === 'bucket') emoji = '🪣';
-            if (item.itemType === 'wood') emoji = '🪵';
+            if (item.itemType === 'wood') emoji = '🟫';
             const suffix = item.itemType === 'bucket' ? (item.filled ? ' (full)' : ' (empty)') : '';
             return (
               <div key={i} style={{
-                color: '#eeffee',
-                fontSize: 13,
-                fontWeight: '500',
-                marginBottom: 2,
+                color: '#ffffff',
+                fontSize: 14,
+                fontWeight: '600',
+                marginBottom: 6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(0, 0, 0, 0.2)',
+                padding: '6px 10px',
+                borderRadius: 8,
               }}>
-                {emoji} {label}{suffix}
+                <span style={{ fontSize: 16 }}>{emoji}</span>
+                {label}{suffix}
               </div>
             );
           })}
           <div style={{
-            color: '#99bb99',
-            fontSize: 10,
-            marginTop: 6,
-            fontStyle: 'italic',
+            color: '#ccbb99',
+            fontSize: 11,
+            marginTop: 10,
+            fontFamily: 'monospace',
+            paddingTop: 8,
+            borderTop: '1px solid rgba(200, 150, 100, 0.2)',
           }}>
-            Q: drop menu
+            Press Q to drop
           </div>
         </div>
       )}
