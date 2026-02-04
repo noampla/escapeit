@@ -115,6 +115,16 @@ export const TILE_TYPES = {
     tooltip: 'Guard uniform. Pick up (F) then wear (E while holding) to become invisible to cameras.',
     walkable: true
   },
+  'item-mirror': {
+    label: 'Mirror',
+    color: '#ccddee',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'mirror',
+    tooltip: 'Mirror. Pick up (F) and place (Q) to block laser beams.',
+    walkable: true,
+    canPickupFromAdjacent: true
+  },
 
   // Security - Hazards
   camera: {
@@ -566,6 +576,7 @@ export function getTileEmoji(tileType) {
     'item-key': null,
     'item-card': null,
     'item-uniform': null, // Custom rendered
+    'item-mirror': null, // Custom rendered
     camera: null, // Custom rendered
     laser: null // Custom rendered
   };
@@ -579,7 +590,7 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['floor', 'start', 'exit'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['door-key', 'door-card'];
+export const INTERACTABLE_TILES = ['door-key', 'door-card', 'floor', 'start', 'exit'];
 
 // Tiles to ignore for floor color detection when picking up items
 export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'camera', 'laser'];

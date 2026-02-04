@@ -84,8 +84,8 @@ export class ThemeLoader {
   }
 
   // Interaction functions
-  getAvailableInteractions(gameState, grid, x, y) {
-    return this.interactions?.getAvailableInteractions?.(gameState, grid, x, y) || [];
+  getAvailableInteractions(gameState, grid, x, y, isSelfCheck = false) {
+    return this.interactions?.getAvailableInteractions?.(gameState, grid, x, y, isSelfCheck) || [];
   }
 
   getInteractionLabel(interactionId) {
@@ -285,6 +285,12 @@ export class ThemeLoader {
   // Alias for isWearable (used by HUD)
   isItemWearable(itemType) {
     return this.isWearable(itemType);
+  }
+
+  // Check if an item tile can be picked up from adjacent tiles
+  canPickupFromAdjacent(tileType) {
+    const tileDef = this.tiles?.TILE_TYPES?.[tileType];
+    return tileDef?.canPickupFromAdjacent === true;
   }
 
   // Get wearable effects for an item

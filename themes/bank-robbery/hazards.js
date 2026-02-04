@@ -41,7 +41,7 @@ export function getLaserBeamTiles(grid, laserX, laserY, direction) {
 
   while (x >= 0 && x < cols && y >= 0 && y < rows) {
     const tile = grid[y][x];
-    if (blocksVision(tile.type)) break; // beam stops at wall
+    if (blocksVision(tile.type) || tile.type === 'item-mirror') break;
     tiles.push({ x, y });
     x += dir.dx;
     y += dir.dy;

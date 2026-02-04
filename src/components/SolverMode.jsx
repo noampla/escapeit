@@ -510,8 +510,31 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
+    // Check adjacent tiles for items that can be picked up from adjacent
+    const adjacentDirs = [
+      { dx: 0, dy: -1 }, // up
+      { dx: 0, dy: 1 },  // down
+      { dx: -1, dy: 0 }, // left
+      { dx: 1, dy: 0 },  // right
+    ];
+    for (const dir of adjacentDirs) {
+      const nx = pos.x + dir.dx;
+      const ny = pos.y + dir.dy;
+      if (nx >= 0 && nx < GRID_COLS && ny >= 0 && ny < GRID_ROWS) {
+        const adjCell = currentGrid[ny][nx];
+        if (adjCell.type.startsWith('item-') && theme?.canPickupFromAdjacent?.(adjCell.type)) {
+          if (currentGS.inventory.length >= maxInventory) {
+            showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+            return;
+          }
+          pickUpItem(adjCell, nx, ny);
+          return;
+        }
+      }
+    }
+
     showMessage('No item here to pick up. Stand on an item and press F.');
-  }, [showMessage, pickUpItem]);
+  }, [showMessage, pickUpItem, theme]);
 
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;
@@ -524,7 +547,7 @@ export default function SolverMode({ level, onBack }) {
     const possibleActions = [];
 
     // Always check interactions at player's current position first (for self-targeted actions like wear/remove)
-    const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y) || [];
+    const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y, true) || [];
     for (const interaction of selfInteractions) {
       possibleActions.push({
         label: interaction.label,
@@ -673,6 +696,16 @@ export default function SolverMode({ level, onBack }) {
       // Movement allowed by theme
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
+
+      // Immediate hazard check on entering a new tile
+      const hazard = theme?.checkHazardAt?.(currentGrid, nx, ny, currentGS);
+      if (hazard && hazard.continuous) {
+        lastHazardDamageRef.current = Date.now();
+        const remaining = loseLife();
+        if (remaining > 0) {
+          showMessage(`${hazard.message} Lives: ${remaining}`);
+        }
+      }
       return;
     }
 
@@ -681,6 +714,16 @@ export default function SolverMode({ level, onBack }) {
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
       revealTargetTile();
+
+      // Immediate hazard check on entering a new tile
+      const hazard = theme?.checkHazardAt?.(currentGrid, nx, ny, gameStateRef.current);
+      if (hazard && hazard.continuous) {
+        lastHazardDamageRef.current = Date.now();
+        const remaining = loseLife();
+        if (remaining > 0) {
+          showMessage(`${hazard.message} Lives: ${remaining}`);
+        }
+      }
     }
   }, [theme, showMessage, loseLife, respawn, cancelInteraction]);
 

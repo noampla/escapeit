@@ -136,11 +136,45 @@ export const INTERACTIONS = {
       };
     }
   },
+
+  'place-mirror': {
+    label: 'Place Mirror',
+    duration: 500,
+    requirements: { tileAny: ['floor', 'start', 'exit'], facingOnly: true },
+    checkCustom: (gameState) => {
+      return gameState.inventory?.some(item => item.itemType === 'mirror');
+    },
+    execute: (gameState, grid, x, y) => {
+      const mirrorIdx = gameState.inventory.findIndex(item => item.itemType === 'mirror');
+      if (mirrorIdx === -1) {
+        return { success: false, error: 'No mirror in inventory!' };
+      }
+
+      // Place mirror on target tile (x,y is the facing tile)
+      grid[y][x] = { type: 'item-mirror', config: {} };
+
+      // Remove from inventory
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== mirrorIdx);
+
+      return {
+        success: true,
+        message: 'Placed mirror.',
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
 };
 
 // Check if requirements are met
-function checkRequirements(requirements, gameState, tile, interaction = null) {
+function checkRequirements(requirements, gameState, tile, interaction = null, grid = null, x = 0, y = 0, isSelfCheck = false) {
   if (!requirements) return true;
+
+  // facingOnly interactions should not match self-checks
+  if (requirements.facingOnly && isSelfCheck) {
+    return false;
+  }
 
   // Check tile type (unless anyTile is set)
   if (!requirements.anyTile) {
@@ -165,7 +199,7 @@ function checkRequirements(requirements, gameState, tile, interaction = null) {
 
   // Check custom requirement (e.g., matching key/card color)
   if (interaction?.checkCustom) {
-    if (!interaction.checkCustom(gameState, tile)) {
+    if (!interaction.checkCustom(gameState, tile, grid, x, y)) {
       return false;
     }
   }
@@ -174,14 +208,14 @@ function checkRequirements(requirements, gameState, tile, interaction = null) {
 }
 
 // Get all available interactions at a position
-export function getAvailableInteractions(gameState, grid, x, y) {
+export function getAvailableInteractions(gameState, grid, x, y, isSelfCheck = false) {
   const tile = grid[y]?.[x];
   if (!tile) return [];
 
   const available = [];
 
   for (const [id, interaction] of Object.entries(INTERACTIONS)) {
-    if (checkRequirements(interaction.requirements, gameState, tile, interaction)) {
+    if (checkRequirements(interaction.requirements, gameState, tile, interaction, grid, x, y, isSelfCheck)) {
       available.push({
         id,
         label: interaction.label,
@@ -212,7 +246,7 @@ export function executeInteraction(interactionId, gameState, grid, x, y) {
   }
 
   // Check requirements
-  if (!checkRequirements(interaction.requirements, gameState, tile, interaction)) {
+  if (!checkRequirements(interaction.requirements, gameState, tile, interaction, grid, x, y)) {
     return { success: false, error: 'Requirements not met' };
   }
 

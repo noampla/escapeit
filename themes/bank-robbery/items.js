@@ -29,6 +29,12 @@ export const ITEM_TYPES = {
     description: 'Wear to become invisible to cameras',
     wearable: true,
     wearSlot: 'body'
+  },
+  mirror: {
+    label: 'Mirror',
+    emoji: null, // Custom rendered
+    color: '#ccddee',
+    description: 'Blocks laser beams when placed on the ground'
   }
 };
 
@@ -139,6 +145,35 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     ctx.fill();
     ctx.beginPath();
     ctx.arc(cx, cy + s * 0.4, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
+  // Mirror item
+  if (itemType === 'mirror') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Handle (wooden frame bottom)
+    ctx.fillStyle = '#8b6914';
+    ctx.fillRect(cx - size * 0.06, cy + size * 0.15, size * 0.12, size * 0.28);
+
+    // Mirror frame (dark border)
+    ctx.fillStyle = '#333';
+    ctx.fillRect(cx - size * 0.28, cy - size * 0.32, size * 0.56, size * 0.5);
+
+    // Mirror glass (light reflective surface)
+    ctx.fillStyle = '#d8eaf5';
+    ctx.fillRect(cx - size * 0.24, cy - size * 0.28, size * 0.48, size * 0.42);
+
+    // Reflection highlight (top-left diagonal streak)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.2, cy - size * 0.26);
+    ctx.lineTo(cx - size * 0.05, cy - size * 0.26);
+    ctx.lineTo(cx - size * 0.2, cy - size * 0.1);
+    ctx.closePath();
     ctx.fill();
 
     return true;
