@@ -21,6 +21,25 @@ export const ITEM_TYPES = {
     emoji: null, // Custom rendered
     color: '#aaaacc',
     description: 'Opens matching colored card doors'
+  },
+  uniform: {
+    label: 'Guard Uniform',
+    emoji: null, // Custom rendered
+    color: '#2244aa',
+    description: 'Wear to become invisible to cameras',
+    wearable: true,
+    wearSlot: 'body'
+  }
+};
+
+// Define wearable items and their effects
+export const WEARABLES = {
+  uniform: {
+    label: 'Guard Uniform',
+    slot: 'body',
+    effects: {
+      cameraImmunity: true
+    }
   }
 };
 
@@ -73,6 +92,54 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     // Chip
     ctx.fillStyle = '#daa520';
     ctx.fillRect(cx - size * 0.2, cy, size * 0.15, size * 0.12);
+
+    return true;
+  }
+
+  // Uniform item
+  if (itemType === 'uniform') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+    const s = size * 0.4;
+
+    // Guard uniform (shirt shape)
+    ctx.fillStyle = '#2244aa';
+
+    // Body
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.6, cy - s * 0.3);
+    ctx.lineTo(cx + s * 0.6, cy - s * 0.3);
+    ctx.lineTo(cx + s * 0.7, cy + s * 0.8);
+    ctx.lineTo(cx - s * 0.7, cy + s * 0.8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Collar
+    ctx.fillStyle = '#1a3377';
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.3, cy - s * 0.3);
+    ctx.lineTo(cx, cy - s * 0.1);
+    ctx.lineTo(cx + s * 0.3, cy - s * 0.3);
+    ctx.lineTo(cx + s * 0.2, cy - s * 0.5);
+    ctx.lineTo(cx, cy - s * 0.3);
+    ctx.lineTo(cx - s * 0.2, cy - s * 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Badge
+    ctx.fillStyle = '#daa520';
+    ctx.beginPath();
+    ctx.arc(cx + s * 0.3, cy, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Buttons
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy + s * 0.1, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy + s * 0.4, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
 
     return true;
   }

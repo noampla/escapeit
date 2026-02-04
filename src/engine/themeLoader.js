@@ -268,6 +268,24 @@ export class ThemeLoader {
     }
     return this.renderItem(ctx, itemType, x, y, size, itemState);
   }
+
+  // === NEW: Wearable Methods ===
+
+  // Get wearable definitions
+  getWearables() {
+    return this.items?.WEARABLES || {};
+  }
+
+  // Check if an item type is wearable
+  isWearable(itemType) {
+    const item = this.items?.ITEM_TYPES?.[itemType];
+    return item?.wearable === true;
+  }
+
+  // Get wearable effects for an item
+  getWearableEffects(itemType) {
+    return this.items?.WEARABLES?.[itemType]?.effects || {};
+  }
 }
 
 export default ThemeLoader;

@@ -77,20 +77,81 @@ export const INTERACTIONS = {
       };
     }
   },
+
+  'wear-uniform': {
+    label: 'Wear Uniform',
+    duration: 1500,
+    requirements: { anyTile: true }, // Can be done on any tile
+    checkCustom: (gameState, tile) => {
+      // Must have uniform in inventory and not already wearing one
+      const hasUniform = gameState.inventory?.some(item => item.itemType === 'uniform');
+      const alreadyWearing = gameState.worn?.body === 'uniform';
+      return hasUniform && !alreadyWearing;
+    },
+    execute: (gameState, grid, x, y) => {
+      const uniformIdx = gameState.inventory.findIndex(item => item.itemType === 'uniform');
+
+      if (uniformIdx === -1) {
+        return { success: false, error: 'No uniform in inventory!' };
+      }
+
+      // Remove from inventory
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== uniformIdx);
+
+      // Add to worn items
+      if (!gameState.worn) gameState.worn = {};
+      gameState.worn.body = 'uniform';
+
+      return {
+        success: true,
+        message: '🎭 Disguised as guard! Cameras ignore you.',
+        modifyInventory: true,
+        modifyState: true
+      };
+    }
+  },
+
+  'remove-uniform': {
+    label: 'Remove Uniform',
+    duration: 1000,
+    requirements: { anyTile: true },
+    checkCustom: (gameState, tile) => {
+      // Must be wearing uniform
+      return gameState.worn?.body === 'uniform';
+    },
+    execute: (gameState, grid, x, y) => {
+      // Remove from worn
+      if (gameState.worn) {
+        gameState.worn.body = null;
+      }
+
+      // Add back to inventory
+      gameState.inventory.push({ itemType: 'uniform' });
+
+      return {
+        success: true,
+        message: 'Removed guard uniform.',
+        modifyInventory: true,
+        modifyState: true
+      };
+    }
+  },
 };
 
 // Check if requirements are met
 function checkRequirements(requirements, gameState, tile, interaction = null) {
   if (!requirements) return true;
 
-  // Check tile type
-  if (requirements.tile && tile.type !== requirements.tile) {
-    return false;
-  }
+  // Check tile type (unless anyTile is set)
+  if (!requirements.anyTile) {
+    if (requirements.tile && tile.type !== requirements.tile) {
+      return false;
+    }
 
-  // Check if tile is one of multiple types
-  if (requirements.tileAny && !requirements.tileAny.includes(tile.type)) {
-    return false;
+    // Check if tile is one of multiple types
+    if (requirements.tileAny && !requirements.tileAny.includes(tile.type)) {
+      return false;
+    }
   }
 
   // Check inventory items

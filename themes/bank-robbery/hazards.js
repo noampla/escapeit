@@ -76,9 +76,23 @@ export function getCameraVisionTiles(grid, cameraX, cameraY, direction, range) {
   return tiles;
 }
 
+// Check if player has immunity to a hazard type
+function hasHazardImmunity(gameState, hazardType) {
+  if (hazardType === 'camera') {
+    // Wearing guard uniform provides camera immunity
+    return gameState?.worn?.body === 'uniform';
+  }
+  return false;
+}
+
 // Check if there's a hazard at the given position
 // Returns hazard info or null
 export function checkHazardAt(grid, x, y, gameState) {
+  // Check for camera immunity (wearing uniform)
+  if (hasHazardImmunity(gameState, 'camera')) {
+    return null; // Immune to cameras
+  }
+
   const rows = grid.length;
   const cols = grid[0]?.length || 0;
 
@@ -99,7 +113,9 @@ export function checkHazardAt(grid, x, y, gameState) {
           return {
             type: 'camera',
             damage: HAZARD_TYPES.camera.damage,
-            message: HAZARD_TYPES.camera.message
+            message: HAZARD_TYPES.camera.message,
+            continuous: true, // Camera damage is continuous (1 life per 5 seconds)
+            interval: 5000 // 5 seconds
           };
         }
       }

@@ -105,6 +105,16 @@ export const TILE_TYPES = {
     tooltip: 'Collectible keycard. Opens matching colored card doors.',
     walkable: true
   },
+  'item-uniform': {
+    label: 'Guard Uniform',
+    color: '#2244aa',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'uniform',
+    wearable: true,
+    tooltip: 'Guard uniform. Pick up (F) then wear (E while holding) to become invisible to cameras.',
+    walkable: true
+  },
 
   // Security - Hazards
   camera: {
@@ -492,6 +502,7 @@ export function getTileEmoji(tileType) {
     'door-card': null,
     'item-key': null,
     'item-card': null,
+    'item-uniform': null, // Custom rendered
     camera: null // Custom rendered
   };
 

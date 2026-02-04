@@ -147,6 +147,7 @@ export default function SolverMode({ level, onBack }) {
     reachedLocations: [],
     reachedExit: false,
     inventory: [],
+    worn: {}, // Wearable items (e.g., uniform)
   });
   const [revealedTiles, setRevealedTiles] = useState(() => initializeRevealedTiles(startPos.x, startPos.y));
   const [tick, setTick] = useState(0);
@@ -176,6 +177,7 @@ export default function SolverMode({ level, onBack }) {
   const exitMessageShownRef = useRef(false);
   const interactionStateRef = useRef(interactionState);
   const interactionKeyReleasedRef = useRef(true); // Track if E/number key was released since last interaction
+  const lastHazardDamageRef = useRef(0); // Track last time we took continuous hazard damage
 
   gridRef.current = grid;
   gameStateRef.current = gameState;
@@ -214,6 +216,7 @@ export default function SolverMode({ level, onBack }) {
     setGameState({
       collectedItems: [], rescuedFriends: 0,
       reachedLocations: [], reachedExit: false, inventory: [],
+      worn: {},
     });
     setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y));
     setTick(0);
@@ -450,6 +453,7 @@ export default function SolverMode({ level, onBack }) {
       ...currentGS,
       inventory: [...currentGS.inventory.map(item => ({ ...item }))],
       collectedItems: [...(currentGS.collectedItems || [])],
+      worn: { ...(currentGS.worn || {}) },
     };
 
     // Execute interaction through theme
@@ -468,6 +472,7 @@ export default function SolverMode({ level, onBack }) {
           inventory: tempGameState.inventory,
           collectedItems: tempGameState.collectedItems,
           rescuedFriends: tempGameState.rescuedFriends ?? prev.rescuedFriends,
+          worn: tempGameState.worn ?? prev.worn,
         }));
       }
 
@@ -510,46 +515,45 @@ export default function SolverMode({ level, onBack }) {
     const playerDir = playerDirectionRef.current;
     const playerPos = playerPosRef.current;
 
+    // Collect all possible actions using theme's interaction system
+    const possibleActions = [];
+
+    // Always check interactions at player's current position first (for self-targeted actions like wear/remove)
+    const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y) || [];
+    for (const interaction of selfInteractions) {
+      possibleActions.push({
+        label: interaction.label,
+        action: () => startInteraction(interaction.id, { x: playerPos.x, y: playerPos.y }),
+      });
+    }
+
     // Filter targets: only include the one we're facing, or all if standing on something
     const facingTarget = targets.find(t => t.dir === playerDir);
     const relevantTargets = facingTarget ? [facingTarget] : targets.filter(t => t.dir === 'self');
 
-    if (relevantTargets.length === 0) {
-      showMessage('Nothing to interact with in that direction.');
-      return;
-    }
+    // Check interactions at facing tile
+    if (relevantTargets.length > 0) {
+      const p = relevantTargets[0];
+      const c = currentGrid[p.y][p.x];
 
-    const p = relevantTargets[0];
-    const c = currentGrid[p.y][p.x];
-
-    // Skip item pickups - those use F key now
-    if (c.type.startsWith('item-')) {
-      showMessage('Press F to pick up items.');
-      return;
-    }
-
-    // Collect all possible actions using theme's interaction system
-    const possibleActions = [];
-
-    // Get interactions at target tile from theme
-    const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
-    for (const interaction of targetInteractions) {
-      possibleActions.push({
-        label: interaction.label,
-        action: () => startInteraction(interaction.id, p),
-      });
-    }
-
-    // Also check interactions at player's current position (for self-targeted actions)
-    if (p.x !== playerPos.x || p.y !== playerPos.y) {
-      const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y) || [];
-      for (const interaction of selfInteractions) {
-        // Avoid duplicates
-        if (!possibleActions.find(a => a.label === interaction.label)) {
-          possibleActions.push({
-            label: interaction.label,
-            action: () => startInteraction(interaction.id, { x: playerPos.x, y: playerPos.y }),
-          });
+      // Skip item pickups - those use F key now
+      if (c.type.startsWith('item-')) {
+        if (possibleActions.length === 0) {
+          showMessage('Press F to pick up items.');
+          return;
+        }
+        // Continue to show self-interactions if any
+      } else if (p.x !== playerPos.x || p.y !== playerPos.y) {
+        // Get interactions at target tile from theme (only if different from player pos)
+        const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
+        for (const interaction of targetInteractions) {
+          // Avoid duplicates
+          if (!possibleActions.find(a => a.label === interaction.label)) {
+            possibleActions.push({
+              label: interaction.label,
+              action: () => startInteraction(interaction.id, p),
+            });
+          }
         }
       }
     }
@@ -979,6 +983,36 @@ export default function SolverMode({ level, onBack }) {
     return () => clearInterval(interval);
   }, [gameOver]);
 
+  // Continuous hazard damage (e.g., cameras deal 1 life per 5 seconds)
+  useEffect(() => {
+    if (gameOver) return;
+
+    const interval = setInterval(() => {
+      const pos = playerPosRef.current;
+      const currentGrid = gridRef.current;
+      const currentGS = gameStateRef.current;
+
+      // Check if player is in a continuous hazard zone
+      const hazard = theme?.checkHazardAt?.(currentGrid, pos.x, pos.y, currentGS);
+
+      if (hazard && hazard.continuous) {
+        const now = Date.now();
+        const timeSinceLastDamage = now - lastHazardDamageRef.current;
+        const damageInterval = hazard.interval || 5000; // Default 5 seconds
+
+        if (timeSinceLastDamage >= damageInterval) {
+          lastHazardDamageRef.current = now;
+          const remaining = loseLife();
+          if (remaining > 0) {
+            showMessage(`${hazard.message} Lives: ${remaining}`);
+          }
+        }
+      }
+    }, 500); // Check every 500ms
+
+    return () => clearInterval(interval);
+  }, [gameOver, theme, loseLife, showMessage]);
+
   useEffect(() => {
     if (gameOver) return;
     const locKey = `${playerPos.x},${playerPos.y}`;
@@ -1156,6 +1190,31 @@ export default function SolverMode({ level, onBack }) {
                   +{gameState.inventory.length - 5}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Worn Items Indicator */}
+          {gameState.worn?.body && (
+            <div style={{
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+            }}>
+              <div style={{
+                background: 'linear-gradient(145deg, rgba(34, 68, 170, 0.8), rgba(26, 51, 119, 0.8))',
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '2px solid rgba(100, 140, 220, 0.6)',
+                boxShadow: '0 2px 8px rgba(34, 68, 170, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <span style={{ fontSize: 14 }}>🎭</span>
+                <span style={{ fontSize: 11, color: '#a8c8ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Disguised
+                </span>
+              </div>
             </div>
           )}
         </div>
