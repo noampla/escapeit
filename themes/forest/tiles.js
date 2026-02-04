@@ -171,6 +171,25 @@ export const CONFIG_HELP = {
   },
 };
 
+// Generic config schema - defines what config fields each tile type has
+export const CONFIG_SCHEMA = {
+  car: {
+    needsKey: {
+      type: 'checkbox',
+      label: 'Requires Key',
+      default: true
+    }
+  },
+  friend: {
+    name: {
+      type: 'text',
+      label: 'Friend Name',
+      placeholder: 'e.g. Alice',
+      default: ''
+    }
+  }
+};
+
 // Check if a tile is walkable, considering game state
 export function isWalkable(tileType, gameState = {}) {
   const tile = TILE_TYPES[tileType];

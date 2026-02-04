@@ -104,6 +104,18 @@ export const TILE_TYPES = {
     defaultConfig: { lockColor: 'red' },
     tooltip: 'Collectible keycard. Opens matching colored card doors.',
     walkable: true
+  },
+
+  // Security - Hazards
+  camera: {
+    label: 'Security Camera',
+    color: '#444466',
+    category: 'hazard',
+    configurable: true,
+    defaultConfig: { direction: 'down', range: 3 },
+    tooltip: 'Security camera. Place on walls or map edge. Detects player in vision cone.',
+    walkable: false,
+    attachToWall: true
   }
 };
 
@@ -116,6 +128,14 @@ export const FLOOR_COLORS = {
   yellow: { label: 'Yellow', color: '#4a4a3a' },
   purple: { label: 'Purple', color: '#4a3a4a' },
   marble: { label: 'Marble', color: '#5a5a5a' }
+};
+
+// Camera direction options
+export const CAMERA_DIRECTIONS = {
+  up: { label: 'Up', dx: 0, dy: -1 },
+  down: { label: 'Down', dx: 0, dy: 1 },
+  left: { label: 'Left', dx: -1, dy: 0 },
+  right: { label: 'Right', dx: 1, dy: 0 }
 };
 
 export const CONFIG_HELP = {
@@ -133,6 +153,69 @@ export const CONFIG_HELP = {
   },
   'item-card': {
     lockColor: 'Color of the keycard. Opens doors with matching color.'
+  },
+  camera: {
+    direction: 'Direction the camera faces (up, down, left, right).',
+    range: 'How many tiles ahead the camera can see (1-5).'
+  }
+};
+
+// Generic config schema - defines what config fields each tile type has
+export const CONFIG_SCHEMA = {
+  floor: {
+    floorColor: {
+      type: 'select',
+      label: 'Floor Color',
+      options: 'FLOOR_COLORS',
+      default: 'gray'
+    }
+  },
+  'door-key': {
+    lockColor: {
+      type: 'select',
+      label: 'Lock Color',
+      options: 'LOCK_COLORS',
+      default: 'red'
+    }
+  },
+  'door-card': {
+    lockColor: {
+      type: 'select',
+      label: 'Lock Color',
+      options: 'LOCK_COLORS',
+      default: 'red'
+    }
+  },
+  'item-key': {
+    lockColor: {
+      type: 'select',
+      label: 'Lock Color',
+      options: 'LOCK_COLORS',
+      default: 'red'
+    }
+  },
+  'item-card': {
+    lockColor: {
+      type: 'select',
+      label: 'Lock Color',
+      options: 'LOCK_COLORS',
+      default: 'red'
+    }
+  },
+  camera: {
+    direction: {
+      type: 'select',
+      label: 'Direction',
+      options: 'CAMERA_DIRECTIONS',
+      default: 'down'
+    },
+    range: {
+      type: 'number',
+      label: 'Vision Range',
+      min: 1,
+      max: 5,
+      default: 3
+    }
   }
 };
 
@@ -347,6 +430,53 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Security Camera
+  if (tile.type === 'camera') {
+    const direction = tile.config?.direction || 'down';
+
+    // Wall/mount background
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Mounting bracket
+    ctx.fillStyle = '#555566';
+    ctx.fillRect(cx - size * 0.15, cy - size * 0.35, size * 0.3, size * 0.2);
+
+    // Camera body - rotate based on direction
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // Rotate based on direction
+    const rotations = { up: Math.PI, down: 0, left: Math.PI / 2, right: -Math.PI / 2 };
+    ctx.rotate(rotations[direction] || 0);
+
+    // Camera housing (dark gray box)
+    ctx.fillStyle = '#333344';
+    ctx.fillRect(-size * 0.2, -size * 0.1, size * 0.4, size * 0.35);
+
+    // Camera lens
+    ctx.fillStyle = '#111122';
+    ctx.beginPath();
+    ctx.arc(0, size * 0.2, size * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Lens reflection
+    ctx.fillStyle = '#4488cc';
+    ctx.beginPath();
+    ctx.arc(-size * 0.03, size * 0.17, size * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Red recording light
+    ctx.fillStyle = '#ff3333';
+    ctx.beginPath();
+    ctx.arc(size * 0.12, -size * 0.02, size * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    return true;
+  }
+
   return false;
 }
 
@@ -361,7 +491,8 @@ export function getTileEmoji(tileType) {
     'door-key': null,
     'door-card': null,
     'item-key': null,
-    'item-card': null
+    'item-card': null,
+    camera: null // Custom rendered
   };
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;
@@ -376,13 +507,13 @@ export const GROUND_TILES = ['floor', 'start', 'exit'];
 export const INTERACTABLE_TILES = ['door-key', 'door-card'];
 
 // Tiles to ignore for floor color detection when picking up items
-export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open'];
+export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'camera'];
 
 // Tiles that use lock colors (doors, keys, cards)
 export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
 
-// Hazard tile types (bank robbery has none)
-export const HAZARD_TILE_TYPES = [];
+// Hazard tile types
+export const HAZARD_TILE_TYPES = ['camera'];
 
 // === MOVEMENT RULES ===
 

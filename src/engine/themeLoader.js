@@ -231,6 +231,29 @@ export class ThemeLoader {
     return this.tiles?.FLOOR_COLORS || {};
   }
 
+  // Get camera directions (for camera tile configuration)
+  getCameraDirections() {
+    return this.tiles?.CAMERA_DIRECTIONS || {};
+  }
+
+  // === Generic Config Schema Methods ===
+
+  // Get config schema for all tiles
+  getConfigSchema() {
+    return this.tiles?.CONFIG_SCHEMA || {};
+  }
+
+  // Get config schema for a specific tile type
+  getTileConfigSchema(tileType) {
+    return this.tiles?.CONFIG_SCHEMA?.[tileType] || null;
+  }
+
+  // Get options for a config field by key name (e.g., 'FLOOR_COLORS', 'LOCK_COLORS')
+  getConfigOptions(optionsKey) {
+    // Look up the options from tiles module exports
+    return this.tiles?.[optionsKey] || {};
+  }
+
   // === NEW: Inventory Icon Methods ===
 
   // Get custom inventory icon component for an item type

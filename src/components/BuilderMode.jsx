@@ -5,11 +5,46 @@ import PropertiesPanel from './PropertiesPanel';
 import SolverMode from './SolverMode';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid } from '../engine/tiles';
 import { saveLevel, generateId, loadLevels } from '../utils/storage';
-import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, GRID_COLS, GRID_ROWS } from '../utils/constants';
 import { ThemeContext } from '../App';
 
 // Default fallback
 const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
+
+// Check if a tile can be placed at position (for tiles with placement restrictions like camera)
+function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
+  const tileDef = TILE_TYPES[tileType];
+
+  // If tile has attachToWall requirement, validate placement
+  if (tileDef?.attachToWall) {
+    // Check if on map boundary
+    const isOnBoundary = x === 0 || x === GRID_COLS - 1 || y === 0 || y === GRID_ROWS - 1;
+    if (isOnBoundary) return { valid: true };
+
+    // Check if adjacent to a wall
+    const neighbors = [
+      { x: x - 1, y },
+      { x: x + 1, y },
+      { x, y: y - 1 },
+      { x, y: y + 1 },
+    ];
+
+    const hasAdjacentWall = neighbors.some(n => {
+      if (n.x < 0 || n.x >= GRID_COLS || n.y < 0 || n.y >= GRID_ROWS) return true; // Boundary counts as wall
+      const neighborCell = grid[n.y][n.x];
+      return neighborCell.type === 'wall' || neighborCell.type === 'empty';
+    });
+
+    if (hasAdjacentWall) return { valid: true };
+
+    return {
+      valid: false,
+      message: `${tileDef.label} must be placed on a wall or map boundary!`
+    };
+  }
+
+  return { valid: true };
+}
 
 export default function BuilderMode({ onBack, editLevel, themeId }) {
   const theme = useContext(ThemeContext);
@@ -24,7 +59,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [selectedFloorColor, setSelectedFloorColor] = useState('gray');
   const [selectedLockColor, setSelectedLockColor] = useState('red');
   const [selectedCell, setSelectedCell] = useState(null);
-  const [showHazardZones, setShowHazardZones] = useState(false);
+  const [showHazardZones, setShowHazardZones] = useState(true);
   const [showTooltips, setShowTooltips] = useState(true);
   const [subMode, setSubMode] = useState('build');
   const [missions, setMissions] = useState(() => editLevel?.missions || []);
@@ -38,7 +73,9 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [redoStack, setRedoStack] = useState([]);
   const [testMode, setTestMode] = useState(false);
   const [loadMenuOpen, setLoadMenuOpen] = useState(false);
+  const [placementError, setPlacementError] = useState(null);
   const lastDragPos = useRef(null);
+  const placementErrorTimer = useRef(null);
 
   const pushUndo = useCallback((currentGrid) => {
     setUndoStack(prev => [...prev.slice(-30), cloneGrid(currentGrid)]);
@@ -61,13 +98,28 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     setGrid(next);
   };
 
+  const showPlacementError = useCallback((message) => {
+    setPlacementError(message);
+    if (placementErrorTimer.current) clearTimeout(placementErrorTimer.current);
+    placementErrorTimer.current = setTimeout(() => setPlacementError(null), 2000);
+  }, []);
+
   const handleGridClick = (x, y, e) => {
     if (subMode === 'edit' || (e && e.shiftKey)) {
       setSelectedCell({ x, y });
       return;
     }
-    pushUndo(grid);
+
     const TILE_TYPES = theme?.getTileTypes() || {};
+
+    // Validate placement for tiles with restrictions
+    const placementCheck = canPlaceTile(grid, x, y, selectedTool, TILE_TYPES);
+    if (!placementCheck.valid) {
+      showPlacementError(placementCheck.message);
+      return;
+    }
+
+    pushUndo(grid);
     let newGrid = placeTile(grid, x, y, selectedTool, TILE_TYPES);
     // Apply floor color if placing floor tile
     if (selectedTool === 'floor') {
@@ -91,6 +143,14 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     if (lastDragPos.current === key) return;
     lastDragPos.current = key;
     const TILE_TYPES = theme?.getTileTypes() || {};
+
+    // Validate placement for tiles with restrictions
+    const placementCheck = canPlaceTile(grid, x, y, selectedTool, TILE_TYPES);
+    if (!placementCheck.valid) {
+      // Don't show error on drag to avoid spam, just skip placement
+      return;
+    }
+
     setGrid(prev => {
       let newGrid = placeTile(prev, x, y, selectedTool, TILE_TYPES);
       // Apply floor color if placing floor tile
@@ -318,7 +378,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       {/* Main area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} />}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', padding: 20 }}>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', padding: 20, position: 'relative' }}>
           <Grid
             grid={grid}
             onClick={handleGridClick}
@@ -328,6 +388,25 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             showTooltips={showTooltips}
             theme={theme}
           />
+          {/* Placement error message */}
+          {placementError && (
+            <div style={{
+              position: 'absolute',
+              top: 20,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'linear-gradient(145deg, rgba(120, 40, 40, 0.95) 0%, rgba(80, 20, 20, 0.95) 100%)',
+              color: '#ffaaaa',
+              padding: '12px 24px',
+              borderRadius: 10,
+              fontSize: 14,
+              fontWeight: '600',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 100, 100, 0.4)',
+              zIndex: 100,
+            }}>
+              ⚠️ {placementError}
+            </div>
+          )}
         </div>
         <PropertiesPanel
           grid={grid}

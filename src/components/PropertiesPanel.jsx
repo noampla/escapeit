@@ -9,27 +9,6 @@ const HelpText = ({ type, field, show, CONFIG_HELP }) => {
   return <p style={{ color: '#888', fontSize: 10, margin: '2px 0 0', lineHeight: 1.3 }}>{help}</p>;
 };
 
-// Default fallbacks
-const DEFAULT_FLOOR_COLORS = {
-  gray: { label: 'Gray' },
-  blue: { label: 'Blue' },
-  red: { label: 'Red' },
-  green: { label: 'Green' },
-  yellow: { label: 'Yellow' },
-  purple: { label: 'Purple' },
-  marble: { label: 'Marble' },
-};
-
-const DEFAULT_LOCK_COLORS = {
-  red: { label: 'Red' },
-  blue: { label: 'Blue' },
-  green: { label: 'Green' },
-  yellow: { label: 'Yellow' },
-  purple: { label: 'Purple' },
-};
-
-const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
-
 // Shared styles
 const panelBg = '#1e1e1e';
 const borderColor = '#3a3a3a';
@@ -47,12 +26,13 @@ export default function PropertiesPanel({
   const theme = useContext(ThemeContext);
   const TILE_TYPES = theme?.getTileTypes() || {};
   const CONFIG_HELP = theme?.getConfigHelp() || {};
+  const CONFIG_SCHEMA = theme?.getConfigSchema?.() || {};
   const primaryColor = theme?.primaryColor || '#6688aa';
 
-  // Get colors and tile lists from theme with fallbacks
-  const FLOOR_COLORS = useMemo(() => theme?.getFloorColors?.() || DEFAULT_FLOOR_COLORS, [theme]);
-  const LOCK_COLORS = useMemo(() => theme?.getLockColors?.() || DEFAULT_LOCK_COLORS, [theme]);
-  const LOCK_TILES = useMemo(() => theme?.getLockTiles?.() || DEFAULT_LOCK_TILES, [theme]);
+  // Get options for a select field from theme
+  const getSelectOptions = (optionsKey) => {
+    return theme?.getConfigOptions?.(optionsKey) || {};
+  };
 
   // Mission editor helpers
   const missionTypes = useMemo(() => {
@@ -102,39 +82,89 @@ export default function PropertiesPanel({
     const config = cell.config || {};
     const update = (key, value) => onConfigChange(x, y, { ...config, [key]: value });
 
+    // Get schema for this tile type
+    const schema = CONFIG_SCHEMA[cell.type];
+    const schemaFields = schema ? Object.entries(schema) : [];
+
+    // Render a field based on its schema definition
+    const renderField = (fieldKey, fieldDef, isFirst) => {
+      const currentValue = config[fieldKey];
+      const baseLabel = { ...labelStyle, marginTop: isFirst ? 0 : 10 };
+
+      switch (fieldDef.type) {
+        case 'checkbox':
+          return (
+            <div key={fieldKey}>
+              <label style={{ ...baseLabel, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={currentValue !== undefined ? currentValue : fieldDef.default}
+                  onChange={e => update(fieldKey, e.target.checked)}
+                />
+                {fieldDef.label}
+              </label>
+              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
+
+        case 'text':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <input
+                style={inputStyle}
+                value={currentValue || fieldDef.default || ''}
+                onChange={e => update(fieldKey, e.target.value)}
+                placeholder={fieldDef.placeholder || ''}
+              />
+              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
+
+        case 'number':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <input
+                type="number"
+                style={{ ...inputStyle, width: 80 }}
+                min={fieldDef.min}
+                max={fieldDef.max}
+                value={currentValue !== undefined ? currentValue : fieldDef.default}
+                onChange={e => update(fieldKey, Number(e.target.value))}
+              />
+              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
+
+        case 'select': {
+          const options = getSelectOptions(fieldDef.options);
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <select
+                style={inputStyle}
+                value={currentValue || fieldDef.default}
+                onChange={e => update(fieldKey, e.target.value)}
+              >
+                {Object.entries(options).map(([optId, optDef]) => (
+                  <option key={optId} value={optId}>{optDef.label}</option>
+                ))}
+              </select>
+              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
+        }
+
+        default:
+          return null;
+      }
+    };
+
     return (
       <>
         <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>{def.label} at ({x}, {y})</p>
-
-        {cell.type === 'car' && (
-          <label style={{ ...labelStyle, marginTop: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" checked={config.needsKey !== false} onChange={e => update('needsKey', e.target.checked)} />
-            Requires Key
-          </label>
-        )}
-
-        {cell.type === 'friend' && (<>
-          <label style={{ ...labelStyle, marginTop: 0 }}>Friend Name</label>
-          <input style={inputStyle} value={config.name || ''} onChange={e => update('name', e.target.value)} placeholder="e.g. Alice" />
-        </>)}
-
-        {cell.type === 'floor' && (<>
-          <label style={{ ...labelStyle, marginTop: 0 }}>Floor Color</label>
-          <select style={inputStyle} value={config.floorColor || 'gray'} onChange={e => update('floorColor', e.target.value)}>
-            {Object.entries(FLOOR_COLORS).map(([colorId, colorDef]) => (
-              <option key={colorId} value={colorId}>{colorDef.label}</option>
-            ))}
-          </select>
-        </>)}
-
-        {LOCK_TILES.includes(cell.type) && (<>
-          <label style={{ ...labelStyle, marginTop: 0 }}>Lock Color</label>
-          <select style={inputStyle} value={config.lockColor || 'red'} onChange={e => update('lockColor', e.target.value)}>
-            {Object.entries(LOCK_COLORS).map(([colorId, colorDef]) => (
-              <option key={colorId} value={colorId}>{colorDef.label}</option>
-            ))}
-          </select>
-        </>)}
+        {schemaFields.map(([fieldKey, fieldDef], idx) => renderField(fieldKey, fieldDef, idx === 0))}
       </>
     );
   };

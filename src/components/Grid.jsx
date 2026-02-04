@@ -104,8 +104,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
 
     // Hazard zones overlay
     if (showHazardZones) {
-      const zones = hazardZoneOverrides || getAllHazardZones(grid);
-      ctx.globalAlpha = 0.25;
+      // Use theme's hazard zones if available, otherwise fall back to engine's
+      const themeZones = theme?.getAllHazardZones?.(grid) || [];
+      const engineZones = getAllHazardZones(grid);
+      const zones = hazardZoneOverrides || [...engineZones, ...themeZones];
+
+      ctx.globalAlpha = 0.35;
       for (const z of zones) {
         // Skip zones outside viewport
         if (viewportBounds && (z.x < startX || z.x > endX || z.y < startY || z.y > endY)) continue;
@@ -113,6 +117,11 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
         const zpx = (z.x - offsetX) * TILE_SIZE, zpy = (z.y - offsetY) * TILE_SIZE;
         ctx.fillStyle = z.renderColor || '#ff4400';
         ctx.fillRect(zpx, zpy, TILE_SIZE, TILE_SIZE);
+
+        // Add border for better visibility
+        ctx.strokeStyle = z.renderColor || '#ff4400';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(zpx + 1, zpy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
       }
       ctx.globalAlpha = 1;
     }
@@ -192,7 +201,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, theme]);
 
   useEffect(() => {
     draw();
