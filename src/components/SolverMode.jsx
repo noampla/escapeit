@@ -202,6 +202,86 @@ function BucketIcon({ size = 24, filled = false }) {
   return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
 }
 
+// Lock colors for keys and cards
+const LOCK_COLORS = {
+  red: { label: 'Red', color: '#cc4444' },
+  blue: { label: 'Blue', color: '#4444cc' },
+  green: { label: 'Green', color: '#44cc44' },
+  yellow: { label: 'Yellow', color: '#cccc44' },
+  purple: { label: 'Purple', color: '#cc44cc' },
+};
+
+// Canvas component to draw key icon with color
+function KeyIcon({ size = 24, lockColor = 'red' }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const cx = size / 2;
+    const cy = size / 2;
+    const s = size * 0.35;
+    const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
+
+    ctx.clearRect(0, 0, size, size);
+
+    ctx.fillStyle = color;
+
+    // Key head (circle)
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.3, cy, s * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key hole
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.3, cy, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key shaft
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - s * 0.05, cy - s * 0.12, s * 0.75, s * 0.24);
+
+    // Key teeth
+    ctx.fillRect(cx + s * 0.45, cy, s * 0.18, s * 0.3);
+    ctx.fillRect(cx + s * 0.22, cy, s * 0.12, s * 0.22);
+  }, [size, lockColor]);
+
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
+}
+
+// Canvas component to draw card icon with color
+function CardIcon({ size = 24, lockColor = 'red' }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const cx = size / 2;
+    const cy = size / 2;
+    const s = size * 0.4;
+    const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Card body
+    ctx.fillStyle = '#eee';
+    ctx.fillRect(cx - s * 0.65, cy - s * 0.42, s * 1.3, s * 0.84);
+
+    // Colored stripe
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - s * 0.65, cy - s * 0.42, s * 1.3, s * 0.26);
+
+    // Chip
+    ctx.fillStyle = '#daa520';
+    ctx.fillRect(cx - s * 0.45, cy + s * 0.05, s * 0.32, s * 0.24);
+  }, [size, lockColor]);
+
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
+}
+
 function convertLegacyItems(grid) {
   const newGrid = cloneGrid(grid);
   for (let y = 0; y < GRID_ROWS; y++) {
@@ -413,10 +493,57 @@ export default function SolverMode({ level, onBack }) {
     const itemType = cell.type.replace('item-', '');
 
     const newGrid = cloneGrid(gridRef.current);
-    newGrid[py][px] = { type: 'ground', config: {} };
+
+    // Determine what tile to leave behind by checking surrounding tiles
+    const neighbors = [
+      { x: px, y: py - 1 }, // up
+      { x: px, y: py + 1 }, // down
+      { x: px - 1, y: py }, // left
+      { x: px + 1, y: py }, // right
+    ].filter(n => n.x >= 0 && n.x < GRID_COLS && n.y >= 0 && n.y < GRID_ROWS);
+
+    // Count floor colors from neighbors (ignore walls, empty, doors)
+    const ignoreTiles = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'water', 'snow', 'bear'];
+    const colorCounts = {};
+
+    for (const n of neighbors) {
+      const neighborCell = newGrid[n.y][n.x];
+      if (ignoreTiles.includes(neighborCell.type)) continue;
+
+      if (neighborCell.type === 'floor') {
+        const color = neighborCell.config?.floorColor || 'gray';
+        colorCounts[color] = (colorCounts[color] || 0) + 1;
+      } else if (['ground', 'start', 'exit', 'campfire', 'raft'].includes(neighborCell.type)) {
+        // Non-floor walkable tiles count as 'ground'
+        colorCounts['_ground'] = (colorCounts['_ground'] || 0) + 1;
+      }
+    }
+
+    // Find most common floor color
+    let maxCount = 0;
+    let bestColor = null;
+    for (const [color, count] of Object.entries(colorCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        bestColor = color;
+      }
+    }
+
+    // Set the tile based on what we found
+    if (bestColor === '_ground' || bestColor === null) {
+      // Use 'ground' for forest theme or if no floor neighbors found
+      newGrid[py][px] = { type: 'ground', config: {} };
+    } else {
+      // Use 'floor' with the most common color
+      newGrid[py][px] = { type: 'floor', config: { floorColor: bestColor } };
+    }
     setGrid(newGrid);
 
+    // Preserve lockColor for keys and cards
     const itemObj = { itemType, filled: false };
+    if ((itemType === 'key' || itemType === 'card') && cell.config?.lockColor) {
+      itemObj.lockColor = cell.config.lockColor;
+    }
     setGameState(prev => ({
       ...prev,
       inventory: [...prev.inventory, itemObj],
@@ -448,7 +575,7 @@ export default function SolverMode({ level, onBack }) {
     const currentGrid = gridRef.current;
     const lastDir = lastDirRef.current;
 
-    const interactable = ['tree', 'water', 'raft', 'fire', 'friend', 'bear'];
+    const interactable = ['tree', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
     const itemTilePattern = /^item-/;
 
     const adjacent = Object.entries(DIRECTIONS).map(([dir, dd]) => ({
@@ -699,6 +826,42 @@ export default function SolverMode({ level, onBack }) {
       showMessage('Defeated the bear! Got a sweater.');
     }
 
+    else if (interactionType === 'unlock-door-key') {
+      const doorColor = c.config?.lockColor || 'red';
+      const keyIdx = currentGS.inventory.findIndex(
+        item => item.itemType === 'key' && item.lockColor === doorColor
+      );
+      if (keyIdx >= 0) {
+        const newGrid = cloneGrid(currentGrid);
+        // Change to open door visual
+        newGrid[targetPos.y][targetPos.x] = { type: 'door-key-open', config: {} };
+        setGrid(newGrid);
+        setGameState(prev => ({
+          ...prev,
+          inventory: prev.inventory.filter((_, i) => i !== keyIdx),
+        }));
+        showMessage(`Unlocked ${doorColor} door with key!`);
+      }
+    }
+
+    else if (interactionType === 'unlock-door-card') {
+      const doorColor = c.config?.lockColor || 'red';
+      const cardIdx = currentGS.inventory.findIndex(
+        item => item.itemType === 'card' && item.lockColor === doorColor
+      );
+      if (cardIdx >= 0) {
+        const newGrid = cloneGrid(currentGrid);
+        // Change to open door visual
+        newGrid[targetPos.y][targetPos.x] = { type: 'door-card-open', config: {} };
+        setGrid(newGrid);
+        setGameState(prev => ({
+          ...prev,
+          inventory: prev.inventory.filter((_, i) => i !== cardIdx),
+        }));
+        showMessage(`Unlocked ${doorColor} door with keycard!`);
+      }
+    }
+
     cancelInteraction();
   }, [showMessage, cancelInteraction]);
 
@@ -821,6 +984,33 @@ export default function SolverMode({ level, onBack }) {
       });
     }
 
+    // Door interactions
+    if (c.type === 'door-key') {
+      const doorColor = c.config?.lockColor || 'red';
+      const hasKey = currentGS.inventory.some(
+        item => item.itemType === 'key' && item.lockColor === doorColor
+      );
+      if (hasKey) {
+        possibleActions.push({
+          label: `Unlock (${doorColor} key)`,
+          action: () => startInteraction('unlock-door-key', p),
+        });
+      }
+    }
+
+    if (c.type === 'door-card') {
+      const doorColor = c.config?.lockColor || 'red';
+      const hasCard = currentGS.inventory.some(
+        item => item.itemType === 'card' && item.lockColor === doorColor
+      );
+      if (hasCard) {
+        possibleActions.push({
+          label: `Unlock (${doorColor} card)`,
+          action: () => startInteraction('unlock-door-card', p),
+        });
+      }
+    }
+
     if (possibleActions.length === 0) {
       showMessage('Nothing to interact with here.');
       return;
@@ -930,6 +1120,33 @@ export default function SolverMode({ level, onBack }) {
       const remaining = loseLife();
       if (remaining > 0) {
         showMessage(`Burned by fire! Lives: ${remaining}`);
+      }
+      return;
+    }
+
+    // Handle door tiles - must use E to interact
+    if (targetCell.type === 'door-key') {
+      const doorColor = targetCell.config?.lockColor || 'red';
+      const hasKey = currentGS.inventory.some(
+        item => item.itemType === 'key' && item.lockColor === doorColor
+      );
+      if (hasKey) {
+        showMessage(`Face the door and hold E to unlock with ${doorColor} key`);
+      } else {
+        showMessage(`Locked! Need a ${doorColor} key`);
+      }
+      return;
+    }
+
+    if (targetCell.type === 'door-card') {
+      const doorColor = targetCell.config?.lockColor || 'red';
+      const hasCard = currentGS.inventory.some(
+        item => item.itemType === 'card' && item.lockColor === doorColor
+      );
+      if (hasCard) {
+        showMessage(`Face the door and hold E to unlock with ${doorColor} keycard`);
+      } else {
+        showMessage(`Locked! Need a ${doorColor} keycard`);
       }
       return;
     }
@@ -1164,6 +1381,27 @@ export default function SolverMode({ level, onBack }) {
         possibleActions.push(() => startInteraction('defeat-bear', p));
       }
 
+      // Door interactions
+      if (c.type === 'door-key') {
+        const doorColor = c.config?.lockColor || 'red';
+        const hasKey = currentGS.inventory.some(
+          item => item.itemType === 'key' && item.lockColor === doorColor
+        );
+        if (hasKey) {
+          possibleActions.push(() => startInteraction('unlock-door-key', p));
+        }
+      }
+
+      if (c.type === 'door-card') {
+        const doorColor = c.config?.lockColor || 'red';
+        const hasCard = currentGS.inventory.some(
+          item => item.itemType === 'card' && item.lockColor === doorColor
+        );
+        if (hasCard) {
+          possibleActions.push(() => startInteraction('unlock-door-card', p));
+        }
+      }
+
       // Only proceed if there are multiple actions
       if (possibleActions.length < 2) return;
 
@@ -1336,6 +1574,9 @@ export default function SolverMode({ level, onBack }) {
       case 'build-raft': return 'Building raft...';
       case 'extinguish-fire': return 'Extinguishing fire...';
       case 'rescue-friend': return 'Rescuing friend...';
+      case 'defeat-bear': return 'Fighting bear...';
+      case 'unlock-door-key': return 'Unlocking door...';
+      case 'unlock-door-card': return 'Swiping keycard...';
       default: return 'Interacting...';
     }
   };
@@ -1438,7 +1679,14 @@ export default function SolverMode({ level, onBack }) {
                 const def = ITEM_TYPES[item.itemType];
                 const isWood = item.itemType === 'wood';
                 const isBucket = item.itemType === 'bucket';
+                const isKey = item.itemType === 'key';
+                const isCard = item.itemType === 'card';
                 let emoji = def?.emoji || '';
+
+                // Get border color for keys/cards
+                const borderColor = (isKey || isCard) && item.lockColor
+                  ? LOCK_COLORS[item.lockColor]?.color || 'rgba(200, 150, 100, 0.3)'
+                  : 'rgba(200, 150, 100, 0.3)';
 
                 return (
                   <div key={i} style={{
@@ -1446,12 +1694,16 @@ export default function SolverMode({ level, onBack }) {
                     padding: '6px',
                     borderRadius: 6,
                     fontSize: 16,
-                    border: '1px solid rgba(200, 150, 100, 0.3)',
+                    border: `2px solid ${borderColor}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                    {isWood ? <WoodIcon size={20} /> : isBucket ? <BucketIcon size={20} filled={item.filled} /> : emoji}
+                    {isWood ? <WoodIcon size={20} />
+                      : isBucket ? <BucketIcon size={20} filled={item.filled} />
+                      : isKey ? <KeyIcon size={20} lockColor={item.lockColor} />
+                      : isCard ? <CardIcon size={20} lockColor={item.lockColor} />
+                      : emoji}
                   </div>
                 );
               })}
@@ -1706,9 +1958,15 @@ export default function SolverMode({ level, onBack }) {
                   const label = itemDef?.label || item.itemType;
                   const isWood = item.itemType === 'wood';
                   const isBucket = item.itemType === 'bucket';
+                  const isKey = item.itemType === 'key';
+                  const isCard = item.itemType === 'card';
                   let emoji = itemDef?.emoji || '';
-                  // Show bucket status clearly
-                  const statusText = isBucket ? (item.filled ? ' (Full)' : ' (Empty)') : '';
+
+                  // Get color label for keys/cards
+                  const colorLabel = (isKey || isCard) && item.lockColor
+                    ? LOCK_COLORS[item.lockColor]?.label || item.lockColor
+                    : null;
+
                   return (
                     <button
                       key={idx}
@@ -1749,9 +2007,13 @@ export default function SolverMode({ level, onBack }) {
                       }}>
                         {idx + 1}
                       </span>
-                      {isWood ? <WoodIcon size={24} /> : isBucket ? <BucketIcon size={24} filled={item.filled} /> : <span style={{ fontSize: 18 }}>{emoji}</span>}
+                      {isWood ? <WoodIcon size={24} />
+                        : isBucket ? <BucketIcon size={24} filled={item.filled} />
+                        : isKey ? <KeyIcon size={24} lockColor={item.lockColor} />
+                        : isCard ? <CardIcon size={24} lockColor={item.lockColor} />
+                        : <span style={{ fontSize: 18 }}>{emoji}</span>}
                       <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flex: 1 }}>
-                        <span>{label}</span>
+                        <span>{colorLabel ? `${colorLabel} ${label}` : label}</span>
                         {isBucket && (
                           <span style={{
                             fontSize: 11,
@@ -1759,6 +2021,15 @@ export default function SolverMode({ level, onBack }) {
                             fontWeight: 'bold',
                           }}>
                             {item.filled ? 'Full' : 'Empty'}
+                          </span>
+                        )}
+                        {(isKey || isCard) && colorLabel && (
+                          <span style={{
+                            fontSize: 11,
+                            color: LOCK_COLORS[item.lockColor]?.color || '#aaa',
+                            fontWeight: 'bold',
+                          }}>
+                            {colorLabel}
                           </span>
                         )}
                       </span>

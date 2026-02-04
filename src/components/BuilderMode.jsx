@@ -19,6 +19,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   });
   const [selectedTool, setSelectedTool] = useState('floor');
   const [selectedFloorColor, setSelectedFloorColor] = useState('gray');
+  const [selectedLockColor, setSelectedLockColor] = useState('red');
   const [selectedCell, setSelectedCell] = useState(null);
   const [showHazardZones, setShowHazardZones] = useState(false);
   const [showTooltips, setShowTooltips] = useState(true);
@@ -70,6 +71,12 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       newGrid = cloneGrid(newGrid);
       newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
     }
+    // Apply lock color if placing door/key/card tile
+    const lockTiles = ['door-key', 'door-card', 'item-key', 'item-card'];
+    if (lockTiles.includes(selectedTool)) {
+      newGrid = cloneGrid(newGrid);
+      newGrid[y][x].config = { ...newGrid[y][x].config, lockColor: selectedLockColor };
+    }
     setGrid(newGrid);
     setSelectedCell({ x, y });
     setSaved(false);
@@ -88,6 +95,12 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       if (selectedTool === 'floor') {
         newGrid = cloneGrid(newGrid);
         newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
+      }
+      // Apply lock color if placing door/key/card tile
+      const lockTiles = ['door-key', 'door-card', 'item-key', 'item-card'];
+      if (lockTiles.includes(selectedTool)) {
+        newGrid = cloneGrid(newGrid);
+        newGrid[y][x].config = { ...newGrid[y][x].config, lockColor: selectedLockColor };
       }
       return newGrid;
     });
@@ -306,7 +319,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
 
       {/* Main area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} />}
+        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} />}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', padding: 20 }}>
           <Grid
             grid={grid}

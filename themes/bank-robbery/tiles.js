@@ -1,5 +1,14 @@
 // Bank Robbery Theme - Tile Definitions
 
+// Shared color options for doors, keys, and cards
+export const LOCK_COLORS = {
+  red: { label: 'Red', color: '#cc4444', dark: '#882222' },
+  blue: { label: 'Blue', color: '#4444cc', dark: '#222288' },
+  green: { label: 'Green', color: '#44cc44', dark: '#228822' },
+  yellow: { label: 'Yellow', color: '#cccc44', dark: '#888822' },
+  purple: { label: 'Purple', color: '#cc44cc', dark: '#882288' }
+};
+
 export const TILE_TYPES = {
   empty: {
     label: 'Empty',
@@ -39,6 +48,62 @@ export const TILE_TYPES = {
     unique: true,
     tooltip: 'Level exit. Escape here after completing all missions.',
     walkable: true
+  },
+
+  // Doors
+  'door-key': {
+    label: 'Key Door',
+    color: '#8b4513',
+    category: 'interactive',
+    configurable: true,
+    defaultConfig: { lockColor: 'red' },
+    tooltip: 'Locked door. Requires matching colored key to open.',
+    walkable: false
+  },
+  'door-card': {
+    label: 'Card Door',
+    color: '#666688',
+    category: 'interactive',
+    configurable: true,
+    defaultConfig: { lockColor: 'red' },
+    tooltip: 'Electronic door. Requires matching colored keycard to open.',
+    walkable: false
+  },
+
+  // Open doors (created when doors are unlocked)
+  'door-key-open': {
+    label: 'Open Key Door',
+    color: '#5a3a1a',
+    walkable: true
+  },
+  'door-card-open': {
+    label: 'Open Card Door',
+    color: '#555566',
+    walkable: true
+  },
+
+  // Item tiles (placeable in builder)
+  'item-key': {
+    label: 'Key',
+    color: '#ffdd00',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'key',
+    configurable: true,
+    defaultConfig: { lockColor: 'red' },
+    tooltip: 'Collectible key. Opens matching colored key doors.',
+    walkable: true
+  },
+  'item-card': {
+    label: 'Keycard',
+    color: '#aaaacc',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'card',
+    configurable: true,
+    defaultConfig: { lockColor: 'red' },
+    tooltip: 'Collectible keycard. Opens matching colored card doors.',
+    walkable: true
   }
 };
 
@@ -56,6 +121,18 @@ export const FLOOR_COLORS = {
 export const CONFIG_HELP = {
   floor: {
     floorColor: 'Color of the floor for visual room distinction.'
+  },
+  'door-key': {
+    lockColor: 'Color of the lock. Only a key of the same color can open it.'
+  },
+  'door-card': {
+    lockColor: 'Color of the lock. Only a keycard of the same color can open it.'
+  },
+  'item-key': {
+    lockColor: 'Color of the key. Opens doors with matching color.'
+  },
+  'item-card': {
+    lockColor: 'Color of the keycard. Opens doors with matching color.'
   }
 };
 
@@ -78,17 +155,14 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
-  // Wall with brick pattern - more visible
+  // Wall with brick pattern
   if (tile.type === 'wall') {
-    // Base wall color - lighter gray
     ctx.fillStyle = '#3a3a3a';
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
 
-    // Brick pattern
     ctx.strokeStyle = '#2a2a2a';
     ctx.lineWidth = 2;
 
-    // Horizontal lines
     const rows = 3;
     for (let i = 1; i < rows; i++) {
       const y = cy - size/2 + (size / rows) * i;
@@ -98,7 +172,6 @@ export function renderTile(ctx, tile, cx, cy, size) {
       ctx.stroke();
     }
 
-    // Vertical lines (offset per row for brick effect)
     ctx.lineWidth = 1;
     const rowHeight = size / rows;
     for (let row = 0; row < rows; row++) {
@@ -109,6 +182,167 @@ export function renderTile(ctx, tile, cx, cy, size) {
       ctx.lineTo(cx - size/2 + offset, yStart + rowHeight);
       ctx.stroke();
     }
+    return true;
+  }
+
+  // Key Door
+  if (tile.type === 'door-key') {
+    const lockColor = tile.config?.lockColor || 'red';
+    const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
+
+    // Door frame
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Door panel
+    ctx.fillStyle = '#8b5a2b';
+    ctx.fillRect(cx - size * 0.4, cy - size * 0.45, size * 0.8, size * 0.9);
+
+    // Lock/handle with color
+    ctx.fillStyle = colorData.color;
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.2, cy, size * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Keyhole
+    ctx.fillStyle = '#222';
+    ctx.fillRect(cx + size * 0.17, cy - size * 0.03, size * 0.06, size * 0.1);
+
+    return true;
+  }
+
+  // Card Door
+  if (tile.type === 'door-card') {
+    const lockColor = tile.config?.lockColor || 'red';
+    const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
+
+    // Metal door frame
+    ctx.fillStyle = '#555566';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Door panel
+    ctx.fillStyle = '#777788';
+    ctx.fillRect(cx - size * 0.4, cy - size * 0.45, size * 0.8, size * 0.9);
+
+    // Card reader with color
+    ctx.fillStyle = colorData.dark;
+    ctx.fillRect(cx + size * 0.1, cy - size * 0.15, size * 0.25, size * 0.3);
+
+    // LED indicator
+    ctx.fillStyle = colorData.color;
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.22, cy - size * 0.25, size * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
+  // Key item
+  if (tile.type === 'item-key') {
+    const lockColor = tile.config?.lockColor || 'red';
+    const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
+
+    // Key body
+    ctx.fillStyle = colorData.color;
+
+    // Key head (circle)
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.15, cy, size * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key hole in head
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.15, cy, size * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key shaft
+    ctx.fillStyle = colorData.color;
+    ctx.fillRect(cx - size * 0.05, cy - size * 0.05, size * 0.4, size * 0.1);
+
+    // Key teeth
+    ctx.fillRect(cx + size * 0.2, cy, size * 0.08, size * 0.15);
+    ctx.fillRect(cx + size * 0.1, cy, size * 0.06, size * 0.1);
+
+    return true;
+  }
+
+  // Card item
+  if (tile.type === 'item-card') {
+    const lockColor = tile.config?.lockColor || 'red';
+    const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
+
+    // Card body
+    ctx.fillStyle = '#eee';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.4);
+
+    // Colored stripe
+    ctx.fillStyle = colorData.color;
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.12);
+
+    // Chip
+    ctx.fillStyle = '#daa520';
+    ctx.fillRect(cx - size * 0.2, cy, size * 0.15, size * 0.12);
+
+    return true;
+  }
+
+  // Open Key Door
+  if (tile.type === 'door-key-open') {
+    // Door frame
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Floor visible through open door
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.45, size * 0.7, size * 0.9);
+
+    // Door panel swung open (on right side)
+    ctx.fillStyle = '#8b5a2b';
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.35, cy - size * 0.45);
+    ctx.lineTo(cx + size * 0.5, cy - size * 0.35);
+    ctx.lineTo(cx + size * 0.5, cy + size * 0.35);
+    ctx.lineTo(cx + size * 0.35, cy + size * 0.45);
+    ctx.closePath();
+    ctx.fill();
+
+    // Door edge highlight
+    ctx.fillStyle = '#a07040';
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.35, cy - size * 0.45);
+    ctx.lineTo(cx + size * 0.38, cy - size * 0.42);
+    ctx.lineTo(cx + size * 0.38, cy + size * 0.42);
+    ctx.lineTo(cx + size * 0.35, cy + size * 0.45);
+    ctx.closePath();
+    ctx.fill();
+
+    return true;
+  }
+
+  // Open Card Door
+  if (tile.type === 'door-card-open') {
+    // Metal door frame
+    ctx.fillStyle = '#555566';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Floor visible through open door
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.45, size * 0.7, size * 0.9);
+
+    // Door panel slid to the side
+    ctx.fillStyle = '#777788';
+    ctx.fillRect(cx + size * 0.25, cy - size * 0.45, size * 0.2, size * 0.9);
+
+    // Door panel edge
+    ctx.fillStyle = '#999aab';
+    ctx.fillRect(cx + size * 0.25, cy - size * 0.45, size * 0.03, size * 0.9);
+
+    // Green LED (unlocked)
+    ctx.fillStyle = '#44cc44';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.35, cy - size * 0.35, size * 0.05, 0, Math.PI * 2);
+    ctx.fill();
 
     return true;
   }
@@ -123,7 +357,11 @@ export function getTileEmoji(tileType) {
     wall: null,
     floor: null,
     start: '🚪',
-    exit: '🚐'
+    exit: '🚐',
+    'door-key': null,
+    'door-card': null,
+    'item-key': null,
+    'item-card': null
   };
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;

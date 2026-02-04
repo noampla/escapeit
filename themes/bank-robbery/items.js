@@ -1,15 +1,99 @@
 // Bank Robbery Theme - Item Definitions
 
+// Lock colors (same as in tiles.js)
+const LOCK_COLORS = {
+  red: { label: 'Red', color: '#cc4444', dark: '#882222' },
+  blue: { label: 'Blue', color: '#4444cc', dark: '#222288' },
+  green: { label: 'Green', color: '#44cc44', dark: '#228822' },
+  yellow: { label: 'Yellow', color: '#cccc44', dark: '#888822' },
+  purple: { label: 'Purple', color: '#cc44cc', dark: '#882288' }
+};
+
 export const ITEM_TYPES = {
-  // Items will be added here
+  key: {
+    label: 'Key',
+    emoji: null, // Custom rendered
+    color: '#ffdd00',
+    description: 'Opens matching colored key doors'
+  },
+  card: {
+    label: 'Keycard',
+    emoji: null, // Custom rendered
+    color: '#aaaacc',
+    description: 'Opens matching colored card doors'
+  }
 };
 
 export function renderItem(ctx, itemType, x, y, size, state = null) {
-  // Custom rendering will be added here
+  const lockColor = state?.lockColor || 'red';
+  const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
+
+  // Key item (in inventory)
+  if (itemType === 'key') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    ctx.fillStyle = colorData.color;
+
+    // Key head (circle)
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.15, cy, size * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key hole in head
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.15, cy, size * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key shaft
+    ctx.fillStyle = colorData.color;
+    ctx.fillRect(cx - size * 0.05, cy - size * 0.05, size * 0.4, size * 0.1);
+
+    // Key teeth
+    ctx.fillRect(cx + size * 0.2, cy, size * 0.08, size * 0.15);
+    ctx.fillRect(cx + size * 0.1, cy, size * 0.06, size * 0.1);
+
+    return true;
+  }
+
+  // Card item (in inventory)
+  if (itemType === 'card') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Card body
+    ctx.fillStyle = '#eee';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.4);
+
+    // Colored stripe
+    ctx.fillStyle = colorData.color;
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.12);
+
+    // Chip
+    ctx.fillStyle = '#daa520';
+    ctx.fillRect(cx - size * 0.2, cy, size * 0.15, size * 0.12);
+
+    return true;
+  }
+
   return false;
 }
 
 export function getItemEmoji(itemType) {
   const item = ITEM_TYPES[itemType];
   return item?.emoji || null;
+}
+
+// Get display label for item with color info
+export function getItemLabel(itemType, state = null) {
+  const item = ITEM_TYPES[itemType];
+  const baseLabel = item?.label || itemType;
+
+  if ((itemType === 'key' || itemType === 'card') && state?.lockColor) {
+    const colorData = LOCK_COLORS[state.lockColor];
+    return `${colorData?.label || state.lockColor} ${baseLabel}`;
+  }
+
+  return baseLabel;
 }

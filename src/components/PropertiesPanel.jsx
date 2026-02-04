@@ -77,6 +77,18 @@ export default function PropertiesPanel({ grid, selectedCell, onConfigChange, sh
         </select>
         <HelpText type="floor" field="floorColor" show={showHelp} CONFIG_HELP={CONFIG_HELP} />
       </>)}
+
+      {(cell.type === 'door-key' || cell.type === 'door-card' || cell.type === 'item-key' || cell.type === 'item-card') && (<>
+        <label style={labelStyle}>Lock Color</label>
+        <select style={inputStyle} value={config.lockColor || 'red'} onChange={e => update('lockColor', e.target.value)}>
+          <option value="red">Red</option>
+          <option value="blue">Blue</option>
+          <option value="green">Green</option>
+          <option value="yellow">Yellow</option>
+          <option value="purple">Purple</option>
+        </select>
+        <HelpText type={cell.type} field="lockColor" show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+      </>)}
     </div>
   );
 }
