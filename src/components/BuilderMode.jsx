@@ -73,6 +73,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [redoStack, setRedoStack] = useState([]);
   const [testMode, setTestMode] = useState(false);
   const [loadMenuOpen, setLoadMenuOpen] = useState(false);
+  const [loadMenuLevels, setLoadMenuLevels] = useState([]);
   const [placementError, setPlacementError] = useState(null);
   const lastDragPos = useRef(null);
   const placementErrorTimer = useRef(null);
@@ -200,8 +201,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       createdAt: editLevel?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
-    saveLevel(level);
-    setSaved(true);
+    saveLevel(level).then(() => setSaved(true));
   };
 
   const handleClear = () => {
@@ -337,7 +337,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         <button onClick={handleSave} style={{ ...barBtn, background: saved ? '#2a4a2a' : '#2a3a4a' }}>
           {saved ? '✓ Saved' : 'Save'}
         </button>
-        <button onClick={() => setLoadMenuOpen(true)} style={{ ...barBtn, background: '#2a3a4a' }}>
+        <button onClick={() => { setLoadMenuOpen(true); loadLevels().then(setLoadMenuLevels); }} style={{ ...barBtn, background: '#2a3a4a' }}>
           Load
         </button>
 
@@ -471,7 +471,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
               {theme?.emoji || '📂'} Load {theme?.name || 'Level'}
             </h2>
             {(() => {
-              const levels = loadLevels();
+              const levels = loadMenuLevels;
               if (levels.length === 0) {
                 return (
                   <div style={{ color: '#888', fontSize: 14, padding: 20, textAlign: 'center' }}>

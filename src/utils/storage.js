@@ -1,49 +1,50 @@
-import { STORAGE_KEY } from './constants';
+import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { db } from './firebase';
+import { GRID_COLS } from './constants';
 
-export function saveLevels(levels) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(levels));
+const COLLECTION = 'maps';
+
+// Firestore doesn't allow nested arrays. Flatten grid (2D) to 1D on save, restore on load.
+function flattenLevel(level) {
+  const { grid, ...rest } = level;
+  return { ...rest, grid: grid.flat() };
 }
 
-export function loadLevels() {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
+function restoreLevel(data) {
+  const { grid, ...rest } = data;
+  const restored = [];
+  for (let row = 0; row < grid.length / GRID_COLS; row++) {
+    restored.push(grid.slice(row * GRID_COLS, (row + 1) * GRID_COLS));
+  }
+  return { ...rest, grid: restored };
+}
+
+export async function saveLevels(levels) {
+  const snapshot = await getDocs(collection(db, COLLECTION));
+  for (const d of snapshot.docs) {
+    await deleteDoc(doc(db, COLLECTION, d.id));
+  }
+  for (const level of levels) {
+    await setDoc(doc(db, COLLECTION, level.id), flattenLevel(level));
   }
 }
 
-export function saveLevel(level) {
-  const levels = loadLevels();
-  const idx = levels.findIndex(l => l.id === level.id);
-  if (idx >= 0) levels[idx] = level;
-  else levels.push(level);
-  saveLevels(levels);
+export async function loadLevels() {
+  const snapshot = await getDocs(collection(db, COLLECTION));
+  return snapshot.docs.map(d => restoreLevel(d.data()));
 }
 
-export function deleteLevel(id) {
-  const levels = loadLevels().filter(l => l.id !== id);
-  saveLevels(levels);
+export async function saveLevel(level) {
+  await setDoc(doc(db, COLLECTION, level.id), flattenLevel(level));
+}
+
+export async function deleteLevel(id) {
+  await deleteDoc(doc(db, COLLECTION, id));
 }
 
 export function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-// Migrate old levels to add themeId
-export function migrateLevels() {
-  const levels = loadLevels();
-  let needsSave = false;
-
-  levels.forEach(level => {
-    if (!level.themeId) {
-      level.themeId = 'forest'; // Default to forest theme
-      needsSave = true;
-    }
-  });
-
-  if (needsSave) {
-    saveLevels(levels);
-    console.log('Migrated', levels.length, 'levels to include themeId');
-  }
-}
+// No-op: migration was for localStorage themeId. Firestore has no legacy data.
+export function migrateLevels() {}

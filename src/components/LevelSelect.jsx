@@ -6,13 +6,12 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
   const [levels, setLevels] = useState([]);
 
   useEffect(() => {
-    setLevels(loadLevels());
+    loadLevels().then(setLevels);
   }, []);
 
   const handleDelete = (id, name) => {
     if (confirm(`Delete level "${name}"?`)) {
-      deleteLevel(id);
-      setLevels(loadLevels());
+      deleteLevel(id).then(() => loadLevels().then(setLevels));
     }
   };
 

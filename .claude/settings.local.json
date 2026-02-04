@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(npx firebase login)",
+      "Bash(npx firebase:*)",
+      "Bash(npm install:*)"
     ]
   }
 }
