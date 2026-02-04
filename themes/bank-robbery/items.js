@@ -1,7 +1,7 @@
 // Bank Robbery Theme - Item Definitions
 
-// Lock colors (same as in tiles.js)
-const LOCK_COLORS = {
+// Lock colors (same as in tiles.js) - exported for use by engine
+export const LOCK_COLORS = {
   red: { label: 'Red', color: '#cc4444', dark: '#882222' },
   blue: { label: 'Blue', color: '#4444cc', dark: '#222288' },
   green: { label: 'Green', color: '#44cc44', dark: '#228822' },
@@ -96,4 +96,9 @@ export function getItemLabel(itemType, state = null) {
   }
 
   return baseLabel;
+}
+
+// Render inventory item (same as renderItem for bank robbery)
+export function renderInventoryItem(ctx, itemType, x, y, size, state = null) {
+  return renderItem(ctx, itemType, x, y, size, state);
 }

@@ -22,7 +22,8 @@ export const INTERACTIONS = {
       grid[y][x] = { type: 'item-wood', config: {} };
       return {
         success: true,
-        message: '🪓 Tree chopped! Wood left on ground.'
+        message: '🪓 Tree chopped! Wood left on ground.',
+        modifyGrid: true
       };
     }
   },
@@ -193,6 +194,111 @@ export const INTERACTIONS = {
       };
     }
   },
+
+  'defeat-bear': {
+    label: 'Defeat Bear',
+    duration: 2000,
+    requirements: { tile: 'bear', inventory: ['knife'] },
+    execute: (gameState, grid, x, y) => {
+      const knifeIdx = findItemIndex(gameState.inventory, 'knife');
+
+      if (knifeIdx === -1) {
+        return { success: false, message: 'Need a knife!' };
+      }
+
+      // Remove bear from grid
+      grid[y][x] = { type: 'ground', config: {} };
+
+      // Remove knife and add sweater
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== knifeIdx);
+      gameState.inventory.push({ itemType: 'sweater' });
+
+      // Track collected item
+      if (!gameState.collectedItems) gameState.collectedItems = [];
+      gameState.collectedItems.push('sweater');
+
+      return {
+        success: true,
+        message: 'Defeated the bear! Got a sweater.',
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
+  'unlock-door-key': {
+    label: 'Unlock Door',
+    duration: 1000,
+    requirements: { tile: 'door-key' },
+    // Custom check for matching key color
+    checkCustom: (gameState, tile) => {
+      const doorColor = tile.config?.lockColor || 'red';
+      return gameState.inventory?.some(
+        item => item.itemType === 'key' && item.lockColor === doorColor
+      );
+    },
+    execute: (gameState, grid, x, y) => {
+      const tile = grid[y][x];
+      const doorColor = tile.config?.lockColor || 'red';
+      const keyIdx = gameState.inventory.findIndex(
+        item => item.itemType === 'key' && item.lockColor === doorColor
+      );
+
+      if (keyIdx === -1) {
+        return { success: false, message: `Need a ${doorColor} key!` };
+      }
+
+      // Open the door
+      grid[y][x] = { type: 'door-key-open', config: {} };
+
+      // Remove the key
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== keyIdx);
+
+      return {
+        success: true,
+        message: `Unlocked ${doorColor} door with key!`,
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
+  'unlock-door-card': {
+    label: 'Unlock Door',
+    duration: 1000,
+    requirements: { tile: 'door-card' },
+    // Custom check for matching card color
+    checkCustom: (gameState, tile) => {
+      const doorColor = tile.config?.lockColor || 'red';
+      return gameState.inventory?.some(
+        item => item.itemType === 'card' && item.lockColor === doorColor
+      );
+    },
+    execute: (gameState, grid, x, y) => {
+      const tile = grid[y][x];
+      const doorColor = tile.config?.lockColor || 'red';
+      const cardIdx = gameState.inventory.findIndex(
+        item => item.itemType === 'card' && item.lockColor === doorColor
+      );
+
+      if (cardIdx === -1) {
+        return { success: false, message: `Need a ${doorColor} keycard!` };
+      }
+
+      // Open the door
+      grid[y][x] = { type: 'door-card-open', config: {} };
+
+      // Remove the card
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== cardIdx);
+
+      return {
+        success: true,
+        message: `Unlocked ${doorColor} door with keycard!`,
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
 };
 
 // Get all available interactions at a position
@@ -204,7 +310,7 @@ export function getAvailableInteractions(gameState, grid, x, y) {
 
   // Check each interaction
   for (const [id, interaction] of Object.entries(INTERACTIONS)) {
-    if (checkRequirements(interaction.requirements, gameState, tile)) {
+    if (checkRequirements(interaction.requirements, gameState, tile, interaction)) {
       available.push({
         id,
         label: interaction.label,
@@ -217,7 +323,7 @@ export function getAvailableInteractions(gameState, grid, x, y) {
 }
 
 // Check if requirements are met
-function checkRequirements(requirements, gameState, tile) {
+function checkRequirements(requirements, gameState, tile, interaction = null) {
   if (!requirements) return true;
 
   // Check tile type
@@ -250,6 +356,13 @@ function checkRequirements(requirements, gameState, tile) {
     }
   }
 
+  // Check custom requirement (e.g., matching key/card color)
+  if (interaction?.checkCustom) {
+    if (!interaction.checkCustom(gameState, tile)) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -272,7 +385,7 @@ export function executeInteraction(interactionId, gameState, grid, x, y) {
   }
 
   // Check requirements
-  if (!checkRequirements(interaction.requirements, gameState, tile)) {
+  if (!checkRequirements(interaction.requirements, gameState, tile, interaction)) {
     return { success: false, error: 'Requirements not met' };
   }
 

@@ -1,8 +1,29 @@
-import { MISSION_TYPES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { useContext, useMemo } from 'react';
+import { BASE_MISSION_TYPES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { ThemeContext } from '../App';
 
 export default function MissionEditor({ missions, onChange, lives, onLivesChange, fixedOrder, onFixedOrderChange, inventoryCapacity, onInventoryCapacityChange }) {
+  const theme = useContext(ThemeContext);
+
+  // Get mission types from theme, fallback to base types
+  const missionTypes = useMemo(() => {
+    const themeMissionIds = theme?.getMissionTypes?.();
+    if (themeMissionIds && themeMissionIds.length > 0) {
+      // Filter BASE_MISSION_TYPES to only include types available in this theme
+      return BASE_MISSION_TYPES.filter(mt => themeMissionIds.includes(mt.id));
+    }
+    return BASE_MISSION_TYPES;
+  }, [theme]);
+
+  // Get target options for a mission type from theme
+  const getTargetOptions = (missionType) => {
+    return theme?.getMissionTargetOptions?.(missionType) || [];
+  };
+
   const addMission = () => {
-    onChange([...missions, { type: 'escape', targetId: '', description: '' }]);
+    // Default to 'escape' if available, otherwise first available type
+    const defaultType = missionTypes.find(mt => mt.id === 'escape')?.id || missionTypes[0]?.id || 'escape';
+    onChange([...missions, { type: defaultType, targetId: '', description: '' }]);
   };
 
   const removeMission = (idx) => {
@@ -22,7 +43,7 @@ export default function MissionEditor({ missions, onChange, lives, onLivesChange
     onChange(updated);
   };
 
-  const missionDef = (type) => MISSION_TYPES.find(mt => mt.id === type);
+  const missionDef = (type) => missionTypes.find(mt => mt.id === type) || BASE_MISSION_TYPES.find(mt => mt.id === type);
 
   const inputStyle = { padding: '3px 6px', background: '#2a3a2a', border: '1px solid #446644', borderRadius: 3, color: '#ddd', fontSize: 11 };
   const btnStyle = { padding: '2px 6px', background: '#2a3a2a', border: '1px solid #446644', borderRadius: 3, color: '#ccc', cursor: 'pointer', fontSize: 11 };
@@ -30,7 +51,7 @@ export default function MissionEditor({ missions, onChange, lives, onLivesChange
   return (
     <div style={{ background: '#1a2a1a', padding: 10, borderTop: '2px solid #335533' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ color: '#aaa', fontSize: 14, margin: 0 }}>🌲 Missions & Settings</h3>
+        <h3 style={{ color: '#aaa', fontSize: 14, margin: 0 }}>Missions & Settings</h3>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <label style={{ color: '#888', fontSize: 11 }}>
             Lives: <input type="number" min="1" max="10" value={lives} onChange={e => onLivesChange(Number(e.target.value))} style={{ ...inputStyle, width: 40 }} />
@@ -46,17 +67,23 @@ export default function MissionEditor({ missions, onChange, lives, onLivesChange
       </div>
 
       {missions.length === 0 && (
-        <p style={{ color: '#556644', fontSize: 12 }}>No missions. Add at least "Reach the Car" for a valid level.</p>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, padding: '4px 6px', background: '#223333', borderRadius: 4, border: '1px dashed #446666' }}>
+          <span style={{ color: '#668888', fontSize: 11, fontStyle: 'italic' }}>
+            Default: {theme?.getDefaultMission?.()?.description || 'Reach the exit'} (auto-added)
+          </span>
+        </div>
       )}
 
       {missions.map((m, i) => {
         const def = missionDef(m.type);
         const isCoord = def?.coordBased;
+        const targetOptions = def?.needsTarget && !isCoord ? getTargetOptions(m.type) : [];
+
         return (
           <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, padding: '4px 6px', background: '#223322', borderRadius: 4 }}>
             <span style={{ color: '#556644', fontSize: 11, width: 20 }}>#{i + 1}</span>
             <select value={m.type} onChange={e => updateMission(i, 'type', e.target.value)} style={{ ...inputStyle, width: 130 }}>
-              {MISSION_TYPES.map(mt => <option key={mt.id} value={mt.id}>{mt.label}</option>)}
+              {missionTypes.map(mt => <option key={mt.id} value={mt.id}>{mt.label}</option>)}
             </select>
             {def?.needsTarget && (
               isCoord ? (
@@ -84,10 +111,10 @@ export default function MissionEditor({ missions, onChange, lives, onLivesChange
                     placeholder="y"
                   />
                 </div>
-              ) : def?.targetOptions ? (
+              ) : targetOptions.length > 0 ? (
                 <select style={{ ...inputStyle, width: 100 }} value={m.targetId || ''} onChange={e => updateMission(i, 'targetId', e.target.value)}>
                   <option value="">-- Pick --</option>
-                  {def.targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               ) : (
                 <input

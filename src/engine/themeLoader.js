@@ -74,6 +74,15 @@ export class ThemeLoader {
     return this.items?.getItemEmoji?.(itemType) || null;
   }
 
+  // Get item label with state (for inventory display)
+  getItemLabel(itemType, state) {
+    if (this.items?.getItemLabel) {
+      return this.items.getItemLabel(itemType, state);
+    }
+    const item = this.items?.ITEM_TYPES?.[itemType];
+    return item?.label || itemType;
+  }
+
   // Interaction functions
   getAvailableInteractions(gameState, grid, x, y) {
     return this.interactions?.getAvailableInteractions?.(gameState, grid, x, y) || [];
@@ -111,6 +120,130 @@ export class ThemeLoader {
       return hook(...args);
     }
     return null;
+  }
+
+  // === NEW: Tile Classification Methods ===
+
+  // Tiles that items can be dropped on
+  getGroundTiles() {
+    return this.tiles?.GROUND_TILES || ['ground', 'floor', 'start'];
+  }
+
+  // Tiles player can interact with (E key)
+  getInteractableTiles() {
+    return this.tiles?.INTERACTABLE_TILES || [];
+  }
+
+  // Tiles to ignore for floor color detection when picking up items
+  getIgnoreTiles() {
+    return this.tiles?.IGNORE_TILES || ['wall', 'empty'];
+  }
+
+  // Tiles that use lock colors (doors, keys, cards)
+  getLockTiles() {
+    return this.tiles?.LOCK_TILES || [];
+  }
+
+  // === NEW: Movement Methods ===
+
+  // Check if player can move into a tile - returns { allowed, message?, loseLife?, moveRaft?, respawn? }
+  checkMovementInto(tileType, gameState, tileConfig) {
+    if (this.tiles?.checkMovementInto) {
+      return this.tiles.checkMovementInto(tileType, gameState, tileConfig);
+    }
+    // Default: use walkability
+    return { allowed: this.isWalkable(tileType, gameState) };
+  }
+
+  // === NEW: Exit Configuration ===
+
+  // Get exit tile types for this theme
+  getExitTiles() {
+    return this.theme?.exitTiles || ['exit'];
+  }
+
+  // Get start/spawn tile type
+  getStartTile() {
+    return this.theme?.startTile || 'start';
+  }
+
+  // Check if player meets exit requirements - returns { allowed, message? }
+  checkExitRequirements(gameState, exitConfig) {
+    if (this.tiles?.checkExitRequirements) {
+      return this.tiles.checkExitRequirements(gameState, exitConfig);
+    }
+    // Default: always allowed
+    return { allowed: true };
+  }
+
+  // === NEW: Mission Methods ===
+
+  // Get mission types available for this theme
+  getMissionTypes() {
+    return this.theme?.missions?.types || null;
+  }
+
+  // Get target options for a mission type (e.g., items for 'collect' mission)
+  getMissionTargetOptions(missionType) {
+    return this.theme?.missions?.targetOptions?.[missionType] || [];
+  }
+
+  // Get default mission if none specified
+  getDefaultMission() {
+    return this.theme?.missions?.defaultMission || {
+      type: 'escape',
+      description: 'Reach the exit'
+    };
+  }
+
+  // Get hazard tile types (for 'extinguish' mission checking)
+  getHazardTileTypes() {
+    return this.tiles?.HAZARD_TILE_TYPES || ['fire'];
+  }
+
+  // === NEW: UI Theming ===
+
+  // Get UI color scheme
+  getUIColors() {
+    return this.theme?.ui || {
+      primaryColor: '#68aa44',
+      backgroundColor: '#0a1f0a',
+      accentColor: '#a8f0a8',
+      dangerColor: '#ff4444',
+      panelBackground: 'rgba(30, 45, 30, 0.95)',
+      messageBackground: 'rgba(58, 122, 58, 0.95)'
+    };
+  }
+
+  // Get lock colors (for doors/keys/cards)
+  getLockColors() {
+    return this.tiles?.LOCK_COLORS || this.items?.LOCK_COLORS || {
+      red: { label: 'Red', color: '#cc4444' },
+      blue: { label: 'Blue', color: '#4444cc' },
+      green: { label: 'Green', color: '#44cc44' },
+      yellow: { label: 'Yellow', color: '#cccc44' },
+      purple: { label: 'Purple', color: '#cc44cc' }
+    };
+  }
+
+  // Get floor colors (for floor tile configuration)
+  getFloorColors() {
+    return this.tiles?.FLOOR_COLORS || {};
+  }
+
+  // === NEW: Inventory Icon Methods ===
+
+  // Get custom inventory icon component for an item type
+  getInventoryIconComponent(itemType) {
+    return this.items?.InventoryIcons?.[itemType] || null;
+  }
+
+  // Render inventory item (for HUD display)
+  renderInventoryItem(ctx, itemType, x, y, size, itemState) {
+    if (this.items?.renderInventoryItem) {
+      return this.items.renderInventoryItem(ctx, itemType, x, y, size, itemState);
+    }
+    return this.renderItem(ctx, itemType, x, y, size, itemState);
   }
 }
 

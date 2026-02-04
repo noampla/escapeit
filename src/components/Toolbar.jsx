@@ -1,4 +1,4 @@
-import { useEffect, useRef, useContext } from 'react';
+import { useEffect, useRef, useContext, useMemo } from 'react';
 import { ThemeContext } from '../App';
 
 const categories = [
@@ -7,17 +7,39 @@ const categories = [
   { id: 'hazard', label: 'Hazards' },
 ];
 
-const TOOLBAR_EMOJIS = {
+// Default emoji fallbacks (used if theme doesn't provide getTileEmoji)
+const DEFAULT_EMOJIS = {
   tree: '🌲', water: '🌊', snow: '❄️',
   campfire: '🏕️', car: '🚗',
   friend: '👤',
   fire: '🔥', bear: '🐻',
-  // Item tiles
   'item-axe': '🪓',
   'item-rope': '🧵',
   'item-knife': '🔪',
   'item-sweater': '🧥',
+  start: '🚪', exit: '🚐',
 };
+
+// Default color fallbacks
+const DEFAULT_FLOOR_COLORS = {
+  gray: { label: 'Gray', color: '#4a4a4a' },
+  blue: { label: 'Blue', color: '#3a3a5a' },
+  red: { label: 'Red', color: '#5a3a3a' },
+  green: { label: 'Green', color: '#3a4a3a' },
+  yellow: { label: 'Yellow', color: '#4a4a3a' },
+  purple: { label: 'Purple', color: '#4a3a4a' },
+  marble: { label: 'Marble', color: '#5a5a5a' },
+};
+
+const DEFAULT_LOCK_COLORS = {
+  red: { label: 'Red', color: '#cc4444' },
+  blue: { label: 'Blue', color: '#4444cc' },
+  green: { label: 'Green', color: '#44cc44' },
+  yellow: { label: 'Yellow', color: '#cccc44' },
+  purple: { label: 'Purple', color: '#cc44cc' },
+};
+
+const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
 
 // Draw mini bucket icon
 function drawMiniBucket(ctx, size) {
@@ -114,7 +136,7 @@ function drawMiniCard(ctx, size, color = '#cc4444') {
   ctx.fillRect(cx - s * 0.4, cy + s * 0.05, s * 0.3, s * 0.22);
 }
 
-function ToolbarIcon({ type, theme, TILE_TYPES, lockColor }) {
+function ToolbarIcon({ type, theme, TILE_TYPES, lockColor, LOCK_COLORS }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -135,9 +157,10 @@ function ToolbarIcon({ type, theme, TILE_TYPES, lockColor }) {
         drawMiniCard(ctx, 16, color);
       }
     }
-  }, [type, lockColor]);
+  }, [type, lockColor, LOCK_COLORS]);
 
-  const emoji = TOOLBAR_EMOJIS[type];
+  // Get emoji from theme or use default fallback
+  const emoji = theme?.getTileEmoji?.(type) ?? DEFAULT_EMOJIS[type];
 
   if (type === 'item-bucket' || type === 'item-wood' || type === 'item-key' || type === 'item-card') {
     return <canvas ref={canvasRef} width={16} height={16} style={{ flexShrink: 0 }} />;
@@ -154,33 +177,15 @@ function ToolbarIcon({ type, theme, TILE_TYPES, lockColor }) {
   }} />;
 }
 
-// Floor color options
-const FLOOR_COLORS = {
-  gray: { label: 'Gray', color: '#4a4a4a' },
-  blue: { label: 'Blue', color: '#3a3a5a' },
-  red: { label: 'Red', color: '#5a3a3a' },
-  green: { label: 'Green', color: '#3a4a3a' },
-  yellow: { label: 'Yellow', color: '#4a4a3a' },
-  purple: { label: 'Purple', color: '#4a3a4a' },
-  marble: { label: 'Marble', color: '#5a5a5a' },
-};
-
-// Lock color options for doors/keys/cards
-const LOCK_COLORS = {
-  red: { label: 'Red', color: '#cc4444' },
-  blue: { label: 'Blue', color: '#4444cc' },
-  green: { label: 'Green', color: '#44cc44' },
-  yellow: { label: 'Yellow', color: '#cccc44' },
-  purple: { label: 'Purple', color: '#cc44cc' },
-};
-
-// Tiles that use lock colors
-const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
-
 export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange, lockColor, onLockColorChange }) {
   const theme = useContext(ThemeContext);
   const TILE_TYPES = theme?.getTileTypes() || {};
   const toolbarRef = useRef(null);
+
+  // Get colors and tile lists from theme with fallbacks
+  const FLOOR_COLORS = useMemo(() => theme?.getFloorColors?.() || DEFAULT_FLOOR_COLORS, [theme]);
+  const LOCK_COLORS = useMemo(() => theme?.getLockColors?.() || DEFAULT_LOCK_COLORS, [theme]);
+  const LOCK_TILES = useMemo(() => theme?.getLockTiles?.() || DEFAULT_LOCK_TILES, [theme]);
 
   return (
     <div ref={toolbarRef} style={{
@@ -273,7 +278,7 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
                       }
                     }}
                   >
-                    <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} lockColor={lockColor} />
+                    <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} lockColor={lockColor} LOCK_COLORS={LOCK_COLORS} />
                     <span style={{ flex: 1 }}>{def.label}</span>
                     {showLockColorIndicator && (
                       <span style={{

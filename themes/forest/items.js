@@ -210,3 +210,134 @@ export function getItemEmoji(itemType) {
   const item = ITEM_TYPES[itemType];
   return item?.emoji || null;
 }
+
+// Lock colors for keys and cards
+export const LOCK_COLORS = {
+  red: { label: 'Red', color: '#cc4444' },
+  blue: { label: 'Blue', color: '#4444cc' },
+  green: { label: 'Green', color: '#44cc44' },
+  yellow: { label: 'Yellow', color: '#cccc44' },
+  purple: { label: 'Purple', color: '#cc44cc' },
+};
+
+// Draw a key icon
+export function drawKey(ctx, cx, cy, size, lockColor = 'red') {
+  const s = size * 0.3;
+  const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
+
+  // Key head (circle)
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx - s * 0.3, cy - s * 0.2, s * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Key hole
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.arc(cx - s * 0.3, cy - s * 0.2, s * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Key shaft
+  ctx.fillStyle = color;
+  ctx.fillRect(cx - s * 0.1, cy - s * 0.15, s * 1.1, s * 0.3);
+
+  // Key teeth
+  ctx.fillRect(cx + s * 0.5, cy + s * 0.15, s * 0.15, s * 0.25);
+  ctx.fillRect(cx + s * 0.75, cy + s * 0.15, s * 0.15, s * 0.35);
+
+  // Highlight
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.beginPath();
+  ctx.arc(cx - s * 0.4, cy - s * 0.35, s * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Draw a card/keycard icon
+export function drawCard(ctx, cx, cy, size, lockColor = 'red') {
+  const s = size * 0.3;
+  const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
+
+  // Card body
+  ctx.fillStyle = color;
+  const cardWidth = s * 1.4;
+  const cardHeight = s * 0.9;
+  const radius = s * 0.15;
+
+  // Rounded rectangle
+  ctx.beginPath();
+  ctx.moveTo(cx - cardWidth/2 + radius, cy - cardHeight/2);
+  ctx.lineTo(cx + cardWidth/2 - radius, cy - cardHeight/2);
+  ctx.quadraticCurveTo(cx + cardWidth/2, cy - cardHeight/2, cx + cardWidth/2, cy - cardHeight/2 + radius);
+  ctx.lineTo(cx + cardWidth/2, cy + cardHeight/2 - radius);
+  ctx.quadraticCurveTo(cx + cardWidth/2, cy + cardHeight/2, cx + cardWidth/2 - radius, cy + cardHeight/2);
+  ctx.lineTo(cx - cardWidth/2 + radius, cy + cardHeight/2);
+  ctx.quadraticCurveTo(cx - cardWidth/2, cy + cardHeight/2, cx - cardWidth/2, cy + cardHeight/2 - radius);
+  ctx.lineTo(cx - cardWidth/2, cy - cardHeight/2 + radius);
+  ctx.quadraticCurveTo(cx - cardWidth/2, cy - cardHeight/2, cx - cardWidth/2 + radius, cy - cardHeight/2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Magnetic stripe
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(cx - cardWidth/2 + s * 0.1, cy - s * 0.1, cardWidth - s * 0.2, s * 0.2);
+
+  // Highlight
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.fillRect(cx - cardWidth/2 + s * 0.1, cy - cardHeight/2 + s * 0.08, cardWidth * 0.4, s * 0.15);
+}
+
+// Render inventory item (for HUD display)
+// This is similar to renderItem but optimized for inventory icons
+export function renderInventoryItem(ctx, itemType, x, y, size, state = null) {
+  const item = ITEM_TYPES[itemType];
+  if (!item) return false;
+
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+
+  // Custom drawing for stateful items
+  if (item.draw === 'bucket') {
+    const isFilled = state?.filled === true;
+    drawBucket(ctx, cx, cy, size, isFilled);
+    return true;
+  }
+
+  if (item.draw === 'wood') {
+    drawWood(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Key with lock color
+  if (itemType === 'key' && state?.lockColor) {
+    drawKey(ctx, cx, cy, size, state.lockColor);
+    return true;
+  }
+
+  // Card with lock color
+  if (itemType === 'card' && state?.lockColor) {
+    drawCard(ctx, cx, cy, size, state.lockColor);
+    return true;
+  }
+
+  // Emoji rendering (handled by caller)
+  return false;
+}
+
+// Get item label with state
+export function getItemLabel(itemType, state = null) {
+  const item = ITEM_TYPES[itemType];
+  if (!item) return itemType;
+
+  // For bucket, show filled/empty state
+  if (itemType === 'bucket') {
+    return state?.filled ? 'Filled Bucket' : 'Empty Bucket';
+  }
+
+  // For key/card, show color
+  if ((itemType === 'key' || itemType === 'card') && state?.lockColor) {
+    const colorLabel = LOCK_COLORS[state.lockColor]?.label || state.lockColor;
+    return `${colorLabel} ${item.label}`;
+  }
+
+  return item.label;
+}

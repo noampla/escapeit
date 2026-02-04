@@ -2,9 +2,11 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, GRID_COLS, GRID_ROWS } from '../utils/constants';
 import { getAllHazardZones } from '../engine/hazards';
 
-const TILE_EMOJIS = {
+// Default emoji fallbacks (used if theme doesn't provide getTileEmoji)
+const DEFAULT_TILE_EMOJIS = {
   tree: '🌲', water: '🌊', snow: '❄️', raft: '🛶',
   campfire: '🏕️', car: '🚗', friend: '👤', fire: '🔥', bear: '🐻',
+  start: '🚪', exit: '🚐',
   // Item tiles
   'item-key': '🔑',
   'item-axe': '🪓',
@@ -14,123 +16,6 @@ const TILE_EMOJIS = {
   'item-sweater': '🧥',
   'item-wood': '🪵',
 };
-
-// Draw a bucket shape on canvas
-function drawBucket(ctx, cx, cy, size) {
-  const s = size * 0.35;
-
-  // Bucket body (trapezoid) - main fill
-  ctx.fillStyle = '#6699cc';
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-  ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
-  ctx.closePath();
-  ctx.fill();
-
-  // Shadow/depth on right side
-  ctx.fillStyle = '#4477aa';
-  ctx.beginPath();
-  ctx.moveTo(cx + s * 0.3, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-  ctx.lineTo(cx + s * 0.3, cy + s * 0.7);
-  ctx.closePath();
-  ctx.fill();
-
-  // Highlight on left side
-  ctx.fillStyle = '#88bbee';
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx - s * 0.3, cy - s * 0.6);
-  ctx.lineTo(cx - s * 0.2, cy + s * 0.3);
-  ctx.lineTo(cx - s * 0.6, cy + s * 0.3);
-  ctx.closePath();
-  ctx.fill();
-
-  // Rim (top edge)
-  ctx.strokeStyle = '#334455';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-  ctx.stroke();
-
-  // Handle
-  ctx.strokeStyle = '#556677';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
-  ctx.stroke();
-
-  // Handle connection points
-  ctx.fillStyle = '#556677';
-  ctx.beginPath();
-  ctx.arc(cx - s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx + s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// Draw wood logs on canvas
-function drawWood(ctx, cx, cy, size) {
-  const s = size * 0.32;
-
-  // Bottom log - darker
-  ctx.fillStyle = '#6b4910';
-  ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 1.5, s * 0.55);
-
-  // Bottom log - bark texture
-  ctx.fillStyle = '#5a3808';
-  ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 0.08, s * 0.55);
-  ctx.fillRect(cx - s * 0.3, cy + s * 0.25, s * 0.08, s * 0.55);
-  ctx.fillRect(cx + s * 0.2, cy + s * 0.25, s * 0.08, s * 0.55);
-
-  // Bottom log - end cut rings
-  ctx.fillStyle = '#8b6914';
-  ctx.beginPath();
-  ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#6b4910';
-  ctx.beginPath();
-  ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#a07818';
-  ctx.beginPath();
-  ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Top log - lighter
-  ctx.fillStyle = '#8b6914';
-  ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.6);
-
-  // Top log - highlight
-  ctx.fillStyle = '#a58420';
-  ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.18);
-
-  // Top log - bark texture
-  ctx.fillStyle = '#6b4910';
-  ctx.fillRect(cx - s * 1.05, cy - s * 0.1, s * 0.09, s * 0.35);
-  ctx.fillRect(cx - s * 0.5, cy - s * 0.1, s * 0.09, s * 0.35);
-  ctx.fillRect(cx + s * 0.1, cy - s * 0.1, s * 0.09, s * 0.35);
-  ctx.fillRect(cx + s * 0.7, cy - s * 0.1, s * 0.09, s * 0.35);
-
-  // Top log - end cut rings
-  ctx.fillStyle = '#9b7418';
-  ctx.beginPath();
-  ctx.arc(cx + s * 1.05, cy - s * 0.05, s * 0.26, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#7b5814';
-  ctx.beginPath();
-  ctx.arc(cx + s * 1.05, cy - s * 0.05, s * 0.18, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#b08820';
-  ctx.beginPath();
-  ctx.arc(cx + s * 1.05, cy - s * 0.05, s * 0.1, 0, Math.PI * 2);
-  ctx.fill();
-}
 
 export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, theme }) {
   const canvasRef = useRef(null);
@@ -192,7 +77,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
           const rendered = theme?.renderItem?.(ctx, itemType, px, py, TILE_SIZE, cell.config);
           if (!rendered) {
             // Fallback to emoji (use center coordinates)
-            const emoji = theme?.getItemEmoji?.(itemType) || TILE_EMOJIS[cell.type];
+            const emoji = theme?.getItemEmoji?.(itemType) || DEFAULT_TILE_EMOJIS[cell.type];
             if (emoji) {
               ctx.font = '22px serif';
               ctx.textAlign = 'center';
@@ -205,7 +90,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
           const rendered = theme?.renderTile?.(ctx, cell, cx, cy, TILE_SIZE);
           if (!rendered) {
             // Fallback to emoji
-            const emoji = theme?.getTileEmoji?.(cell.type) || TILE_EMOJIS[cell.type];
+            const emoji = theme?.getTileEmoji?.(cell.type) || DEFAULT_TILE_EMOJIS[cell.type];
             if (emoji) {
               ctx.font = '22px serif';
               ctx.textAlign = 'center';
@@ -226,7 +111,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
         if (viewportBounds && (z.x < startX || z.x > endX || z.y < startY || z.y > endY)) continue;
         if (revealedTiles && !revealedTiles.has(`${z.x},${z.y}`)) continue;
         const zpx = (z.x - offsetX) * TILE_SIZE, zpy = (z.y - offsetY) * TILE_SIZE;
-        ctx.fillStyle = z.hazardType === 'bear' ? '#8b4513' : '#ff4400';
+        ctx.fillStyle = z.renderColor || '#ff4400';
         ctx.fillRect(zpx, zpy, TILE_SIZE, TILE_SIZE);
       }
       ctx.globalAlpha = 1;

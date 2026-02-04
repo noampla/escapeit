@@ -15,14 +15,18 @@ export const DIRECTIONS = {
 
 export const DIRECTION_LIST = ['up', 'down', 'left', 'right'];
 
-// Mission types (theme-independent)
-export const MISSION_TYPES = [
-  { id: 'collect', label: 'Find Item', needsTarget: true, targetLabel: 'Item type (e.g. axe)', targetOptions: ['key', 'axe', 'bucket', 'rope', 'knife', 'sweater', 'wood'] },
-  { id: 'rescue', label: 'Rescue Friend', needsTarget: false },
-  { id: 'extinguish', label: 'Extinguish All Fires', needsTarget: false },
+// Base mission types (theme-independent structure)
+// Target options come from theme.getMissionTargetOptions()
+export const BASE_MISSION_TYPES = [
+  { id: 'collect', label: 'Find Item', needsTarget: true, targetLabel: 'Item type' },
+  { id: 'rescue', label: 'Rescue', needsTarget: false },
+  { id: 'extinguish', label: 'Extinguish All Hazards', needsTarget: false },
   { id: 'reach', label: 'Reach Location', needsTarget: true, targetLabel: 'Coords (x,y)', coordBased: true },
-  { id: 'escape', label: 'Reach the Car', needsTarget: false },
+  { id: 'escape', label: 'Reach Exit', needsTarget: false },
 ];
+
+// Deprecated: use BASE_MISSION_TYPES and get options from theme
+export const MISSION_TYPES = BASE_MISSION_TYPES;
 
 // Default game settings
 export const DEFAULT_LIVES = 3;

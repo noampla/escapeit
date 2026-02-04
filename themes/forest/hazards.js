@@ -77,11 +77,19 @@ export function getAllHazardZones(grid) {
       const tile = grid[y][x];
 
       if (tile.type === 'fire') {
-        zones.push({ x, y, hazardType: 'fire' });
+        zones.push({
+          x, y,
+          hazardType: 'fire',
+          renderColor: HAZARD_TYPES.fire.renderColor
+        });
       }
 
       if (tile.type === 'bear') {
-        zones.push({ x, y, hazardType: 'bear' });
+        zones.push({
+          x, y,
+          hazardType: 'bear',
+          renderColor: HAZARD_TYPES.bear.renderColor
+        });
       }
     }
   }

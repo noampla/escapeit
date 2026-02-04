@@ -3,7 +3,7 @@ import Grid from './Grid';
 import { findTile, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
 import { getAllHazardZones } from '../engine/hazards';
-import { checkAllMissions } from '../engine/missions';
+import { checkAllMissions, checkMissionComplete } from '../engine/missions';
 import { DIRECTIONS, GRID_COLS, GRID_ROWS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { InteractionEngine } from '../engine/interactionEngine';
@@ -11,199 +11,8 @@ import { InteractionEngine } from '../engine/interactionEngine';
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
 
-function hasItemType(inventory, itemType) {
-  return inventory.some(item => item.itemType === itemType);
-}
-
-function findItemIndex(inventory, itemType) {
-  return inventory.findIndex(item => item.itemType === itemType);
-}
-
-// Canvas component to draw wood icon matching the map
-function WoodIcon({ size = 24 }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const cx = size / 2;
-    const cy = size / 2;
-    const s = size * 0.32;
-
-    ctx.clearRect(0, 0, size, size);
-
-    // Bottom log - darker
-    ctx.fillStyle = '#6b4910';
-    ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 1.5, s * 0.55);
-
-    // Bottom log - bark texture
-    ctx.fillStyle = '#5a3808';
-    ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 0.08, s * 0.55);
-    ctx.fillRect(cx - s * 0.3, cy + s * 0.25, s * 0.08, s * 0.55);
-    ctx.fillRect(cx + s * 0.2, cy + s * 0.25, s * 0.08, s * 0.55);
-
-    // Bottom log - end cut rings
-    ctx.fillStyle = '#8b6914';
-    ctx.beginPath();
-    ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#6b4910';
-    ctx.beginPath();
-    ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#a07818';
-    ctx.beginPath();
-    ctx.arc(cx + s * 0.75, cy + s * 0.52, s * 0.08, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Top log - lighter
-    ctx.fillStyle = '#8b6914';
-    ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.6);
-
-    // Top log - highlight
-    ctx.fillStyle = '#a58420';
-    ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.18);
-
-    // Top log - bark lines
-    ctx.fillStyle = '#6b4910';
-    ctx.fillRect(cx - s * 0.85, cy - s * 0.35, s * 0.08, s * 0.6);
-    ctx.fillRect(cx - s * 0.3, cy - s * 0.35, s * 0.08, s * 0.6);
-    ctx.fillRect(cx + s * 0.35, cy - s * 0.35, s * 0.08, s * 0.6);
-    ctx.fillRect(cx + s * 0.85, cy - s * 0.35, s * 0.08, s * 0.6);
-
-    // Top log - end cut rings
-    ctx.fillStyle = '#a58420';
-    ctx.beginPath();
-    ctx.arc(cx - s * 1.05, cy - s * 0.05, s * 0.25, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#8b6914';
-    ctx.beginPath();
-    ctx.arc(cx - s * 1.05, cy - s * 0.05, s * 0.18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#c09828';
-    ctx.beginPath();
-    ctx.arc(cx - s * 1.05, cy - s * 0.05, s * 0.1, 0, Math.PI * 2);
-    ctx.fill();
-  }, [size]);
-
-  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
-}
-
-// Canvas component to draw bucket icon matching the map
-function BucketIcon({ size = 24, filled = false }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const cx = size / 2;
-    const cy = size / 2;
-    const s = size * 0.35;
-
-    ctx.clearRect(0, 0, size, size);
-
-    if (filled) {
-      // FILLED BUCKET - Blue with water
-      ctx.fillStyle = '#6699cc';
-      ctx.beginPath();
-      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-      ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-      ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
-      ctx.closePath();
-      ctx.fill();
-
-      // Shadow/depth on right side
-      ctx.fillStyle = '#4477aa';
-      ctx.beginPath();
-      ctx.moveTo(cx + s * 0.3, cy - s * 0.6);
-      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-      ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-      ctx.lineTo(cx + s * 0.3, cy + s * 0.7);
-      ctx.closePath();
-      ctx.fill();
-
-      // Highlight on left side
-      ctx.fillStyle = '#88bbee';
-      ctx.beginPath();
-      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-      ctx.lineTo(cx - s * 0.3, cy - s * 0.6);
-      ctx.lineTo(cx - s * 0.2, cy + s * 0.3);
-      ctx.lineTo(cx - s * 0.6, cy + s * 0.3);
-      ctx.closePath();
-      ctx.fill();
-
-      // Water
-      ctx.fillStyle = 'rgba(100, 180, 255, 0.6)';
-      ctx.beginPath();
-      ctx.moveTo(cx - s * 0.7, cy - s * 0.3);
-      ctx.lineTo(cx + s * 0.7, cy - s * 0.3);
-      ctx.lineTo(cx + s * 0.55, cy + s * 0.6);
-      ctx.lineTo(cx - s * 0.55, cy + s * 0.6);
-      ctx.closePath();
-      ctx.fill();
-
-      // Rim (top edge)
-      ctx.strokeStyle = '#334455';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-      ctx.stroke();
-
-      // Handle
-      ctx.strokeStyle = '#556677';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
-      ctx.stroke();
-
-      // Handle connection points
-      ctx.fillStyle = '#556677';
-      ctx.beginPath();
-      ctx.arc(cx - s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx + s * 0.4, cy - s * 0.6, s * 0.12, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // EMPTY BUCKET - Simple gray outline
-      ctx.strokeStyle = '#888888';
-      ctx.lineWidth = 2;
-
-      // Bucket outline (trapezoid)
-      ctx.beginPath();
-      ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-      ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-      ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-      ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
-      ctx.closePath();
-      ctx.stroke();
-
-      // Handle
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
-      ctx.stroke();
-
-      // Handle connection points
-      ctx.fillStyle = '#888888';
-      ctx.beginPath();
-      ctx.arc(cx - s * 0.4, cy - s * 0.6, s * 0.1, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx + s * 0.4, cy - s * 0.6, s * 0.1, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }, [size, filled]);
-
-  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
-}
-
-// Lock colors for keys and cards
-const LOCK_COLORS = {
+// Default lock colors (used if theme doesn't provide them)
+const DEFAULT_LOCK_COLORS = {
   red: { label: 'Red', color: '#cc4444' },
   blue: { label: 'Blue', color: '#4444cc' },
   green: { label: 'Green', color: '#44cc44' },
@@ -211,73 +20,29 @@ const LOCK_COLORS = {
   purple: { label: 'Purple', color: '#cc44cc' },
 };
 
-// Canvas component to draw key icon with color
-function KeyIcon({ size = 24, lockColor = 'red' }) {
+// Generic inventory icon component - uses theme's renderInventoryItem
+function InventoryIcon({ theme, itemType, size = 24, itemState = {} }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const cx = size / 2;
-    const cy = size / 2;
-    const s = size * 0.35;
-    const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
-
     ctx.clearRect(0, 0, size, size);
 
-    ctx.fillStyle = color;
-
-    // Key head (circle)
-    ctx.beginPath();
-    ctx.arc(cx - s * 0.3, cy, s * 0.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Key hole
-    ctx.fillStyle = '#333';
-    ctx.beginPath();
-    ctx.arc(cx - s * 0.3, cy, s * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Key shaft
-    ctx.fillStyle = color;
-    ctx.fillRect(cx - s * 0.05, cy - s * 0.12, s * 0.75, s * 0.24);
-
-    // Key teeth
-    ctx.fillRect(cx + s * 0.45, cy, s * 0.18, s * 0.3);
-    ctx.fillRect(cx + s * 0.22, cy, s * 0.12, s * 0.22);
-  }, [size, lockColor]);
-
-  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
-}
-
-// Canvas component to draw card icon with color
-function CardIcon({ size = 24, lockColor = 'red' }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const cx = size / 2;
-    const cy = size / 2;
-    const s = size * 0.4;
-    const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
-
-    ctx.clearRect(0, 0, size, size);
-
-    // Card body
-    ctx.fillStyle = '#eee';
-    ctx.fillRect(cx - s * 0.65, cy - s * 0.42, s * 1.3, s * 0.84);
-
-    // Colored stripe
-    ctx.fillStyle = color;
-    ctx.fillRect(cx - s * 0.65, cy - s * 0.42, s * 1.3, s * 0.26);
-
-    // Chip
-    ctx.fillStyle = '#daa520';
-    ctx.fillRect(cx - s * 0.45, cy + s * 0.05, s * 0.32, s * 0.24);
-  }, [size, lockColor]);
+    // Try theme's inventory item rendering
+    const rendered = theme?.renderInventoryItem?.(ctx, itemType, 0, 0, size, itemState);
+    if (!rendered) {
+      // Fallback to emoji
+      const emoji = theme?.getItemEmoji?.(itemType);
+      if (emoji) {
+        ctx.font = `${size * 0.7}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, size / 2, size / 2);
+      }
+    }
+  }, [theme, itemType, size, itemState]);
 
   return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />;
 }
@@ -340,31 +105,39 @@ function initializeRevealedTiles(startX, startY) {
   return revealed;
 }
 
-function isMissionDone(mission, gs, grid) {
-  switch (mission.type) {
-    case 'collect': return gs.collectedItems.includes(mission.targetId);
-    case 'rescue': return gs.rescuedFriends > 0 || gs.collectedItems.includes('friend');
-    case 'extinguish': {
-      if (!grid) return false;
-      for (let y = 0; y < grid.length; y++) {
-        for (let x = 0; x < grid[y].length; x++) {
-          if (grid[y][x].type === 'fire') return false;
-        }
-      }
-      return true;
-    }
-    case 'reach': return gs.reachedLocations.includes(mission.targetId);
-    case 'escape': return gs.reachedExit;
-    default: return false;
-  }
-}
+// isMissionDone is now imported as checkMissionComplete from missions.js
 
 export default function SolverMode({ level, onBack }) {
   const theme = useContext(ThemeContext);
   const interactionEngine = useMemo(() => theme ? new InteractionEngine(theme) : null, [theme]);
 
+  // Get theme-specific values with defaults
+  const LOCK_COLORS = useMemo(() => theme?.getLockColors?.() || DEFAULT_LOCK_COLORS, [theme]);
+  const groundTiles = useMemo(() => theme?.getGroundTiles?.() || ['ground', 'floor', 'start'], [theme]);
+  const interactableTiles = useMemo(() => theme?.getInteractableTiles?.() || [], [theme]);
+  const ignoreTiles = useMemo(() => theme?.getIgnoreTiles?.() || ['wall', 'empty'], [theme]);
+  const exitTiles = useMemo(() => theme?.getExitTiles?.() || ['exit'], [theme]);
+  const startTileType = useMemo(() => theme?.getStartTile?.() || 'start', [theme]);
+
+  // Compute effective missions - always include default escape mission if not present
+  const effectiveMissions = useMemo(() => {
+    const levelMissions = level.missions || [];
+    const hasEscapeMission = levelMissions.some(m => m.type === 'escape');
+    if (hasEscapeMission) {
+      return levelMissions;
+    }
+    // Add the theme's default mission (usually "reach exit/car")
+    const defaultMission = theme?.getDefaultMission?.() || { type: 'escape', description: 'Reach the exit' };
+    return [...levelMissions, defaultMission];
+  }, [level.missions, theme]);
+
   const [grid, setGrid] = useState(() => convertLegacyItems(level.grid));
-  const startPos = findTile(level.grid, 'campfire') || findTile(level.grid, 'start') || { x: 1, y: 1 };
+  // Find start position using theme's start tile type, with fallback to generic 'start'
+  const startPos = useMemo(() => {
+    return findTile(level.grid, startTileType)
+      || findTile(level.grid, 'start')
+      || { x: 1, y: 1 };
+  }, [level.grid, startTileType]);
   const [playerPos, setPlayerPos] = useState(() => ({ ...startPos }));
   const [lives, setLives] = useState(level.lives || 3);
   const maxInventory = level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY;
@@ -402,6 +175,7 @@ export default function SolverMode({ level, onBack }) {
   const keyPressOrder = useRef([]); // Track order of key presses
   const exitMessageShownRef = useRef(false);
   const interactionStateRef = useRef(interactionState);
+  const interactionKeyReleasedRef = useRef(true); // Track if E/number key was released since last interaction
 
   gridRef.current = grid;
   gameStateRef.current = gameState;
@@ -453,6 +227,7 @@ export default function SolverMode({ level, onBack }) {
     keysDown.current.clear();
     keyPressOrder.current = [];
     exitMessageShownRef.current = false;
+    interactionKeyReleasedRef.current = true;
   }, [level, startPos]);
 
   const dropItem = useCallback((index) => {
@@ -462,8 +237,7 @@ export default function SolverMode({ level, onBack }) {
     const pos = playerPosRef.current;
     const currentGrid = gridRef.current;
     const cell = currentGrid[pos.y][pos.x];
-    // Allow dropping on ground-type tiles (forest: ground, campfire, raft | bank: floor, start)
-    const groundTiles = ['ground', 'campfire', 'raft', 'floor', 'start'];
+    // Allow dropping on ground-type tiles (uses theme's ground tiles)
     if (!groundTiles.includes(cell.type)) {
       showMessage("Can't drop here!");
       return;
@@ -502,8 +276,7 @@ export default function SolverMode({ level, onBack }) {
       { x: px + 1, y: py }, // right
     ].filter(n => n.x >= 0 && n.x < GRID_COLS && n.y >= 0 && n.y < GRID_ROWS);
 
-    // Count floor colors from neighbors (ignore walls, empty, doors)
-    const ignoreTiles = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'water', 'snow', 'bear'];
+    // Count floor colors from neighbors (uses theme's ignore tiles)
     const colorCounts = {};
 
     for (const n of neighbors) {
@@ -513,7 +286,7 @@ export default function SolverMode({ level, onBack }) {
       if (neighborCell.type === 'floor') {
         const color = neighborCell.config?.floorColor || 'gray';
         colorCounts[color] = (colorCounts[color] || 0) + 1;
-      } else if (['ground', 'start', 'exit', 'campfire', 'raft'].includes(neighborCell.type)) {
+      } else if (groundTiles.includes(neighborCell.type)) {
         // Non-floor walkable tiles count as 'ground'
         colorCounts['_ground'] = (colorCounts['_ground'] || 0) + 1;
       }
@@ -539,9 +312,9 @@ export default function SolverMode({ level, onBack }) {
     }
     setGrid(newGrid);
 
-    // Preserve lockColor for keys and cards
+    // Preserve config properties like lockColor for any item
     const itemObj = { itemType, filled: false };
-    if ((itemType === 'key' || itemType === 'card') && cell.config?.lockColor) {
+    if (cell.config?.lockColor) {
       itemObj.lockColor = cell.config.lockColor;
     }
     setGameState(prev => ({
@@ -549,33 +322,18 @@ export default function SolverMode({ level, onBack }) {
       inventory: [...prev.inventory, itemObj],
       collectedItems: [...prev.collectedItems, itemType],
     }));
-    const ITEM_TYPES = theme?.getItemTypes() || {};
-    const itemDef = ITEM_TYPES[itemType];
-    // Show custom canvas icons for wood and bucket
-    if (itemType === 'wood') {
-      showMessage(
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          Picked up: <WoodIcon size={20} /> {itemDef?.label || itemType}
-        </span>
-      );
-    } else if (itemType === 'bucket') {
-      showMessage(
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          Picked up: <BucketIcon size={20} filled={false} /> {itemDef?.label || itemType}
-        </span>
-      );
-    } else {
-      showMessage(`Picked up: ${itemDef?.emoji || ''} ${itemDef?.label || itemType}`);
-    }
+    // Get item label from theme
+    const itemLabel = theme?.getItemLabel?.(itemType, itemObj) || itemType;
+    showMessage(`Picked up: ${itemLabel}`);
     return true;
-  }, [showMessage, maxInventory]);
+  }, [showMessage, maxInventory, theme]);
 
   const getInteractTargets = useCallback(() => {
     const pos = playerPosRef.current;
     const currentGrid = gridRef.current;
     const lastDir = lastDirRef.current;
 
-    const interactable = ['tree', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
+    // Use theme's interactable tiles
     const itemTilePattern = /^item-/;
 
     const adjacent = Object.entries(DIRECTIONS).map(([dir, dd]) => ({
@@ -591,7 +349,7 @@ export default function SolverMode({ level, onBack }) {
 
     for (const adj of adjacent) {
       const c = currentGrid[adj.y][adj.x];
-      if (interactable.includes(c.type)) {
+      if (interactableTiles.includes(c.type)) {
         targets.push(adj);
       }
     }
@@ -608,7 +366,7 @@ export default function SolverMode({ level, onBack }) {
     });
 
     return valid;
-  }, []);
+  }, [interactableTiles]);
 
   const startInteraction = useCallback((type, targetPos) => {
     setInteractionState({
@@ -643,70 +401,26 @@ export default function SolverMode({ level, onBack }) {
 
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
-    const c = currentGrid[y][x];
 
-    const possibleActions = [];
+    // Get available interactions from theme
+    const interactions = theme?.getAvailableInteractions?.(currentGS, currentGrid, x, y) || [];
 
-    if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
-      possibleActions.push({
-        type: 'cut-tree',
-        targetPos: { x, y },
-        dir,
-      });
-    }
-
-    if (c.type === 'water') {
-      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-      if (bucketIdx >= 0) {
-        possibleActions.push({
-          type: 'fill-bucket',
-          targetPos: { x, y },
-        });
-      }
-      if (hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
-        possibleActions.push({
-          type: 'build-raft',
-          targetPos: { x, y },
-        });
-      }
-    }
-
-    if (c.type === 'raft') {
-      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-      if (bucketIdx >= 0) {
-        possibleActions.push({
-          type: 'fill-bucket',
-          targetPos: { x, y },
-        });
-      }
-    }
-
-    if (c.type === 'fire') {
-      const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
-      if (filledBucketIdx >= 0) {
-        possibleActions.push({
-          type: 'extinguish-fire',
-          targetPos: { x, y },
-        });
-      }
-    }
-
-    if (c.type === 'friend') {
-      possibleActions.push({
-        type: 'rescue-friend',
-        targetPos: { x, y },
-      });
-    }
-
-    if (possibleActions.length === 0) {
+    if (interactions.length === 0) {
       showMessage('Nothing to interact with here.');
       return;
     }
 
+    const possibleActions = interactions.map(interaction => ({
+      type: interaction.id,
+      targetPos: { x, y },
+      dir,
+      label: interaction.label,
+    }));
+
     if (possibleActions.length > 1) {
       setInteractionChoices({
         choices: possibleActions.map(action => {
-          let label = getInteractionLabel(action.type).replace('...', '');
+          let label = action.label;
           if (action.dir) {
             label = `${label} (${action.dir})`;
           }
@@ -724,146 +438,51 @@ export default function SolverMode({ level, onBack }) {
 
     const action = possibleActions[0];
     startInteraction(action.type, action.targetPos);
-  }, [showMessage]);
+  }, [theme, showMessage, startInteraction]);
 
   const completeInteraction = useCallback((interactionType, targetPos) => {
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
-    const c = currentGrid[targetPos.y][targetPos.x];
 
-    if (interactionType === 'cut-tree') {
-      const newGrid = cloneGrid(currentGrid);
-      newGrid[targetPos.y][targetPos.x] = { type: 'item-wood', config: {} };
-      setGrid(newGrid);
-      showMessage('🪓 Tree chopped! Wood left on ground.');
-    }
+    // Clone grid and gameState for theme to modify
+    const newGrid = cloneGrid(currentGrid);
+    const tempGameState = {
+      ...currentGS,
+      inventory: [...currentGS.inventory.map(item => ({ ...item }))],
+      collectedItems: [...(currentGS.collectedItems || [])],
+    };
 
-    else if (interactionType === 'fill-bucket') {
-      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-      setGameState(prev => {
-        const newInv = [...prev.inventory];
-        newInv[bucketIdx] = { ...newInv[bucketIdx], filled: true };
-        return { ...prev, inventory: newInv };
-      });
-      showMessage('Filled bucket with water!');
-    }
+    // Execute interaction through theme
+    const result = theme?.executeInteraction?.(interactionType, tempGameState, newGrid, targetPos.x, targetPos.y);
 
-    else if (interactionType === 'build-raft') {
-      const ropeIdx = findItemIndex(currentGS.inventory, 'rope');
-      const woodIdx = findItemIndex(currentGS.inventory, 'wood');
-      setGameState(prev => {
-        const newInv = prev.inventory.filter((_, i) => i !== ropeIdx && i !== woodIdx);
-        newInv.push({ itemType: 'raft', filled: false });
-        return { ...prev, inventory: newInv };
-      });
-      showMessage('Built a raft! You can now place it on water.');
-    }
-
-    else if (interactionType === 'place-raft') {
-      const raftIdx = findItemIndex(currentGS.inventory, 'raft');
-      const newGrid = cloneGrid(currentGrid);
-      newGrid[targetPos.y][targetPos.x] = { type: 'raft', config: {} };
-      setGrid(newGrid);
-      setGameState(prev => {
-        const newInv = prev.inventory.filter((_, i) => i !== raftIdx);
-        return { ...prev, inventory: newInv };
-      });
-      showMessage('Raft placed! You can walk on it.');
-    }
-
-    else if (interactionType === 'pickup-raft') {
-      const newGrid = cloneGrid(currentGrid);
-      newGrid[targetPos.y][targetPos.x] = { type: 'water', config: {} };
-      setGrid(newGrid);
-      setGameState(prev => {
-        const newInv = [...prev.inventory];
-        newInv.push({ itemType: 'raft', filled: false });
-        return { ...prev, inventory: newInv };
-      });
-      showMessage('Picked up raft!');
-    }
-
-    else if (interactionType === 'extinguish-fire') {
-      const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
-      const newGrid = cloneGrid(currentGrid);
-      newGrid[targetPos.y][targetPos.x] = { type: 'ground', config: {} };
-      setGrid(newGrid);
-      setGameState(prev => {
-        const newInv = [...prev.inventory];
-        newInv[filledBucketIdx] = { ...newInv[filledBucketIdx], filled: false };
-        return { ...prev, inventory: newInv };
-      });
-      showMessage('Fire extinguished!');
-    }
-
-    else if (interactionType === 'rescue-friend') {
-      const friendName = c.config.name || 'Friend';
-      const newGrid = cloneGrid(currentGrid);
-      newGrid[targetPos.y][targetPos.x] = { type: 'ground', config: {} };
-      setGrid(newGrid);
-      setGameState(prev => ({
-        ...prev,
-        rescuedFriends: (prev.rescuedFriends || 0) + 1,
-        collectedItems: [...prev.collectedItems, 'friend'],
-      }));
-      showMessage(`Rescued: ${friendName}!`);
-    }
-
-    else if (interactionType === 'defeat-bear') {
-      const knifeIdx = findItemIndex(currentGS.inventory, 'knife');
-      const newGrid = cloneGrid(currentGrid);
-      newGrid[targetPos.y][targetPos.x] = { type: 'ground', config: {} };
-      setGrid(newGrid);
-      setGameState(prev => {
-        const newInv = prev.inventory.filter((_, i) => i !== knifeIdx);
-        newInv.push({ itemType: 'sweater' });
-        return {
-          ...prev,
-          inventory: newInv,
-          collectedItems: [...prev.collectedItems, 'sweater'],
-        };
-      });
-      showMessage('Defeated the bear! Got a sweater.');
-    }
-
-    else if (interactionType === 'unlock-door-key') {
-      const doorColor = c.config?.lockColor || 'red';
-      const keyIdx = currentGS.inventory.findIndex(
-        item => item.itemType === 'key' && item.lockColor === doorColor
-      );
-      if (keyIdx >= 0) {
-        const newGrid = cloneGrid(currentGrid);
-        // Change to open door visual
-        newGrid[targetPos.y][targetPos.x] = { type: 'door-key-open', config: {} };
+    if (result?.success) {
+      // Apply grid changes
+      if (result.modifyGrid) {
         setGrid(newGrid);
+      }
+
+      // Apply inventory/state changes
+      if (result.modifyInventory || result.modifyState) {
         setGameState(prev => ({
           ...prev,
-          inventory: prev.inventory.filter((_, i) => i !== keyIdx),
+          inventory: tempGameState.inventory,
+          collectedItems: tempGameState.collectedItems,
+          rescuedFriends: tempGameState.rescuedFriends ?? prev.rescuedFriends,
         }));
-        showMessage(`Unlocked ${doorColor} door with key!`);
       }
+
+      // Show message
+      if (result.message) {
+        showMessage(result.message);
+      }
+    } else if (result?.error) {
+      showMessage(result.error);
     }
 
-    else if (interactionType === 'unlock-door-card') {
-      const doorColor = c.config?.lockColor || 'red';
-      const cardIdx = currentGS.inventory.findIndex(
-        item => item.itemType === 'card' && item.lockColor === doorColor
-      );
-      if (cardIdx >= 0) {
-        const newGrid = cloneGrid(currentGrid);
-        // Change to open door visual
-        newGrid[targetPos.y][targetPos.x] = { type: 'door-card-open', config: {} };
-        setGrid(newGrid);
-        setGameState(prev => ({
-          ...prev,
-          inventory: prev.inventory.filter((_, i) => i !== cardIdx),
-        }));
-        showMessage(`Unlocked ${doorColor} door with keycard!`);
-      }
-    }
-
+    // Mark that E/number key must be released before starting new interaction
+    interactionKeyReleasedRef.current = false;
     cancelInteraction();
-  }, [showMessage, cancelInteraction]);
+  }, [theme, showMessage, cancelInteraction]);
 
   const doPickup = useCallback(() => {
     const currentGrid = gridRef.current;
@@ -889,6 +508,7 @@ export default function SolverMode({ level, onBack }) {
     const currentGS = gameStateRef.current;
     const targets = getInteractTargets();
     const playerDir = playerDirectionRef.current;
+    const playerPos = playerPosRef.current;
 
     // Filter targets: only include the one we're facing, or all if standing on something
     const facingTarget = targets.find(t => t.dir === playerDir);
@@ -908,106 +528,29 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    // Collect all possible actions for this tile
+    // Collect all possible actions using theme's interaction system
     const possibleActions = [];
 
-    // First check current tile for building raft
-    const currentTile = currentGrid[playerPosRef.current.y][playerPosRef.current.x];
-    if ((currentTile.type === 'ground' || currentTile.type === 'campfire' || currentTile.type === 'raft') &&
-        hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
+    // Get interactions at target tile from theme
+    const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
+    for (const interaction of targetInteractions) {
       possibleActions.push({
-        label: 'Build raft',
-        action: () => startInteraction('build-raft', { x: playerPosRef.current.x, y: playerPosRef.current.y }),
+        label: interaction.label,
+        action: () => startInteraction(interaction.id, p),
       });
     }
 
-    if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
-      possibleActions.push({
-        label: 'Cut tree',
-        action: () => startInteraction('cut-tree', p),
-      });
-    }
-
-    if (c.type === 'water') {
-      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-      if (bucketIdx >= 0) {
-        possibleActions.push({
-          label: 'Fill bucket',
-          action: () => startInteraction('fill-bucket', p),
-        });
-      }
-      // Place raft on water
-      if (hasItemType(currentGS.inventory, 'raft')) {
-        possibleActions.push({
-          label: 'Place raft',
-          action: () => startInteraction('place-raft', p),
-        });
-      }
-    }
-
-    if (c.type === 'raft') {
-      const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-      if (bucketIdx >= 0) {
-        possibleActions.push({
-          label: 'Fill bucket',
-          action: () => startInteraction('fill-bucket', p),
-        });
-      }
-      // Pick up raft
-      possibleActions.push({
-        label: 'Pick up raft',
-        action: () => startInteraction('pickup-raft', p),
-      });
-    }
-
-    if (c.type === 'fire') {
-      const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
-      if (filledBucketIdx >= 0) {
-        possibleActions.push({
-          label: 'Extinguish fire',
-          action: () => startInteraction('extinguish-fire', p),
-        });
-      }
-    }
-
-    if (c.type === 'friend') {
-      possibleActions.push({
-        label: 'Rescue friend',
-        action: () => startInteraction('rescue-friend', p),
-      });
-    }
-
-    if (c.type === 'bear' && hasItemType(currentGS.inventory, 'knife')) {
-      possibleActions.push({
-        label: 'Defeat bear',
-        action: () => startInteraction('defeat-bear', p),
-      });
-    }
-
-    // Door interactions
-    if (c.type === 'door-key') {
-      const doorColor = c.config?.lockColor || 'red';
-      const hasKey = currentGS.inventory.some(
-        item => item.itemType === 'key' && item.lockColor === doorColor
-      );
-      if (hasKey) {
-        possibleActions.push({
-          label: `Unlock (${doorColor} key)`,
-          action: () => startInteraction('unlock-door-key', p),
-        });
-      }
-    }
-
-    if (c.type === 'door-card') {
-      const doorColor = c.config?.lockColor || 'red';
-      const hasCard = currentGS.inventory.some(
-        item => item.itemType === 'card' && item.lockColor === doorColor
-      );
-      if (hasCard) {
-        possibleActions.push({
-          label: `Unlock (${doorColor} card)`,
-          action: () => startInteraction('unlock-door-card', p),
-        });
+    // Also check interactions at player's current position (for self-targeted actions)
+    if (p.x !== playerPos.x || p.y !== playerPos.y) {
+      const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y) || [];
+      for (const interaction of selfInteractions) {
+        // Avoid duplicates
+        if (!possibleActions.find(a => a.label === interaction.label)) {
+          possibleActions.push({
+            label: interaction.label,
+            action: () => startInteraction(interaction.id, { x: playerPos.x, y: playerPos.y }),
+          });
+        }
       }
     }
 
@@ -1039,7 +582,7 @@ export default function SolverMode({ level, onBack }) {
 
     // Otherwise show inline menu
     setInlineMenu({ actions: actionsWithKeys });
-  }, [showMessage, getInteractTargets, startInteraction, maxInventory]);
+  }, [theme, showMessage, getInteractTargets, startInteraction, maxInventory]);
 
   const doMove = useCallback((dir) => {
     if (gameOverRef.current) return;
@@ -1062,18 +605,11 @@ export default function SolverMode({ level, onBack }) {
 
     const currentGrid = gridRef.current;
     const targetCell = currentGrid[ny][nx];
+    const currentCell = currentGrid[prev.y][prev.x];
     const currentGS = gameStateRef.current;
 
-    if (targetCell.type === 'bear') {
-      // Bear always blocks movement - must be defeated with interaction (hold E)
-      const remaining = loseLife();
-      if (remaining > 0) {
-        showMessage(`A bear attacks! Hold E near the bear with a knife to defeat it. Lives: ${remaining}`);
-      }
-      return;
-    }
-
-    if (targetCell.type === 'snow') {
+    // Helper to reveal tiles when moving/attempting to move
+    const revealTargetTile = () => {
       setRevealedTiles(prev => {
         const newRevealed = new Set(prev);
         newRevealed.add(`${nx},${ny}`);
@@ -1081,96 +617,63 @@ export default function SolverMode({ level, onBack }) {
         adjacent.forEach(pos => newRevealed.add(pos.key));
         return newRevealed;
       });
+    };
 
-      if (hasItemType(currentGS.inventory, 'sweater')) {
-        setPlayerPos({ x: nx, y: ny });
-      } else {
-        showMessage('Too cold! You need a Sweater to enter snow.');
+    // Use theme's movement rules
+    const moveResult = theme?.checkMovementInto?.(targetCell.type, {
+      ...currentGS,
+      currentTileType: currentCell.type
+    }, targetCell.config);
+
+    if (moveResult) {
+      // Always reveal tile when attempting movement (for fog of war)
+      revealTargetTile();
+
+      // Handle life loss from hazards
+      if (moveResult.loseLife) {
+        const remaining = loseLife();
+        if (remaining > 0 && moveResult.message) {
+          showMessage(`${moveResult.message} Lives: ${remaining}`);
+        }
+        return;
       }
-      return;
-    }
 
-    if (targetCell.type === 'water') {
-      // Check if standing on a raft - if so, move the raft with you
-      const currentCell = currentGrid[prev.y][prev.x];
-      if (currentCell.type === 'raft') {
+      // Handle tile replacements during movement (theme-defined)
+      if (moveResult.setSourceTile || moveResult.setDestTile) {
         const newGrid = cloneGrid(currentGrid);
-        // Move raft from current position to water
-        newGrid[prev.y][prev.x] = { type: 'water', config: {} };
-        newGrid[ny][nx] = { type: 'raft', config: {} };
+        if (moveResult.setSourceTile) {
+          newGrid[prev.y][prev.x] = moveResult.setSourceTile;
+        }
+        if (moveResult.setDestTile) {
+          newGrid[ny][nx] = moveResult.setDestTile;
+        }
         setGrid(newGrid);
         setPlayerPos({ x: nx, y: ny });
         setMoveCount(prev => prev + 1);
-
-        setRevealedTiles(prev => {
-          const newRevealed = new Set(prev);
-          newRevealed.add(`${nx},${ny}`);
-          const adjacent = getAdjacentPositions(nx, ny);
-          adjacent.forEach(pos => newRevealed.add(pos.key));
-          return newRevealed;
-        });
-        return;
-      } else {
-        showMessage("Can't swim! Place a raft on the water.");
         return;
       }
-    }
 
-    if (targetCell.type === 'fire') {
-      const remaining = loseLife();
-      if (remaining > 0) {
-        showMessage(`Burned by fire! Lives: ${remaining}`);
+      // Handle blocked movement with message
+      if (!moveResult.allowed) {
+        if (moveResult.message) {
+          showMessage(moveResult.message);
+        }
+        return;
       }
-      return;
-    }
 
-    // Handle door tiles - must use E to interact
-    if (targetCell.type === 'door-key') {
-      const doorColor = targetCell.config?.lockColor || 'red';
-      const hasKey = currentGS.inventory.some(
-        item => item.itemType === 'key' && item.lockColor === doorColor
-      );
-      if (hasKey) {
-        showMessage(`Face the door and hold E to unlock with ${doorColor} key`);
-      } else {
-        showMessage(`Locked! Need a ${doorColor} key`);
-      }
-      return;
-    }
-
-    if (targetCell.type === 'door-card') {
-      const doorColor = targetCell.config?.lockColor || 'red';
-      const hasCard = currentGS.inventory.some(
-        item => item.itemType === 'card' && item.lockColor === doorColor
-      );
-      if (hasCard) {
-        showMessage(`Face the door and hold E to unlock with ${doorColor} keycard`);
-      } else {
-        showMessage(`Locked! Need a ${doorColor} keycard`);
-      }
-      return;
-    }
-
-    if (canMoveTo(currentGrid, nx, ny)) {
-      // Check if moving from raft to non-water tile - leave raft behind
-      const currentCell = currentGrid[prev.y][prev.x];
-      if (currentCell.type === 'raft' && targetCell.type !== 'water') {
-        // Moving from raft to ground/other - raft stays as raft
-        setPlayerPos({ x: nx, y: ny });
-      } else {
-        setPlayerPos({ x: nx, y: ny });
-      }
+      // Movement allowed by theme
+      setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
-
-      setRevealedTiles(prev => {
-        const newRevealed = new Set(prev);
-        newRevealed.add(`${nx},${ny}`);
-        const adjacent = getAdjacentPositions(nx, ny);
-        adjacent.forEach(pos => newRevealed.add(pos.key));
-        return newRevealed;
-      });
+      return;
     }
-  }, [showMessage, loseLife, respawn, cancelInteraction]);
+
+    // Fallback: use standard canMoveTo check if theme doesn't handle this tile
+    if (canMoveTo(currentGrid, nx, ny)) {
+      setPlayerPos({ x: nx, y: ny });
+      setMoveCount(prev => prev + 1);
+      revealTargetTile();
+    }
+  }, [theme, showMessage, loseLife, respawn, cancelInteraction]);
 
   useEffect(() => {
     const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'f', 'r', 'q', '1', '2', '3', '4', '5']);
@@ -1219,7 +722,10 @@ export default function SolverMode({ level, onBack }) {
       if (key === 'r') { restart(); return; }
 
       if (key === 'e' && !interactionStateRef.current && !inlineMenu) {
-        doInteract();
+        // Only start new interaction if E was released since last interaction completed
+        if (interactionKeyReleasedRef.current) {
+          doInteract();
+        }
         return;
       }
 
@@ -1260,15 +766,25 @@ export default function SolverMode({ level, onBack }) {
         }
       }
 
-      if (key === 'e' && interactionStateRef.current) {
-        cancelInteraction();
-        showMessage('Interaction cancelled.');
+      if (key === 'e') {
+        // Mark E as released so new interactions can start
+        interactionKeyReleasedRef.current = true;
+
+        if (interactionStateRef.current) {
+          cancelInteraction();
+          showMessage('Interaction cancelled.');
+        }
       }
 
       // Also cancel on number key release if interaction in progress
-      if (['1', '2', '3', '4', '5'].includes(key) && interactionStateRef.current) {
-        cancelInteraction();
-        showMessage('Interaction cancelled.');
+      if (['1', '2', '3', '4', '5'].includes(key)) {
+        // Mark number key as released so new interactions can start
+        interactionKeyReleasedRef.current = true;
+
+        if (interactionStateRef.current) {
+          cancelInteraction();
+          showMessage('Interaction cancelled.');
+        }
       }
     };
 
@@ -1285,6 +801,7 @@ export default function SolverMode({ level, onBack }) {
     if (gameOver || !inlineMenu) return;
     const interval = setInterval(() => {
       if (interactionStateRef.current) return; // Already in an interaction
+      if (!interactionKeyReleasedRef.current) return; // Key not released since last interaction
 
       const keys = keysDown.current;
       // Check which number key is being held
@@ -1308,6 +825,8 @@ export default function SolverMode({ level, onBack }) {
     const interval = setInterval(() => {
       // Don't check if already in interaction or menu is open
       if (interactionStateRef.current || inlineMenu) return;
+      // Don't check if key not released since last interaction
+      if (!interactionKeyReleasedRef.current) return;
 
       const keys = keysDown.current;
       const currentGrid = gridRef.current;
@@ -1332,73 +851,21 @@ export default function SolverMode({ level, onBack }) {
       // Skip item pickups
       if (c.type.startsWith('item-')) return;
 
-      // Collect possible actions - MUST MATCH ORDER IN doInteract()
+      // Get available interactions from theme
       const possibleActions = [];
 
-      // First check current tile for building raft
-      const currentTile = currentGrid[pos.y][pos.x];
-      if ((currentTile.type === 'ground' || currentTile.type === 'campfire' || currentTile.type === 'raft') &&
-          hasItemType(currentGS.inventory, 'rope') && hasItemType(currentGS.inventory, 'wood')) {
-        possibleActions.push(() => startInteraction('build-raft', { x: pos.x, y: pos.y }));
+      // Get interactions at target tile
+      const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
+      for (const interaction of targetInteractions) {
+        possibleActions.push(() => startInteraction(interaction.id, p));
       }
 
-      if (c.type === 'tree' && hasItemType(currentGS.inventory, 'axe')) {
-        possibleActions.push(() => startInteraction('cut-tree', p));
-      }
-
-      if (c.type === 'water') {
-        const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-        if (bucketIdx >= 0) {
-          possibleActions.push(() => startInteraction('fill-bucket', p));
-        }
-        // Place raft on water
-        if (hasItemType(currentGS.inventory, 'raft')) {
-          possibleActions.push(() => startInteraction('place-raft', p));
-        }
-      }
-
-      if (c.type === 'raft') {
-        const bucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && !item.filled);
-        if (bucketIdx >= 0) {
-          possibleActions.push(() => startInteraction('fill-bucket', p));
-        }
-        // Pick up raft
-        possibleActions.push(() => startInteraction('pickup-raft', p));
-      }
-
-      if (c.type === 'fire') {
-        const filledBucketIdx = currentGS.inventory.findIndex(item => item.itemType === 'bucket' && item.filled);
-        if (filledBucketIdx >= 0) {
-          possibleActions.push(() => startInteraction('extinguish-fire', p));
-        }
-      }
-
-      if (c.type === 'friend') {
-        possibleActions.push(() => startInteraction('rescue-friend', p));
-      }
-
-      if (c.type === 'bear' && hasItemType(currentGS.inventory, 'knife')) {
-        possibleActions.push(() => startInteraction('defeat-bear', p));
-      }
-
-      // Door interactions
-      if (c.type === 'door-key') {
-        const doorColor = c.config?.lockColor || 'red';
-        const hasKey = currentGS.inventory.some(
-          item => item.itemType === 'key' && item.lockColor === doorColor
-        );
-        if (hasKey) {
-          possibleActions.push(() => startInteraction('unlock-door-key', p));
-        }
-      }
-
-      if (c.type === 'door-card') {
-        const doorColor = c.config?.lockColor || 'red';
-        const hasCard = currentGS.inventory.some(
-          item => item.itemType === 'card' && item.lockColor === doorColor
-        );
-        if (hasCard) {
-          possibleActions.push(() => startInteraction('unlock-door-card', p));
+      // Also check interactions at player's current position
+      const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, pos.x, pos.y) || [];
+      for (const interaction of selfInteractions) {
+        // Avoid duplicates by checking if we already have this interaction type
+        if (!targetInteractions.find(t => t.id === interaction.id)) {
+          possibleActions.push(() => startInteraction(interaction.id, { x: pos.x, y: pos.y }));
         }
       }
 
@@ -1417,7 +884,7 @@ export default function SolverMode({ level, onBack }) {
     }, 50); // Check every 50ms (less frequent than 16ms to avoid spam)
 
     return () => clearInterval(interval);
-  }, [gameOver, inlineMenu, startInteraction]);
+  }, [theme, gameOver, inlineMenu, startInteraction]);
 
   useEffect(() => {
     if (gameOver) return;
@@ -1534,26 +1001,29 @@ export default function SolverMode({ level, onBack }) {
 
   useEffect(() => {
     if (gameOver) return;
-    // Check for exit tile (forest: 'car', bank: 'exit')
-    const exitPos = findTile(level.grid, 'car') || findTile(level.grid, 'exit');
+    // Check for exit tile using theme's exit tiles
+    const exitPos = exitTiles.reduce((found, tileType) =>
+      found || findTile(level.grid, tileType), null
+    );
     if (!exitPos || !isSamePos(playerPos, exitPos)) {
       exitMessageShownRef.current = false;
       return;
     }
 
     const exitCell = level.grid[exitPos.y][exitPos.x];
-    const needsKey = exitCell.config?.needsKey !== false;
 
-    if (needsKey && !hasItemType(gameState.inventory, 'key')) {
+    // Use theme's exit requirements check
+    const exitResult = theme?.checkExitRequirements?.(gameState, exitCell.config);
+    if (exitResult && !exitResult.allowed) {
       if (!exitMessageShownRef.current) {
         exitMessageShownRef.current = true;
-        showMessage('You need a Key to escape!');
+        showMessage(exitResult.message || 'Cannot exit yet!');
       }
       return;
     }
 
     const gs = { ...gameState, reachedExit: true };
-    const { allComplete } = checkAllMissions(level.missions || [], gs, level.fixedOrder, grid);
+    const { allComplete } = checkAllMissions(effectiveMissions, gs, level.fixedOrder, grid, theme);
     if (allComplete) {
       setGameState(prev => ({ ...prev, reachedExit: true }));
       setGameOver('win');
@@ -1562,24 +1032,10 @@ export default function SolverMode({ level, onBack }) {
       exitMessageShownRef.current = true;
       showMessage('Complete all missions first!');
     }
-  }, [playerPos, gameOver, level, showMessage, grid, gameState]);
+  }, [playerPos, gameOver, level, showMessage, grid, gameState, exitTiles, theme]);
 
   // Removed viewport bounds for open-world feel
   const viewportBounds = null;
-
-  const getInteractionLabel = (type) => {
-    switch (type) {
-      case 'cut-tree': return 'Cutting tree...';
-      case 'fill-bucket': return 'Filling bucket...';
-      case 'build-raft': return 'Building raft...';
-      case 'extinguish-fire': return 'Extinguishing fire...';
-      case 'rescue-friend': return 'Rescuing friend...';
-      case 'defeat-bear': return 'Fighting bear...';
-      case 'unlock-door-key': return 'Unlocking door...';
-      case 'unlock-door-card': return 'Swiping keycard...';
-      default: return 'Interacting...';
-    }
-  };
 
   return (
     <div style={{
@@ -1675,16 +1131,8 @@ export default function SolverMode({ level, onBack }) {
                 Inv:
               </div>
               {gameState.inventory.slice(0, 5).map((item, i) => {
-                const ITEM_TYPES = theme?.getItemTypes() || {};
-                const def = ITEM_TYPES[item.itemType];
-                const isWood = item.itemType === 'wood';
-                const isBucket = item.itemType === 'bucket';
-                const isKey = item.itemType === 'key';
-                const isCard = item.itemType === 'card';
-                let emoji = def?.emoji || '';
-
-                // Get border color for keys/cards
-                const borderColor = (isKey || isCard) && item.lockColor
+                // Get border color for items with lockColor
+                const borderColor = item.lockColor
                   ? LOCK_COLORS[item.lockColor]?.color || 'rgba(200, 150, 100, 0.3)'
                   : 'rgba(200, 150, 100, 0.3)';
 
@@ -1699,11 +1147,7 @@ export default function SolverMode({ level, onBack }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                    {isWood ? <WoodIcon size={20} />
-                      : isBucket ? <BucketIcon size={20} filled={item.filled} />
-                      : isKey ? <KeyIcon size={20} lockColor={item.lockColor} />
-                      : isCard ? <CardIcon size={20} lockColor={item.lockColor} />
-                      : emoji}
+                    <InventoryIcon theme={theme} itemType={item.itemType} size={20} itemState={item} />
                   </div>
                 );
               })}
@@ -1757,9 +1201,9 @@ export default function SolverMode({ level, onBack }) {
             Missions {level.fixedOrder ? '(Ordered)' : ''}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {(level.missions || []).map((m, i) => {
-              const complete = isMissionDone(m, gameState, grid);
-              const isCurrent = level.fixedOrder && !complete && (level.missions || []).slice(0, i).every(prev => isMissionDone(prev, gameState, grid));
+            {effectiveMissions.map((m, i) => {
+              const complete = checkMissionComplete(m, gameState, grid, theme);
+              const isCurrent = level.fixedOrder && !complete && effectiveMissions.slice(0, i).every(prev => checkMissionComplete(prev, gameState, grid, theme));
               return (
                 <div key={i} style={{
                   color: complete ? '#88ff88' : isCurrent ? '#ffee66' : '#99aabb',
@@ -1953,19 +1397,8 @@ export default function SolverMode({ level, onBack }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {gameState.inventory.map((item, idx) => {
-                  const ITEM_TYPES = theme?.getItemTypes() || {};
-                  const itemDef = ITEM_TYPES[item.itemType];
-                  const label = itemDef?.label || item.itemType;
-                  const isWood = item.itemType === 'wood';
-                  const isBucket = item.itemType === 'bucket';
-                  const isKey = item.itemType === 'key';
-                  const isCard = item.itemType === 'card';
-                  let emoji = itemDef?.emoji || '';
-
-                  // Get color label for keys/cards
-                  const colorLabel = (isKey || isCard) && item.lockColor
-                    ? LOCK_COLORS[item.lockColor]?.label || item.lockColor
-                    : null;
+                  // Get item label from theme (handles item state and color)
+                  const itemLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
 
                   return (
                     <button
@@ -2007,31 +1440,9 @@ export default function SolverMode({ level, onBack }) {
                       }}>
                         {idx + 1}
                       </span>
-                      {isWood ? <WoodIcon size={24} />
-                        : isBucket ? <BucketIcon size={24} filled={item.filled} />
-                        : isKey ? <KeyIcon size={24} lockColor={item.lockColor} />
-                        : isCard ? <CardIcon size={24} lockColor={item.lockColor} />
-                        : <span style={{ fontSize: 18 }}>{emoji}</span>}
-                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flex: 1 }}>
-                        <span>{colorLabel ? `${colorLabel} ${label}` : label}</span>
-                        {isBucket && (
-                          <span style={{
-                            fontSize: 11,
-                            color: item.filled ? '#88ccff' : '#ffaa66',
-                            fontWeight: 'bold',
-                          }}>
-                            {item.filled ? 'Full' : 'Empty'}
-                          </span>
-                        )}
-                        {(isKey || isCard) && colorLabel && (
-                          <span style={{
-                            fontSize: 11,
-                            color: LOCK_COLORS[item.lockColor]?.color || '#aaa',
-                            fontWeight: 'bold',
-                          }}>
-                            {colorLabel}
-                          </span>
-                        )}
+                      <InventoryIcon theme={theme} itemType={item.itemType} size={24} itemState={item} />
+                      <span style={{ flex: 1 }}>
+                        {itemLabel}
                       </span>
                     </button>
                   );

@@ -1,16 +1,19 @@
-import { useState, useCallback, useRef, useContext } from 'react';
+import { useState, useCallback, useRef, useContext, useMemo } from 'react';
 import Grid from './Grid';
 import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
-import MissionEditor from './MissionEditor';
 import SolverMode from './SolverMode';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid } from '../engine/tiles';
 import { saveLevel, generateId, loadLevels } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 import { ThemeContext } from '../App';
 
+// Default fallback
+const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
+
 export default function BuilderMode({ onBack, editLevel, themeId }) {
   const theme = useContext(ThemeContext);
+  const lockTiles = useMemo(() => theme?.getLockTiles?.() || DEFAULT_LOCK_TILES, [theme]);
   const [grid, setGrid] = useState(() => {
     if (editLevel) {
       return editLevel.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } })));
@@ -72,7 +75,6 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
     }
     // Apply lock color if placing door/key/card tile
-    const lockTiles = ['door-key', 'door-card', 'item-key', 'item-card'];
     if (lockTiles.includes(selectedTool)) {
       newGrid = cloneGrid(newGrid);
       newGrid[y][x].config = { ...newGrid[y][x].config, lockColor: selectedLockColor };
@@ -97,7 +99,6 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
       }
       // Apply lock color if placing door/key/card tile
-      const lockTiles = ['door-key', 'door-card', 'item-key', 'item-card'];
       if (lockTiles.includes(selectedTool)) {
         newGrid = cloneGrid(newGrid);
         newGrid[y][x].config = { ...newGrid[y][x].config, lockColor: selectedLockColor };
@@ -152,10 +153,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   };
 
   const handleTest = () => {
-    if (!missions || missions.length === 0) {
-      alert('Add at least one mission before testing.');
-      return;
-    }
+    // No mission check needed - SolverMode automatically adds the default escape mission
     setTestMode(true);
   };
 
@@ -336,20 +334,16 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           selectedCell={selectedCell}
           onConfigChange={handleConfigChange}
           showHelp={showTooltips}
+          missions={missions}
+          onMissionsChange={m => { setMissions(m); setSaved(false); }}
+          lives={lives}
+          onLivesChange={l => { setLives(l); setSaved(false); }}
+          fixedOrder={fixedOrder}
+          onFixedOrderChange={f => { setFixedOrder(f); setSaved(false); }}
+          inventoryCapacity={inventoryCapacity}
+          onInventoryCapacityChange={c => { setInventoryCapacity(c); setSaved(false); }}
         />
       </div>
-
-      {/* Mission editor */}
-      <MissionEditor
-        missions={missions}
-        onChange={m => { setMissions(m); setSaved(false); }}
-        lives={lives}
-        onLivesChange={l => { setLives(l); setSaved(false); }}
-        fixedOrder={fixedOrder}
-        onFixedOrderChange={f => { setFixedOrder(f); setSaved(false); }}
-        inventoryCapacity={inventoryCapacity}
-        onInventoryCapacityChange={c => { setInventoryCapacity(c); setSaved(false); }}
-      />
 
       {/* Load level menu */}
       {loadMenuOpen && (

@@ -5,7 +5,30 @@
   "emoji": "🏦",
   "version": "1.0.0",
   "author": "Claude",
-  "primaryColor": "#2a2a2a",
+  "primaryColor": "#ffd700",
   "backgroundColor": "#1a1a1a",
-  "accentColor": "#ffd700"
+  "accentColor": "#ffd700",
+  "startTile": "start",
+  "exitTiles": ["exit"],
+  "ui": {
+    "primaryColor": "#ffd700",
+    "backgroundColor": "#1a1a1a",
+    "accentColor": "#ffd700",
+    "dangerColor": "#ff4444",
+    "panelBackground": "linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 25%, #1a1a1a 50%, #0a0a0a 100%)",
+    "hudBackground": "linear-gradient(180deg, rgba(25, 25, 25, 0.95) 0%, rgba(15, 15, 15, 0.95) 100%)",
+    "messageBackground": "linear-gradient(145deg, rgba(50, 50, 50, 0.95) 0%, rgba(30, 30, 30, 0.95) 100%)",
+    "buttonBackground": "linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)",
+    "buttonHoverShadow": "0 8px 28px rgba(255, 215, 0, 0.4)"
+  },
+  "missions": {
+    "types": ["collect", "reach", "escape"],
+    "targetOptions": {
+      "collect": ["key", "card"]
+    },
+    "defaultMission": {
+      "type": "escape",
+      "description": "Reach the escape van"
+    }
+  }
 }

@@ -366,3 +366,76 @@ export function getTileEmoji(tileType) {
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;
 }
+
+// === TILE CLASSIFICATIONS ===
+
+// Tiles that items can be dropped on
+export const GROUND_TILES = ['floor', 'start', 'exit'];
+
+// Tiles player can interact with (E key)
+export const INTERACTABLE_TILES = ['door-key', 'door-card'];
+
+// Tiles to ignore for floor color detection when picking up items
+export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open'];
+
+// Tiles that use lock colors (doors, keys, cards)
+export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
+
+// Hazard tile types (bank robbery has none)
+export const HAZARD_TILE_TYPES = [];
+
+// === MOVEMENT RULES ===
+
+// Helper to check if inventory has item with matching color
+function hasMatchingItem(inventory, itemType, lockColor) {
+  return inventory?.some(item =>
+    item.itemType === itemType && item.lockColor === lockColor
+  ) || false;
+}
+
+// Check if player can move into a tile
+// Returns { allowed, message?, loseLife?, moveRaft?, respawn? }
+export function checkMovementInto(tileType, gameState, tileConfig) {
+  const inventory = gameState?.inventory || [];
+
+  switch (tileType) {
+    case 'door-key': {
+      const doorColor = tileConfig?.lockColor || 'red';
+      const hasKey = hasMatchingItem(inventory, 'key', doorColor);
+      if (hasKey) {
+        return {
+          allowed: false,
+          message: `Face the door and hold E to unlock with ${doorColor} key`
+        };
+      }
+      return {
+        allowed: false,
+        message: `Locked! Need a ${doorColor} key`
+      };
+    }
+
+    case 'door-card': {
+      const doorColor = tileConfig?.lockColor || 'red';
+      const hasCard = hasMatchingItem(inventory, 'card', doorColor);
+      if (hasCard) {
+        return {
+          allowed: false,
+          message: `Face the door and hold E to unlock with ${doorColor} keycard`
+        };
+      }
+      return {
+        allowed: false,
+        message: `Locked! Need a ${doorColor} keycard`
+      };
+    }
+
+    default:
+      // Use default walkability
+      return { allowed: isWalkable(tileType, gameState) };
+  }
+}
+
+// Check if player meets exit requirements (bank robbery has no key requirement)
+export function checkExitRequirements(gameState, exitConfig) {
+  return { allowed: true };
+}

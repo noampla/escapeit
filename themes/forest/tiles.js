@@ -277,3 +277,136 @@ export function getTileEmoji(tileType) {
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;
 }
+
+// === TILE CLASSIFICATIONS ===
+
+// Tiles that items can be dropped on
+export const GROUND_TILES = ['ground', 'campfire', 'raft', 'floor', 'start'];
+
+// Tiles player can interact with (E key)
+export const INTERACTABLE_TILES = ['tree', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
+
+// Tiles to ignore for floor color detection when picking up items
+export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'water', 'snow', 'bear'];
+
+// Tiles that use lock colors (doors, keys, cards)
+export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
+
+// Hazard tile types (for extinguish mission)
+export const HAZARD_TILE_TYPES = ['fire'];
+
+// Lock colors for keys and doors
+export const LOCK_COLORS = {
+  red: { label: 'Red', color: '#cc4444' },
+  blue: { label: 'Blue', color: '#4444cc' },
+  green: { label: 'Green', color: '#44cc44' },
+  yellow: { label: 'Yellow', color: '#cccc44' },
+  purple: { label: 'Purple', color: '#cc44cc' },
+};
+
+// === MOVEMENT RULES ===
+
+// Helper to check if inventory has item type
+function hasItemType(inventory, itemType) {
+  return inventory?.some(item => item.itemType === itemType) || false;
+}
+
+// Check if player can move into a tile
+// Returns { allowed, message?, loseLife?, moveRaft?, respawn? }
+export function checkMovementInto(tileType, gameState, tileConfig) {
+  const inventory = gameState?.inventory || [];
+  const currentTileType = gameState?.currentTileType;
+
+  switch (tileType) {
+    case 'bear':
+      // Bear always attacks - must be defeated with interaction
+      return {
+        allowed: false,
+        loseLife: true,
+        message: 'A bear attacks! Hold E near the bear with a knife to defeat it.'
+      };
+
+    case 'snow':
+      if (hasItemType(inventory, 'sweater')) {
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        message: 'Too cold! You need a Sweater to enter snow.'
+      };
+
+    case 'water':
+      // Check if standing on raft - can push raft into water
+      if (currentTileType === 'raft') {
+        return {
+          allowed: true,
+          // Set the source tile (where player was) to water, dest tile to raft
+          setSourceTile: { type: 'water', config: {} },
+          setDestTile: { type: 'raft', config: {} }
+        };
+      }
+      return {
+        allowed: false,
+        message: "Can't swim! Place a raft on the water."
+      };
+
+    case 'fire':
+      return {
+        allowed: false,
+        loseLife: true,
+        message: 'Burned by fire!'
+      };
+
+    case 'door-key': {
+      const doorColor = tileConfig?.lockColor || 'red';
+      const hasKey = inventory.some(
+        item => item.itemType === 'key' && item.lockColor === doorColor
+      );
+      if (hasKey) {
+        return {
+          allowed: false,
+          message: `Face the door and hold E to unlock with ${doorColor} key`
+        };
+      }
+      return {
+        allowed: false,
+        message: `Locked! Need a ${doorColor} key`
+      };
+    }
+
+    case 'door-card': {
+      const doorColor = tileConfig?.lockColor || 'red';
+      const hasCard = inventory.some(
+        item => item.itemType === 'card' && item.lockColor === doorColor
+      );
+      if (hasCard) {
+        return {
+          allowed: false,
+          message: `Face the door and hold E to unlock with ${doorColor} keycard`
+        };
+      }
+      return {
+        allowed: false,
+        message: `Locked! Need a ${doorColor} keycard`
+      };
+    }
+
+    default:
+      // Use default walkability
+      return { allowed: isWalkable(tileType, gameState) };
+  }
+}
+
+// Check if player meets exit requirements
+export function checkExitRequirements(gameState, exitConfig) {
+  const needsKey = exitConfig?.needsKey !== false;
+
+  if (needsKey && !hasItemType(gameState?.inventory, 'key')) {
+    return {
+      allowed: false,
+      message: 'You need a Key to escape!'
+    };
+  }
+
+  return { allowed: true };
+}
