@@ -126,6 +126,16 @@ export const TILE_TYPES = {
     tooltip: 'Security camera. Place on walls or map edge. Detects player in vision cone.',
     walkable: false,
     attachToWall: true
+  },
+  laser: {
+    label: 'Laser Tripwire',
+    color: '#330000',
+    category: 'hazard',
+    configurable: true,
+    defaultConfig: { direction: 'down' },
+    tooltip: 'Laser tripwire. Place on a wall or floor boundary. Fires a beam perpendicular to the wall until it hits another wall.',
+    walkable: false,
+    attachToWall: true
   }
 };
 
@@ -167,6 +177,9 @@ export const CONFIG_HELP = {
   camera: {
     direction: 'Direction the camera faces (up, down, left, right).',
     range: 'How many tiles ahead the camera can see (1-5).'
+  },
+  laser: {
+    direction: 'Direction the laser beam fires (perpendicular to the wall it is on).'
   }
 };
 
@@ -225,6 +238,14 @@ export const CONFIG_SCHEMA = {
       min: 1,
       max: 5,
       default: 3
+    }
+  },
+  laser: {
+    direction: {
+      type: 'select',
+      label: 'Direction',
+      options: 'CAMERA_DIRECTIONS',
+      default: 'down'
     }
   }
 };
@@ -440,6 +461,48 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Laser Tripwire emitter
+  if (tile.type === 'laser') {
+    const direction = tile.config?.direction || 'down';
+
+    // Dark wall background
+    ctx.fillStyle = '#1a0000';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Emitter housing (small dark box)
+    ctx.fillStyle = '#222222';
+    ctx.fillRect(cx - size * 0.18, cy - size * 0.18, size * 0.36, size * 0.36);
+
+    // Emitter ring
+    ctx.strokeStyle = '#553333';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - size * 0.18, cy - size * 0.18, size * 0.36, size * 0.36);
+
+    // Glow around lens
+    ctx.fillStyle = 'rgba(255, 30, 30, 0.4)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Red lens dot in center (on top of glow)
+    ctx.fillStyle = '#ff2222';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Short beam stub shooting out from the emitter in the configured direction
+    const dirs = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+    const [dx, dy] = dirs[direction] || [0, 1];
+    ctx.strokeStyle = '#ff3333';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + dx * size * 0.5, cy + dy * size * 0.5);
+    ctx.stroke();
+
+    return true;
+  }
+
   // Security Camera
   if (tile.type === 'camera') {
     const direction = tile.config?.direction || 'down';
@@ -503,7 +566,8 @@ export function getTileEmoji(tileType) {
     'item-key': null,
     'item-card': null,
     'item-uniform': null, // Custom rendered
-    camera: null // Custom rendered
+    camera: null, // Custom rendered
+    laser: null // Custom rendered
   };
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;
@@ -518,13 +582,13 @@ export const GROUND_TILES = ['floor', 'start', 'exit'];
 export const INTERACTABLE_TILES = ['door-key', 'door-card'];
 
 // Tiles to ignore for floor color detection when picking up items
-export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'camera'];
+export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'camera', 'laser'];
 
 // Tiles that use lock colors (doors, keys, cards)
 export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
 
 // Hazard tile types
-export const HAZARD_TILE_TYPES = ['camera'];
+export const HAZARD_TILE_TYPES = ['camera', 'laser'];
 
 // === MOVEMENT RULES ===
 

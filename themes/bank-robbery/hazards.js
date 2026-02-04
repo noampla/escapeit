@@ -8,6 +8,12 @@ export const HAZARD_TYPES = {
     damage: 1,
     message: 'Spotted by security camera!',
     renderColor: 'rgba(255, 50, 50, 0.25)'
+  },
+  laser: {
+    name: 'Laser Tripwire',
+    damage: 1,
+    message: 'Cut by laser tripwire!',
+    renderColor: 'rgba(255, 20, 20, 0.6)'
   }
 };
 
@@ -21,6 +27,27 @@ function blocksVision(tileType) {
   // Walls and closed doors block vision
   const blockingTiles = ['wall', 'empty', 'door-key', 'door-card'];
   return blockingTiles.includes(tileType);
+}
+
+// Trace a laser beam from (laserX, laserY) in direction until hitting a wall or map edge
+export function getLaserBeamTiles(grid, laserX, laserY, direction) {
+  const dir = getDirectionDelta(direction);
+  const rows = grid.length;
+  const cols = grid[0]?.length || 0;
+  const tiles = [];
+
+  let x = laserX + dir.dx;
+  let y = laserY + dir.dy;
+
+  while (x >= 0 && x < cols && y >= 0 && y < rows) {
+    const tile = grid[y][x];
+    if (blocksVision(tile.type)) break; // beam stops at wall
+    tiles.push({ x, y });
+    x += dir.dx;
+    y += dir.dy;
+  }
+
+  return tiles;
 }
 
 // Calculate camera vision tiles (cone/triangle shape that expands)
@@ -88,34 +115,41 @@ function hasHazardImmunity(gameState, hazardType) {
 // Check if there's a hazard at the given position
 // Returns hazard info or null
 export function checkHazardAt(grid, x, y, gameState) {
-  // Check for camera immunity (wearing uniform)
-  if (hasHazardImmunity(gameState, 'camera')) {
-    return null; // Immune to cameras
-  }
-
+  const cameraImmune = hasHazardImmunity(gameState, 'camera');
   const rows = grid.length;
   const cols = grid[0]?.length || 0;
 
-  // Check all cameras to see if player is in their vision
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
       const tile = grid[cy][cx];
 
-      if (tile.type === 'camera') {
+      if (tile.type === 'camera' && !cameraImmune) {
         const direction = tile.config?.direction || 'down';
         const range = tile.config?.range || 3;
         const visionTiles = getCameraVisionTiles(grid, cx, cy, direction, range);
 
-        // Check if player position is in camera vision
-        const isInVision = visionTiles.some(vt => vt.x === x && vt.y === y);
-
-        if (isInVision) {
+        if (visionTiles.some(vt => vt.x === x && vt.y === y)) {
           return {
             type: 'camera',
             damage: HAZARD_TYPES.camera.damage,
             message: HAZARD_TYPES.camera.message,
-            continuous: true, // Camera damage is continuous (1 life per 5 seconds)
-            interval: 5000 // 5 seconds
+            continuous: true,
+            interval: 5000
+          };
+        }
+      }
+
+      if (tile.type === 'laser') {
+        const direction = tile.config?.direction || 'down';
+        const beamTiles = getLaserBeamTiles(grid, cx, cy, direction);
+
+        if (beamTiles.some(bt => bt.x === x && bt.y === y)) {
+          return {
+            type: 'laser',
+            damage: HAZARD_TYPES.laser.damage,
+            message: HAZARD_TYPES.laser.message,
+            continuous: true,
+            interval: 3000
           };
         }
       }
@@ -140,7 +174,6 @@ export function getAllHazardZones(grid) {
         const range = tile.config?.range || 3;
         const visionTiles = getCameraVisionTiles(grid, x, y, direction, range);
 
-        // Add each vision tile as a hazard zone
         for (const vt of visionTiles) {
           zones.push({
             x: vt.x,
@@ -150,6 +183,24 @@ export function getAllHazardZones(grid) {
             distance: vt.distance,
             sourceX: x,
             sourceY: y
+          });
+        }
+      }
+
+      if (tile.type === 'laser') {
+        const direction = tile.config?.direction || 'down';
+        const beamTiles = getLaserBeamTiles(grid, x, y, direction);
+
+        for (const bt of beamTiles) {
+          zones.push({
+            x: bt.x,
+            y: bt.y,
+            hazardType: 'laser',
+            renderColor: HAZARD_TYPES.laser.renderColor,
+            isLaserBeam: true,
+            sourceX: x,
+            sourceY: y,
+            direction: direction
           });
         }
       }
@@ -180,5 +231,48 @@ export function renderHazardOverlay(ctx, grid, tileSize, offsetX = 0, offsetY = 
     ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
     ctx.lineWidth = 1;
     ctx.strokeRect(px + 1, py + 1, tileSize - 2, tileSize - 2);
+  }
+
+  // Render laser beams as thin red lines through tile centers
+  // Group laser zones by source emitter to draw one continuous line per laser
+  const laserSources = new Map();
+  for (const zone of zones) {
+    if (zone.hazardType !== 'laser') continue;
+    const key = `${zone.sourceX},${zone.sourceY}`;
+    if (!laserSources.has(key)) {
+      laserSources.set(key, { sourceX: zone.sourceX, sourceY: zone.sourceY, direction: zone.direction, tiles: [] });
+    }
+    laserSources.get(key).tiles.push(zone);
+  }
+
+  for (const laser of laserSources.values()) {
+    if (laser.tiles.length === 0) continue;
+
+    // Sort tiles along the beam direction so the line is continuous
+    const dir = CAMERA_DIRECTIONS[laser.direction] || CAMERA_DIRECTIONS.down;
+    laser.tiles.sort((a, b) => (a.x - b.x) * dir.dx + (a.y - b.y) * dir.dy);
+
+    const last = laser.tiles[laser.tiles.length - 1];
+
+    const startPx = (laser.sourceX - offsetX) * tileSize + tileSize / 2;
+    const startPy = (laser.sourceY - offsetY) * tileSize + tileSize / 2;
+    const endPx = (last.x - offsetX) * tileSize + tileSize / 2 + dir.dx * tileSize / 2;
+    const endPy = (last.y - offsetY) * tileSize + tileSize / 2 + dir.dy * tileSize / 2;
+
+    // Outer glow
+    ctx.strokeStyle = 'rgba(255, 60, 60, 0.4)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(startPx, startPy);
+    ctx.lineTo(endPx, endPy);
+    ctx.stroke();
+
+    // Thin bright core
+    ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(startPx, startPy);
+    ctx.lineTo(endPx, endPy);
+    ctx.stroke();
   }
 }
