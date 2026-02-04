@@ -104,7 +104,18 @@ function ToolbarIcon({ type, theme, TILE_TYPES }) {
   }} />;
 }
 
-export default function Toolbar({ selected, onSelect }) {
+// Floor color options
+const FLOOR_COLORS = {
+  gray: { label: 'Gray', color: '#4a4a4a' },
+  blue: { label: 'Blue', color: '#3a3a5a' },
+  red: { label: 'Red', color: '#5a3a3a' },
+  green: { label: 'Green', color: '#3a4a3a' },
+  yellow: { label: 'Yellow', color: '#4a4a3a' },
+  purple: { label: 'Purple', color: '#4a3a4a' },
+  marble: { label: 'Marble', color: '#5a5a5a' },
+};
+
+export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange }) {
   const theme = useContext(ThemeContext);
   const TILE_TYPES = theme?.getTileTypes() || {};
 
@@ -201,6 +212,50 @@ export default function Toolbar({ selected, onSelect }) {
           </div>
         );
       })}
+
+      {/* Floor color picker - shows when floor is selected */}
+      {selected === 'floor' && onFloorColorChange && (
+        <div style={{
+          marginBottom: 20,
+          padding: '12px 14px',
+          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(20, 20, 20, 0.3) 100%)',
+          borderRadius: 10,
+          border: `1px solid ${theme?.primaryColor ? `${theme.primaryColor}33` : 'rgba(100, 100, 100, 0.2)'}`,
+        }}>
+          <div style={{
+            color: theme?.primaryColor || '#aaddff',
+            fontSize: 12,
+            marginBottom: 10,
+            textTransform: 'uppercase',
+            fontWeight: '700',
+            letterSpacing: 1,
+          }}>
+            Floor Color
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {Object.entries(FLOOR_COLORS).map(([colorId, colorDef]) => (
+              <button
+                key={colorId}
+                onClick={() => onFloorColorChange(colorId)}
+                title={colorDef.label}
+                style={{
+                  width: 28,
+                  height: 28,
+                  background: colorDef.color,
+                  border: floorColor === colorId ? '3px solid #fff' : '2px solid #555',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  boxShadow: floorColor === colorId
+                    ? '0 0 8px rgba(255,255,255,0.5)'
+                    : '0 2px 4px rgba(0,0,0,0.3)',
+                  transition: 'all 0.15s ease',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{
         color: '#aaaaaa',
         fontSize: 12,

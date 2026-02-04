@@ -60,7 +60,8 @@ export function removeTile(grid, x, y) {
 }
 
 export function isWalkable(cell) {
-  const blocking = ['tree', 'empty', 'water', 'snow', 'bear'];
+  // Blocking tiles (forest + bank-robbery themes)
+  const blocking = ['tree', 'empty', 'water', 'snow', 'bear', 'wall'];
   // Item tiles are walkable
   if (cell.type.startsWith('item-')) return true;
   return !blocking.includes(cell.type);

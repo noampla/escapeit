@@ -284,7 +284,7 @@ export default function SolverMode({ level, onBack }) {
   const interactionEngine = useMemo(() => theme ? new InteractionEngine(theme) : null, [theme]);
 
   const [grid, setGrid] = useState(() => convertLegacyItems(level.grid));
-  const startPos = findTile(level.grid, 'campfire') || { x: 1, y: 1 };
+  const startPos = findTile(level.grid, 'campfire') || findTile(level.grid, 'start') || { x: 1, y: 1 };
   const [playerPos, setPlayerPos] = useState(() => ({ ...startPos }));
   const [lives, setLives] = useState(level.lives || 3);
   const maxInventory = level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY;
@@ -382,7 +382,9 @@ export default function SolverMode({ level, onBack }) {
     const pos = playerPosRef.current;
     const currentGrid = gridRef.current;
     const cell = currentGrid[pos.y][pos.x];
-    if (cell.type !== 'ground' && cell.type !== 'campfire' && cell.type !== 'raft') {
+    // Allow dropping on ground-type tiles (forest: ground, campfire, raft | bank: floor, start)
+    const groundTiles = ['ground', 'campfire', 'raft', 'floor', 'start'];
+    if (!groundTiles.includes(cell.type)) {
       showMessage("Can't drop here!");
       return;
     }
@@ -1294,19 +1296,20 @@ export default function SolverMode({ level, onBack }) {
 
   useEffect(() => {
     if (gameOver) return;
-    const exitPos = findTile(level.grid, 'car');
+    // Check for exit tile (forest: 'car', bank: 'exit')
+    const exitPos = findTile(level.grid, 'car') || findTile(level.grid, 'exit');
     if (!exitPos || !isSamePos(playerPos, exitPos)) {
       exitMessageShownRef.current = false;
       return;
     }
 
-    const carCell = level.grid[exitPos.y][exitPos.x];
-    const needsKey = carCell.config?.needsKey !== false;
+    const exitCell = level.grid[exitPos.y][exitPos.x];
+    const needsKey = exitCell.config?.needsKey !== false;
 
     if (needsKey && !hasItemType(gameState.inventory, 'key')) {
       if (!exitMessageShownRef.current) {
         exitMessageShownRef.current = true;
-        showMessage('You need a Key to start the car!');
+        showMessage('You need a Key to escape!');
       }
       return;
     }
@@ -1316,7 +1319,7 @@ export default function SolverMode({ level, onBack }) {
     if (allComplete) {
       setGameState(prev => ({ ...prev, reachedExit: true }));
       setGameOver('win');
-      showMessage('YOU ESCAPED THE FOREST!', 999999);
+      showMessage('YOU ESCAPED!', 999999);
     } else if (!exitMessageShownRef.current) {
       exitMessageShownRef.current = true;
       showMessage('Complete all missions first!');

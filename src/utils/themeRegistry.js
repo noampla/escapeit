@@ -8,7 +8,14 @@ export const AVAILABLE_THEMES = [
     difficulty: 'Medium',
     author: 'Original'
   },
-  // Add more themes here as they're created
+  {
+    id: 'bank-robbery',
+    name: 'Bank Heist',
+    description: 'Break into the vault and escape with the loot',
+    emoji: '🏦',
+    difficulty: 'Hard',
+    author: 'Claude'
+  }
 ];
 
 export function getThemeById(id) {

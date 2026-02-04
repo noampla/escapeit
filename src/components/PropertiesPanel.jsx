@@ -62,6 +62,21 @@ export default function PropertiesPanel({ grid, selectedCell, onConfigChange, sh
         <input style={inputStyle} value={config.name || ''} onChange={e => update('name', e.target.value)} placeholder="e.g. Alice" />
         <HelpText type="friend" field="name" show={showHelp} CONFIG_HELP={CONFIG_HELP} />
       </>)}
+
+      {cell.type === 'floor' && (<>
+        <label style={labelStyle}>Floor Color</label>
+        <select style={inputStyle} value={config.floorColor || 'gray'} onChange={e => update('floorColor', e.target.value)}>
+          <option value="gray">Gray</option>
+          <option value="blue">Blue</option>
+          <option value="red">Red</option>
+          <option value="green">Green</option>
+          <option value="yellow">Yellow</option>
+          <option value="purple">Purple</option>
+          <option value="orange">Orange</option>
+          <option value="marble">Marble</option>
+        </select>
+        <HelpText type="floor" field="floorColor" show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+      </>)}
     </div>
   );
 }

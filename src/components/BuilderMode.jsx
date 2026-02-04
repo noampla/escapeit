@@ -17,7 +17,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     }
     return createEmptyGrid();
   });
-  const [selectedTool, setSelectedTool] = useState('tree');
+  const [selectedTool, setSelectedTool] = useState('floor');
+  const [selectedFloorColor, setSelectedFloorColor] = useState('gray');
   const [selectedCell, setSelectedCell] = useState(null);
   const [showHazardZones, setShowHazardZones] = useState(false);
   const [showTooltips, setShowTooltips] = useState(true);
@@ -63,7 +64,12 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     }
     pushUndo(grid);
     const TILE_TYPES = theme?.getTileTypes() || {};
-    const newGrid = placeTile(grid, x, y, selectedTool, TILE_TYPES);
+    let newGrid = placeTile(grid, x, y, selectedTool, TILE_TYPES);
+    // Apply floor color if placing floor tile
+    if (selectedTool === 'floor') {
+      newGrid = cloneGrid(newGrid);
+      newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
+    }
     setGrid(newGrid);
     setSelectedCell({ x, y });
     setSaved(false);
@@ -76,7 +82,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     if (lastDragPos.current === key) return;
     lastDragPos.current = key;
     const TILE_TYPES = theme?.getTileTypes() || {};
-    setGrid(prev => placeTile(prev, x, y, selectedTool, TILE_TYPES));
+    setGrid(prev => {
+      let newGrid = placeTile(prev, x, y, selectedTool, TILE_TYPES);
+      // Apply floor color if placing floor tile
+      if (selectedTool === 'floor') {
+        newGrid = cloneGrid(newGrid);
+        newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
+      }
+      return newGrid;
+    });
     setSaved(false);
   };
 
@@ -292,7 +306,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
 
       {/* Main area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} />}
+        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} />}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', padding: 20 }}>
           <Grid
             grid={grid}
