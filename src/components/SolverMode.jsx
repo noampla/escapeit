@@ -327,7 +327,12 @@ export default function SolverMode({ level, onBack }) {
     }));
     // Get item label from theme
     const itemLabel = theme?.getItemLabel?.(itemType, itemObj) || itemType;
-    showMessage(`Picked up: ${itemLabel}`);
+    // Show special message for wearable items
+    if (theme?.isWearable?.(itemType)) {
+      showMessage(`Picked up: ${itemLabel} (Press E to wear)`);
+    } else {
+      showMessage(`Picked up: ${itemLabel}`);
+    }
     return true;
   }, [showMessage, maxInventory, theme]);
 
@@ -1164,7 +1169,7 @@ export default function SolverMode({ level, onBack }) {
               <div style={{ fontSize: 11, color: '#ccbb99', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Inv:
               </div>
-              {gameState.inventory.slice(0, 5).map((item, i) => {
+              {gameState.inventory.filter(item => !theme?.isWearable?.(item.itemType)).slice(0, 5).map((item, i) => {
                 // Get border color for items with lockColor
                 const borderColor = item.lockColor
                   ? LOCK_COLORS[item.lockColor]?.color || 'rgba(200, 150, 100, 0.3)'
@@ -1185,36 +1190,80 @@ export default function SolverMode({ level, onBack }) {
                   </div>
                 );
               })}
-              {gameState.inventory.length > 5 && (
+              {gameState.inventory.filter(item => !theme?.isWearable?.(item.itemType)).length > 5 && (
                 <div style={{ fontSize: 11, color: '#ccbb99', fontWeight: 'bold' }}>
-                  +{gameState.inventory.length - 5}
+                  +{gameState.inventory.filter(item => !theme?.isWearable?.(item.itemType)).length - 5}
                 </div>
               )}
             </div>
           )}
 
-          {/* Worn Items Indicator */}
-          {gameState.worn?.body && (
+          {/* Wearables Preview */}
+          {gameState.inventory.some(item => theme?.isWearable?.(item.itemType)) && (
             <div style={{
               display: 'flex',
               gap: 6,
               alignItems: 'center',
             }}>
-              <div style={{
-                background: 'linear-gradient(145deg, rgba(34, 68, 170, 0.8), rgba(26, 51, 119, 0.8))',
-                padding: '6px 12px',
-                borderRadius: 8,
-                border: '2px solid rgba(100, 140, 220, 0.6)',
-                boxShadow: '0 2px 8px rgba(34, 68, 170, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}>
-                <span style={{ fontSize: 14 }}>🎭</span>
-                <span style={{ fontSize: 11, color: '#a8c8ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Disguised
-                </span>
+              <div style={{ fontSize: 11, color: '#a8c8ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Wear:
               </div>
+              {gameState.inventory.filter(item => theme?.isWearable?.(item.itemType)).map((item, i) => (
+                <div key={i} style={{
+                  background: 'rgba(34, 68, 120, 0.6)',
+                  padding: '6px',
+                  borderRadius: 6,
+                  fontSize: 16,
+                  border: '2px solid rgba(100, 140, 220, 0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                }}>
+                  <InventoryIcon theme={theme} itemType={item.itemType} size={20} itemState={item} />
+                  <span style={{
+                    position: 'absolute',
+                    bottom: -6,
+                    right: -4,
+                    fontSize: 8,
+                    color: '#a8c8ff',
+                    background: 'rgba(34, 68, 120, 0.9)',
+                    padding: '1px 3px',
+                    borderRadius: 3,
+                    fontWeight: 'bold',
+                  }}>E</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Worn Items Indicator */}
+          {gameState.worn && Object.entries(gameState.worn).some(([, v]) => v) && (
+            <div style={{
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+            }}>
+              {Object.entries(gameState.worn).filter(([, itemType]) => itemType).map(([slot, itemType]) => {
+                const itemLabel = theme?.getItemLabel?.(itemType, {}) || itemType;
+                return (
+                  <div key={slot} style={{
+                    background: 'linear-gradient(145deg, rgba(34, 68, 170, 0.8), rgba(26, 51, 119, 0.8))',
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '2px solid rgba(100, 140, 220, 0.6)',
+                    boxShadow: '0 2px 8px rgba(34, 68, 170, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}>
+                    <InventoryIcon theme={theme} itemType={itemType} size={16} itemState={{}} />
+                    <span style={{ fontSize: 11, color: '#a8c8ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {itemLabel}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1455,8 +1504,11 @@ export default function SolverMode({ level, onBack }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Regular items */}
                 {gameState.inventory.map((item, idx) => {
-                  // Get item label from theme (handles item state and color)
+                  const isWearable = theme?.isWearable?.(item.itemType);
+                  if (isWearable) return null; // Skip wearables in main list
+
                   const itemLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
 
                   return (
@@ -1506,6 +1558,92 @@ export default function SolverMode({ level, onBack }) {
                     </button>
                   );
                 })}
+
+                {/* Wearables section */}
+                {gameState.inventory.some(item => theme?.isWearable?.(item.itemType)) && (
+                  <>
+                    <div style={{
+                      marginTop: 8,
+                      paddingTop: 12,
+                      borderTop: '1px solid rgba(100, 140, 220, 0.3)',
+                    }}>
+                      <div style={{
+                        color: '#a8c8ff',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase',
+                        letterSpacing: 1,
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}>
+                        <span>Wearables</span>
+                        <span style={{
+                          fontSize: 9,
+                          color: '#88aadd',
+                          fontWeight: 'normal',
+                          textTransform: 'none',
+                        }}>
+                          (Press E to wear)
+                        </span>
+                      </div>
+                    </div>
+                    {gameState.inventory.map((item, idx) => {
+                      const isWearable = theme?.isWearable?.(item.itemType);
+                      if (!isWearable) return null;
+
+                      const itemLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => dropItem(idx)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '12px 16px',
+                            background: 'rgba(34, 68, 120, 0.5)',
+                            border: '1px solid rgba(100, 140, 220, 0.4)',
+                            borderRadius: 10,
+                            color: '#ffffff',
+                            fontSize: 14,
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 8px rgba(34, 68, 170, 0.3)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(44, 88, 150, 0.7)';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(34, 68, 120, 0.5)';
+                            e.currentTarget.style.transform = 'translateX(0)';
+                          }}
+                        >
+                          <span style={{
+                            background: 'rgba(100, 140, 200, 0.4)',
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 'bold',
+                            color: '#c0d8ff',
+                            minWidth: 24,
+                            textAlign: 'center',
+                          }}>
+                            {idx + 1}
+                          </span>
+                          <InventoryIcon theme={theme} itemType={item.itemType} size={24} itemState={item} />
+                          <span style={{ flex: 1 }}>
+                            {itemLabel}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             )}
             <button

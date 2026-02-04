@@ -7,28 +7,15 @@ const categories = [
   { id: 'hazard', label: 'Hazards' },
 ];
 
-// Default emoji fallbacks (used if theme doesn't provide getTileEmoji)
+// Minimal fallbacks for engine-level tiles only
 const DEFAULT_EMOJIS = {
-  tree: '🌲', water: '🌊', snow: '❄️',
-  campfire: '🏕️', car: '🚗',
-  friend: '👤',
-  fire: '🔥', bear: '🐻',
-  'item-axe': '🪓',
-  'item-rope': '🧵',
-  'item-knife': '🔪',
-  'item-sweater': '🧥',
-  start: '🚪', exit: '🚐',
+  start: '🚪',
+  exit: '🏁',
 };
 
 // Default color fallbacks
 const DEFAULT_FLOOR_COLORS = {
   gray: { label: 'Gray', color: '#4a4a4a' },
-  blue: { label: 'Blue', color: '#3a3a5a' },
-  red: { label: 'Red', color: '#5a3a3a' },
-  green: { label: 'Green', color: '#3a4a3a' },
-  yellow: { label: 'Yellow', color: '#4a4a3a' },
-  purple: { label: 'Purple', color: '#4a3a4a' },
-  marble: { label: 'Marble', color: '#5a5a5a' },
 };
 
 const DEFAULT_LOCK_COLORS = {
@@ -41,140 +28,48 @@ const DEFAULT_LOCK_COLORS = {
 
 const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
 
-// Draw mini bucket icon
-function drawMiniBucket(ctx, size) {
-  const s = size * 0.3;
-  const cx = size / 2, cy = size / 2;
-
-  ctx.fillStyle = '#6699cc';
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-  ctx.lineTo(cx - s * 0.6, cy + s * 0.7);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = '#4477aa';
-  ctx.beginPath();
-  ctx.moveTo(cx + s * 0.3, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.8, cy - s * 0.6);
-  ctx.lineTo(cx + s * 0.6, cy + s * 0.7);
-  ctx.lineTo(cx + s * 0.3, cy + s * 0.7);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = '#556677';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy - s * 0.85, s * 0.55, Math.PI * 0.85, Math.PI * 0.15);
-  ctx.stroke();
-}
-
-// Draw mini wood icon
-function drawMiniWood(ctx, size) {
-  const s = size * 0.28;
-  const cx = size / 2, cy = size / 2;
-
-  ctx.fillStyle = '#6b4910';
-  ctx.fillRect(cx - s * 0.75, cy + s * 0.25, s * 1.5, s * 0.55);
-
-  ctx.fillStyle = '#8b6914';
-  ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.6);
-
-  ctx.fillStyle = '#a58420';
-  ctx.fillRect(cx - s * 1.05, cy - s * 0.35, s * 2.1, s * 0.18);
-
-  ctx.fillStyle = '#8b6914';
-  ctx.beginPath();
-  ctx.arc(cx + s * 1.05, cy - s * 0.05, s * 0.22, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// Draw mini key icon with color
-function drawMiniKey(ctx, size, color = '#cc4444') {
-  const s = size * 0.35;
-  const cx = size / 2, cy = size / 2;
-
-  ctx.fillStyle = color;
-
-  // Key head (circle)
-  ctx.beginPath();
-  ctx.arc(cx - s * 0.3, cy, s * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Key hole
-  ctx.fillStyle = '#333';
-  ctx.beginPath();
-  ctx.arc(cx - s * 0.3, cy, s * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Key shaft
-  ctx.fillStyle = color;
-  ctx.fillRect(cx - s * 0.05, cy - s * 0.1, s * 0.7, s * 0.2);
-
-  // Key teeth
-  ctx.fillRect(cx + s * 0.4, cy, s * 0.15, s * 0.25);
-  ctx.fillRect(cx + s * 0.2, cy, s * 0.1, s * 0.18);
-}
-
-// Draw mini card icon with color
-function drawMiniCard(ctx, size, color = '#cc4444') {
-  const s = size * 0.4;
-  const cx = size / 2, cy = size / 2;
-
-  // Card body
-  ctx.fillStyle = '#eee';
-  ctx.fillRect(cx - s * 0.6, cy - s * 0.4, s * 1.2, s * 0.8);
-
-  // Colored stripe
-  ctx.fillStyle = color;
-  ctx.fillRect(cx - s * 0.6, cy - s * 0.4, s * 1.2, s * 0.25);
-
-  // Chip
-  ctx.fillStyle = '#daa520';
-  ctx.fillRect(cx - s * 0.4, cy + s * 0.05, s * 0.3, s * 0.22);
-}
-
-function ToolbarIcon({ type, theme, TILE_TYPES, lockColor, LOCK_COLORS }) {
+// Generic toolbar icon - delegates rendering to theme
+function ToolbarIcon({ type, theme, TILE_TYPES, lockColor }) {
   const canvasRef = useRef(null);
 
+  // Check if this is an item tile that has custom rendering
+  const isItemTile = type.startsWith('item-');
+  const itemType = isItemTile ? type.replace('item-', '') : null;
+
   useEffect(() => {
-    if (type === 'item-bucket' || type === 'item-wood' || type === 'item-key' || type === 'item-card') {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, 16, 16);
-      if (type === 'item-bucket') {
-        drawMiniBucket(ctx, 16);
-      } else if (type === 'item-wood') {
-        drawMiniWood(ctx, 16);
-      } else if (type === 'item-key') {
-        const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
-        drawMiniKey(ctx, 16, color);
-      } else if (type === 'item-card') {
-        const color = LOCK_COLORS[lockColor]?.color || '#cc4444';
-        drawMiniCard(ctx, 16, color);
-      }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 16, 16);
+
+    // For item tiles, try theme's item rendering
+    if (isItemTile && itemType) {
+      const itemState = { lockColor };
+      const rendered = theme?.renderItem?.(ctx, itemType, 0, 0, 16, itemState);
+      if (rendered) return;
     }
-  }, [type, lockColor, LOCK_COLORS]);
 
-  // Get emoji from theme or use default fallback
-  const emoji = theme?.getTileEmoji?.(type) ?? DEFAULT_EMOJIS[type];
+    // Try theme's tile rendering
+    const tile = { type, config: { lockColor } };
+    const rendered = theme?.renderTile?.(ctx, tile, 8, 8, 16);
+    if (rendered) return;
 
-  if (type === 'item-bucket' || type === 'item-wood' || type === 'item-key' || type === 'item-card') {
-    return <canvas ref={canvasRef} width={16} height={16} style={{ flexShrink: 0 }} />;
-  }
+    // Fallback: draw emoji or color block
+    const emoji = theme?.getTileEmoji?.(type) ?? DEFAULT_EMOJIS[type];
+    if (emoji) {
+      ctx.font = '12px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, 8, 8);
+    } else {
+      const def = TILE_TYPES[type];
+      ctx.fillStyle = def?.color || '#666';
+      ctx.fillRect(1, 1, 14, 14);
+    }
+  }, [type, itemType, isItemTile, lockColor, theme, TILE_TYPES]);
 
-  if (emoji) {
-    return <span style={{ fontSize: 16 }}>{emoji}</span>;
-  }
-
-  const def = TILE_TYPES[type];
-  return <span style={{
-    width: 14, height: 14, borderRadius: 3,
-    background: def?.color || '#666', display: 'inline-block', flexShrink: 0,
-  }} />;
+  return <canvas ref={canvasRef} width={16} height={16} style={{ flexShrink: 0 }} />;
 }
 
 export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange, lockColor, onLockColorChange }) {
@@ -278,7 +173,7 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
                       }
                     }}
                   >
-                    <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} lockColor={lockColor} LOCK_COLORS={LOCK_COLORS} />
+                    <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} lockColor={lockColor} />
                     <span style={{ flex: 1 }}>{def.label}</span>
                     {showLockColorIndicator && (
                       <span style={{

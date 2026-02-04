@@ -30,7 +30,7 @@ function InventoryItemIcon({ itemType, itemState = {} }) {
   return <canvas ref={canvasRef} width={20} height={20} style={{ flexShrink: 0 }} />;
 }
 
-export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, message, inventory = [], grid }) {
+export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, message, inventory = [], grid, worn = {} }) {
   const theme = useContext(ThemeContext);
 
   return (
@@ -159,6 +159,7 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
           {inventory.map((item, i) => {
             // Use theme's getItemLabel for proper labeling (handles state like filled/empty, colors)
             const label = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+            const isWearable = theme?.isItemWearable?.(item.itemType);
             return (
               <div key={i} style={{
                 color: '#ffffff',
@@ -173,7 +174,19 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
                 borderRadius: 8,
               }}>
                 <InventoryItemIcon itemType={item.itemType} itemState={item} />
-                {label}
+                <span style={{ flex: 1 }}>{label}</span>
+                {isWearable && (
+                  <span style={{
+                    color: '#aaddff',
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                    background: 'rgba(100, 150, 200, 0.2)',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                  }}>
+                    E:wear
+                  </span>
+                )}
               </div>
             );
           })}
@@ -187,6 +200,63 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
           }}>
             Press Q to drop
           </div>
+        </div>
+      )}
+
+      {/* Worn Items */}
+      {worn && Object.values(worn).some(v => v) && (
+        <div style={{
+          background: 'linear-gradient(145deg, rgba(45, 30, 60, 0.95) 0%, rgba(30, 20, 40, 0.95) 100%)',
+          padding: '14px 18px',
+          borderRadius: 12,
+          border: 'none',
+          boxShadow: `
+            0 6px 20px rgba(0, 0, 0, 0.6),
+            0 0 0 2px rgba(150, 100, 200, 0.3),
+            inset 0 2px 0 rgba(255, 255, 255, 0.08)
+          `,
+          backdropFilter: 'blur(10px)',
+        }}>
+          <div style={{
+            color: '#d8a8f8',
+            fontSize: 11,
+            marginBottom: 8,
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: 1.5,
+          }}>
+            Wearing
+          </div>
+          {Object.entries(worn).filter(([, itemType]) => itemType).map(([slot, itemType]) => {
+            const label = theme?.getItemLabel?.(itemType, {}) || itemType;
+            return (
+              <div key={slot} style={{
+                color: '#ffffff',
+                fontSize: 14,
+                fontWeight: '600',
+                marginBottom: 6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(0, 0, 0, 0.2)',
+                padding: '6px 10px',
+                borderRadius: 8,
+              }}>
+                <InventoryItemIcon itemType={itemType} itemState={{}} />
+                <span style={{ flex: 1 }}>{label}</span>
+                <span style={{
+                  color: '#ffaa88',
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  background: 'rgba(200, 100, 50, 0.2)',
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                }}>
+                  E:remove
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

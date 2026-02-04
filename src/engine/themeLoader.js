@@ -282,6 +282,11 @@ export class ThemeLoader {
     return item?.wearable === true;
   }
 
+  // Alias for isWearable (used by HUD)
+  isItemWearable(itemType) {
+    return this.isWearable(itemType);
+  }
+
   // Get wearable effects for an item
   getWearableEffects(itemType) {
     return this.items?.WEARABLES?.[itemType]?.effects || {};
