@@ -153,6 +153,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     reachedExit: false,
     inventory: [],
     worn: {}, // Wearable items (e.g., uniform)
+    containers: {}, // Container items (e.g., bag)
   });
   const [revealedTiles, setRevealedTiles] = useState(() => initializeRevealedTiles(startPos.x, startPos.y));
   const [tick, setTick] = useState(0);
@@ -230,6 +231,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       collectedItems: [], rescuedFriends: 0,
       reachedLocations: [], reachedExit: false, inventory: [],
       worn: {},
+      containers: {},
     });
     setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y));
     setTick(0);
@@ -290,12 +292,24 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;
-    if (currentGS.inventory.length >= maxInventory) {
-      showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+
+    // Check if tile is pickable (some items like money must be collected via interaction)
+    const TILE_TYPES = theme?.getTileTypes?.() || {};
+    const tileDef = TILE_TYPES[cell.type];
+    if (tileDef?.pickable === false) {
+      showMessage("Can't pick this up! Use E to interact.");
       return false;
     }
 
     const itemType = cell.type.replace('item-', '');
+
+    // Check if this is a container item - auto-equip instead of adding to inventory
+    const isContainer = theme?.isContainer?.(itemType);
+
+    if (!isContainer && currentGS.inventory.length >= maxInventory) {
+      showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+      return false;
+    }
 
     const newGrid = cloneGrid(gridRef.current);
 
@@ -344,14 +358,62 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     setGrid(newGrid);
 
     // Preserve all config properties from tile to inventory item
-    const itemObj = { itemType, filled: false, ...cell.config }
+    const itemObj = { itemType, filled: false, ...cell.config };
+    const itemLabel = theme?.getItemLabel?.(itemType, itemObj) || itemType;
+
+    // Auto-equip containers (like bag)
+    if (isContainer) {
+      const containerDef = theme?.getContainerDef?.(itemType);
+      const slot = containerDef?.slot || itemType;
+      const newCapacity = cell.config?.capacity || containerDef?.defaultCapacity || 10000;
+      const existingContainer = currentGS.containers?.[slot];
+
+      setGameState(prev => {
+        const existing = prev.containers?.[slot];
+        if (existing) {
+          // Add capacity to existing container
+          return {
+            ...prev,
+            collectedItems: [...prev.collectedItems, itemType],
+            containers: {
+              ...prev.containers,
+              [slot]: {
+                ...existing,
+                capacity: existing.capacity + newCapacity
+              }
+            }
+          };
+        }
+        // Create new container
+        return {
+          ...prev,
+          collectedItems: [...prev.collectedItems, itemType],
+          containers: {
+            ...prev.containers,
+            [slot]: {
+              itemType,
+              capacity: newCapacity,
+              contents: 0
+            }
+          }
+        };
+      });
+      soundManager.play('pickup');
+      if (existingContainer) {
+        const totalCapacity = existingContainer.capacity + newCapacity;
+        showMessage(`+$${newCapacity.toLocaleString()} capacity! (Total: $${totalCapacity.toLocaleString()})`);
+      } else {
+        showMessage(`${itemLabel} equipped!`);
+      }
+      return true;
+    }
+
+    // Regular item - add to inventory
     setGameState(prev => ({
       ...prev,
       inventory: [...prev.inventory, itemObj],
       collectedItems: [...prev.collectedItems, itemType],
     }));
-    // Get item label from theme
-    const itemLabel = theme?.getItemLabel?.(itemType, itemObj) || itemType;
     soundManager.play('pickup');
     // Show special message for wearable items
     if (theme?.isWearable?.(itemType)) {
@@ -491,6 +553,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       inventory: [...currentGS.inventory.map(item => ({ ...item }))],
       collectedItems: [...(currentGS.collectedItems || [])],
       worn: { ...(currentGS.worn || {}) },
+      containers: currentGS.containers ? JSON.parse(JSON.stringify(currentGS.containers)) : {},
     };
 
     // Execute interaction through theme
@@ -523,13 +586,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
 
       // Apply inventory/state changes
-      if (result.modifyInventory || result.modifyState) {
+      if (result.modifyInventory || result.modifyState || result.modifyContainers) {
         setGameState(prev => ({
           ...prev,
           inventory: tempGameState.inventory,
           collectedItems: tempGameState.collectedItems,
           rescuedFriends: tempGameState.rescuedFriends ?? prev.rescuedFriends,
           worn: tempGameState.worn ?? prev.worn,
+          containers: tempGameState.containers ?? prev.containers,
         }));
       }
 
@@ -1402,6 +1466,66 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                     <span style={{ fontSize: 11, color: '#a8c8ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       {itemLabel}
                     </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Equipped Containers (e.g., bag with money) */}
+          {gameState.containers && Object.entries(gameState.containers).some(([, v]) => v) && (
+            <div style={{
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+            }}>
+              {Object.entries(gameState.containers).filter(([, container]) => container).map(([slot, container]) => {
+                const itemLabel = theme?.getItemLabel?.(container.itemType, container) || slot;
+                const fillPercent = container.capacity ? Math.min(100, (container.contents / container.capacity) * 100) : 0;
+                return (
+                  <div key={slot} style={{
+                    background: 'linear-gradient(145deg, rgba(74, 58, 42, 0.9), rgba(58, 42, 26, 0.9))',
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '2px solid rgba(139, 105, 20, 0.6)',
+                    boxShadow: '0 2px 8px rgba(74, 58, 42, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    position: 'relative',
+                  }}>
+                    <InventoryIcon theme={theme} itemType={container.itemType} size={18} itemState={container} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 10, color: '#d4b896', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        {itemLabel}
+                      </span>
+                      {container.contents !== undefined && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 12, color: '#55dd55', fontWeight: 'bold' }}>
+                            ${container.contents.toLocaleString()}
+                          </span>
+                          {container.capacity && (
+                            <>
+                              <span style={{ fontSize: 9, color: '#998866' }}>/ ${container.capacity.toLocaleString()}</span>
+                              <div style={{
+                                width: 40,
+                                height: 4,
+                                background: 'rgba(0,0,0,0.4)',
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                              }}>
+                                <div style={{
+                                  width: `${fillPercent}%`,
+                                  height: '100%',
+                                  background: fillPercent >= 90 ? '#ff6644' : fillPercent >= 70 ? '#ffaa44' : '#55aa55',
+                                  transition: 'width 0.3s',
+                                }} />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}

@@ -317,6 +317,23 @@ export class ThemeLoader {
     return this.items?.WEARABLES?.[itemType]?.effects || {};
   }
 
+  // === Container Methods ===
+
+  // Get container definitions
+  getContainers() {
+    return this.items?.CONTAINERS || {};
+  }
+
+  // Check if an item type is a container
+  isContainer(itemType) {
+    return this.items?.isContainer?.(itemType) || this.items?.ITEM_TYPES?.[itemType]?.isContainer === true;
+  }
+
+  // Get container definition for an item type
+  getContainerDef(itemType) {
+    return this.items?.getContainerDef?.(itemType) || this.items?.CONTAINERS?.[itemType] || null;
+  }
+
   // Custom drop handler - allows theme to handle special item drops (e.g., raft on adjacent water)
   // Returns { handled: true, newGrid, newInventory, message } if theme handles it, null otherwise
   customDrop(itemObj, gameState, grid, playerPos, direction) {

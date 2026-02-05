@@ -195,6 +195,33 @@ export const TILE_TYPES = {
     defaultConfig: { minSafeDistance: 2, maxRange: 6 },
     tooltip: 'Remote detonator. Pick up (F) and use (E) to detonate placed bombs. Stay at safe distance!',
     walkable: true
+  },
+
+  // Bag item tile
+  'item-bag': {
+    label: 'Duffel Bag',
+    color: '#4a3a2a',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'bag',
+    configurable: true,
+    defaultConfig: { capacity: 100000 },
+    tooltip: 'Duffel bag for carrying loot. Pick up (F) to auto-equip and collect money.',
+    walkable: true
+  },
+
+  // Money item tile
+  'item-money': {
+    label: 'Cash',
+    color: '#55aa55',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'money',
+    configurable: true,
+    defaultConfig: { amount: 50000 },
+    tooltip: 'Cold hard cash! Requires equipped bag to collect. Hold E to grab.',
+    walkable: true,
+    pickable: false // Can't pick up with F - must collect with E into bag
   }
 };
 
@@ -243,6 +270,12 @@ export const CONFIG_HELP = {
   'item-detonator': {
     minSafeDistance: 'Minimum distance from bomb to survive explosion (tiles).',
     maxRange: 'Maximum distance from which detonator can trigger bomb (tiles).'
+  },
+  'item-bag': {
+    capacity: 'Maximum amount of money the bag can hold.'
+  },
+  'item-money': {
+    amount: 'Amount of cash in this stack.'
   }
 };
 
@@ -325,6 +358,24 @@ export const CONFIG_SCHEMA = {
       min: 2,
       max: 15,
       default: 6
+    }
+  },
+  'item-bag': {
+    capacity: {
+      type: 'number',
+      label: 'Capacity',
+      min: 10000,
+      max: 5000000,
+      default: 100000
+    }
+  },
+  'item-money': {
+    amount: {
+      type: 'number',
+      label: 'Amount ($)',
+      min: 100,
+      max: 5000000,
+      default: 50000
     }
   }
 };
@@ -782,6 +833,90 @@ export function renderTile(ctx, tile, cx, cy, size) {
     ctx.beginPath();
     ctx.arc(cx + size * 0.12, cy - size * 0.35, size * 0.03, 0, Math.PI * 2);
     ctx.fill();
+
+    return true;
+  }
+
+  // Bag item tile
+  if (tile.type === 'item-bag') {
+    // Main bag body (duffel bag shape)
+    ctx.fillStyle = '#4a3a2a';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.05, size * 0.38, size * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Darker bottom shadow
+    ctx.fillStyle = '#3a2a1a';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.15, size * 0.35, size * 0.18, 0, 0, Math.PI);
+    ctx.fill();
+
+    // Zipper line
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.32, cy - size * 0.02);
+    ctx.lineTo(cx + size * 0.32, cy - size * 0.02);
+    ctx.stroke();
+
+    // Zipper pull
+    ctx.fillStyle = '#888';
+    ctx.fillRect(cx + size * 0.18, cy - size * 0.1, size * 0.1, size * 0.16);
+
+    // Handles
+    ctx.strokeStyle = '#3a2a1a';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.18, cy - size * 0.15, size * 0.12, Math.PI, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.18, cy - size * 0.15, size * 0.12, Math.PI, 0);
+    ctx.stroke();
+
+    return true;
+  }
+
+  // Money item tile - simple design with prominent amount
+  if (tile.type === 'item-money') {
+    const amount = tile.config?.amount || 50000;
+
+    // Format amount with K/M suffix
+    let amountText;
+    if (amount >= 1000000) {
+      amountText = `${(amount / 1000000).toFixed(amount % 1000000 === 0 ? 0 : 1)}M`;
+    } else if (amount >= 1000) {
+      amountText = `${Math.floor(amount / 1000)}K`;
+    } else {
+      amountText = `${amount}`;
+    }
+
+    // Green background circle
+    ctx.fillStyle = '#3a6a3a';
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.08, size * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dollar sign - large and centered
+    ctx.fillStyle = '#88dd88';
+    ctx.font = `bold ${size * 0.5}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$', cx, cy - size * 0.08);
+
+    // Amount label at bottom with background
+    ctx.font = `bold ${size * 0.28}px sans-serif`;
+    const textY = cy + size * 0.38;
+    const textWidth = ctx.measureText(amountText).width;
+
+    // Dark background pill
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(cx - textWidth / 2 - 4, textY - size * 0.14, textWidth + 8, size * 0.28, 4);
+    ctx.fill();
+
+    // Amount text in bright green
+    ctx.fillStyle = '#66ff66';
+    ctx.fillText(amountText, cx, textY);
 
     return true;
   }

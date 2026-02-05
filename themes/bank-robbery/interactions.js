@@ -332,6 +332,72 @@ export const INTERACTIONS = {
     }
   },
 
+  'collect-money': {
+    label: 'Grab Cash',
+    // Duration is calculated dynamically based on amount (sqrt scale for huge amounts)
+    getDuration: (gameState, tile) => {
+      const amount = tile.config?.amount || 50000;
+      // Sqrt scale: $1K=~550ms, $100K=~1000ms, $1M=~2000ms, $5M=~4000ms
+      return Math.min(5000, 500 + Math.sqrt(amount) * 1.5);
+    },
+    duration: 1500, // Default, overridden by getDuration
+    progressColor: '#55aa55',
+    requirements: { tile: 'item-money' },
+    checkCustom: (gameState) => {
+      // Must have bag equipped with space
+      const bag = gameState.containers?.bag;
+      if (!bag) return false;
+      return bag.contents < bag.capacity;
+    },
+    execute: (gameState, grid, x, y) => {
+      const bag = gameState.containers?.bag;
+      if (!bag) {
+        return { success: false, error: 'Need an equipped bag!' };
+      }
+
+      const tile = grid[y][x];
+      const amount = tile.config?.amount || 50000;
+      const spaceLeft = bag.capacity - bag.contents;
+
+      if (spaceLeft <= 0) {
+        return { success: false, error: 'Bag is full!' };
+      }
+
+      // Calculate how much we can actually take
+      const amountToTake = Math.min(amount, spaceLeft);
+
+      // Add to bag
+      bag.contents += amountToTake;
+
+      // Remove money tile or reduce amount
+      if (amountToTake >= amount) {
+        // Take it all - replace with floor
+        grid[y][x] = { type: 'floor', config: { floorColor: 'gray' } };
+      } else {
+        // Partial take - reduce amount
+        grid[y][x] = { type: 'item-money', config: { amount: amount - amountToTake } };
+      }
+
+      // Format amounts with K/M suffix
+      const formatMoney = (val) => {
+        if (val >= 1000000) return `$${(val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1)}M`;
+        if (val >= 1000) return `$${Math.floor(val / 1000)}K`;
+        return `$${val}`;
+      };
+
+      const message = amountToTake >= amount
+        ? `💰 Grabbed ${formatMoney(amountToTake)}! (Bag: ${formatMoney(bag.contents)}/${formatMoney(bag.capacity)})`
+        : `💰 Grabbed ${formatMoney(amountToTake)} (bag full)! ${formatMoney(amount - amountToTake)} left.`;
+
+      return {
+        success: true,
+        message,
+        modifyGrid: true,
+        modifyContainers: true
+      };
+    }
+  },
+
 };
 
 // Check if requirements are met
@@ -383,10 +449,15 @@ export function getAvailableInteractions(gameState, grid, x, y, isSelfCheck = fa
 
   for (const [id, interaction] of Object.entries(INTERACTIONS)) {
     if (checkRequirements(interaction.requirements, gameState, tile, interaction, grid, x, y, isSelfCheck)) {
+      // Calculate duration (may be dynamic based on tile)
+      const duration = interaction.getDuration
+        ? interaction.getDuration(gameState, tile)
+        : interaction.duration;
+
       const interactionData = {
         id,
         label: interaction.label,
-        duration: interaction.duration,
+        duration,
         progressColor: interaction.progressColor || null
       };
 

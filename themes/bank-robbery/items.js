@@ -53,6 +53,21 @@ export const ITEM_TYPES = {
     emoji: null, // Custom rendered
     color: '#ffcc00',
     description: 'Triggers placed bombs. Stay at safe distance!'
+  },
+  bag: {
+    label: 'Duffel Bag',
+    emoji: null, // Custom rendered
+    color: '#4a3a2a',
+    description: 'Equip to collect money. Press E to equip.',
+    isContainer: true,
+    containerSlot: 'bag',
+    accepts: ['money'], // What item types can go in this container
+  },
+  money: {
+    label: 'Cash',
+    emoji: null, // Custom rendered
+    color: '#55aa55',
+    description: 'Cold hard cash. Requires equipped bag to collect.'
   }
 };
 
@@ -64,6 +79,16 @@ export const WEARABLES = {
     effects: {
       cameraImmunity: true
     }
+  }
+};
+
+// Define container items (bags, etc.)
+export const CONTAINERS = {
+  bag: {
+    label: 'Duffel Bag',
+    slot: 'bag',
+    accepts: ['money'],
+    defaultCapacity: 100000, // Default max money ($100K)
   }
 };
 
@@ -300,12 +325,111 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     return true;
   }
 
+  // Bag item (duffel bag)
+  if (itemType === 'bag') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Main bag body (rounded rectangle shape)
+    ctx.fillStyle = '#4a3a2a';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.05, size * 0.35, size * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Darker bottom
+    ctx.fillStyle = '#3a2a1a';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.12, size * 0.32, size * 0.15, 0, 0, Math.PI);
+    ctx.fill();
+
+    // Zipper line
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.28, cy - size * 0.02);
+    ctx.lineTo(cx + size * 0.28, cy - size * 0.02);
+    ctx.stroke();
+
+    // Zipper pull
+    ctx.fillStyle = '#888';
+    ctx.fillRect(cx + size * 0.15, cy - size * 0.08, size * 0.08, size * 0.12);
+
+    // Handles
+    ctx.strokeStyle = '#3a2a1a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.15, cy - size * 0.12, size * 0.1, Math.PI, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.15, cy - size * 0.12, size * 0.1, Math.PI, 0);
+    ctx.stroke();
+
+    return true;
+  }
+
+  // Money item (cash stack) - simple design with prominent amount
+  if (itemType === 'money') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+    const amount = state?.amount || 50000;
+
+    // Format amount with K/M suffix
+    let amountText;
+    if (amount >= 1000000) {
+      amountText = `${(amount / 1000000).toFixed(amount % 1000000 === 0 ? 0 : 1)}M`;
+    } else if (amount >= 1000) {
+      amountText = `${Math.floor(amount / 1000)}K`;
+    } else {
+      amountText = `${amount}`;
+    }
+
+    // Green background circle
+    ctx.fillStyle = '#3a6a3a';
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.08, size * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dollar sign - large and centered
+    ctx.fillStyle = '#88dd88';
+    ctx.font = `bold ${size * 0.5}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$', cx, cy - size * 0.08);
+
+    // Amount label at bottom with background
+    ctx.font = `bold ${size * 0.28}px sans-serif`;
+    const textY = cy + size * 0.38;
+    const textWidth = ctx.measureText(amountText).width;
+
+    // Dark background pill
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(cx - textWidth / 2 - 4, textY - size * 0.14, textWidth + 8, size * 0.28, 4);
+    ctx.fill();
+
+    // Amount text in bright green
+    ctx.fillStyle = '#66ff66';
+    ctx.fillText(amountText, cx, textY);
+
+    return true;
+  }
+
   return false;
 }
 
 export function getItemEmoji(itemType) {
   const item = ITEM_TYPES[itemType];
   return item?.emoji || null;
+}
+
+// Format money amount with K/M suffix
+function formatMoney(amount) {
+  if (amount >= 1000000) {
+    return `$${(amount / 1000000).toFixed(amount % 1000000 === 0 ? 0 : 1)}M`;
+  } else if (amount >= 1000) {
+    return `$${Math.floor(amount / 1000)}K`;
+  }
+  return `$${amount}`;
 }
 
 // Get display label for item with color info
@@ -318,7 +442,27 @@ export function getItemLabel(itemType, state = null) {
     return `${colorData?.label || state.lockColor} ${baseLabel}`;
   }
 
+  // Show money amount
+  if (itemType === 'money' && state?.amount) {
+    return formatMoney(state.amount);
+  }
+
+  // Show bag contents with formatted amount
+  if (itemType === 'bag' && state?.contents !== undefined) {
+    return `${baseLabel} (${formatMoney(state.contents)})`;
+  }
+
   return baseLabel;
+}
+
+// Check if an item type is a container
+export function isContainer(itemType) {
+  return ITEM_TYPES[itemType]?.isContainer === true;
+}
+
+// Get container definition
+export function getContainerDef(itemType) {
+  return CONTAINERS[itemType] || null;
 }
 
 // Render inventory item (same as renderItem for bank robbery)
