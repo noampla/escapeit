@@ -7,6 +7,7 @@ import { createEmptyGrid, placeTile, removeTile, cloneGrid } from '../engine/til
 import { saveLevel, generateId, loadLevels } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, GRID_COLS, GRID_ROWS } from '../utils/constants';
 import { ThemeContext } from '../App';
+import { useUser } from '../contexts/UserContext.jsx';
 
 // Default fallback
 const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
@@ -48,6 +49,7 @@ function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
 
 export default function BuilderMode({ onBack, editLevel, themeId }) {
   const theme = useContext(ThemeContext);
+  const { userId, displayName } = useUser();
   const lockTiles = useMemo(() => theme?.getLockTiles?.() || DEFAULT_LOCK_TILES, [theme]);
   const [grid, setGrid] = useState(() => {
     if (editLevel) {
@@ -189,6 +191,11 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       alert('Please enter a level name.');
       return;
     }
+
+    // Determine creator - keep existing creator if editing, otherwise use current user
+    const creatorId = editLevel?.creatorId || userId;
+    const creatorName = editLevel?.creatorName || displayName;
+
     const level = {
       id: levelId,
       name: levelName.trim(),
@@ -200,6 +207,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       themeId: themeId,
       createdAt: editLevel?.createdAt || Date.now(),
       updatedAt: Date.now(),
+      creatorId,
+      creatorName,
     };
     saveLevel(level).then(() => setSaved(true));
   };

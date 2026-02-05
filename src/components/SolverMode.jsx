@@ -7,6 +7,9 @@ import { checkAllMissions, checkMissionComplete } from '../engine/missions';
 import { DIRECTIONS, GRID_COLS, GRID_ROWS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { InteractionEngine } from '../engine/interactionEngine';
+import { useUser } from '../contexts/UserContext.jsx';
+import { submitScore } from '../utils/leaderboardService.js';
+import Leaderboard from './Leaderboard.jsx';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -107,8 +110,9 @@ function initializeRevealedTiles(startX, startY) {
 
 // isMissionDone is now imported as checkMissionComplete from missions.js
 
-export default function SolverMode({ level, onBack }) {
+export default function SolverMode({ level, onBack, isTestMode = false }) {
   const theme = useContext(ThemeContext);
+  const { userId, displayName } = useUser();
   const interactionEngine = useMemo(() => theme ? new InteractionEngine(theme) : null, [theme]);
 
   // Get theme-specific values with defaults
@@ -1136,6 +1140,14 @@ export default function SolverMode({ level, onBack }) {
       setGameState(prev => ({ ...prev, reachedExit: true }));
       setGameOver('win');
       showMessage('YOU ESCAPED!', 999999);
+
+      // Submit score to leaderboard (only for named users, not in test mode)
+      if (!isTestMode && level.id && displayName) {
+        const finalTime = (Date.now() - startTime) / 1000;
+        submitScore(level.id, userId, displayName, finalTime, moveCount).catch(err => {
+          console.error('Failed to submit score:', err);
+        });
+      }
     } else if (!exitMessageShownRef.current) {
       exitMessageShownRef.current = true;
       showMessage('Complete all missions first!');
@@ -1870,6 +1882,13 @@ export default function SolverMode({ level, onBack }) {
                 }}>
                   🏆 Score: {Math.max(0, 10000 - (elapsedTime * 10) - (moveCount * 5))} pts
                 </div>
+              </div>
+            )}
+
+            {/* Leaderboard - only show for saved levels, not test mode */}
+            {gameOver === 'win' && level.id && !isTestMode && (
+              <div style={{ marginTop: 16 }}>
+                <Leaderboard mapId={level.id} compact={true} />
               </div>
             )}
           </div>

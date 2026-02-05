@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { GRID_COLS } from './constants';
 
@@ -40,6 +40,13 @@ export async function saveLevel(level) {
 
 export async function deleteLevel(id) {
   await deleteDoc(doc(db, COLLECTION, id));
+}
+
+// Load levels created by a specific user
+export async function loadLevelsByCreator(creatorId) {
+  const q = query(collection(db, COLLECTION), where('creatorId', '==', creatorId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => restoreLevel(d.data()));
 }
 
 export function generateId() {

@@ -6,11 +6,13 @@ import MainMenu from './components/MainMenu';
 import ThemeSelect from './components/ThemeSelect';
 import ThemeLoader from './engine/themeLoader';
 import { migrateLevels } from './utils/storage';
+import { UserProvider } from './contexts/UserContext.jsx';
+import UserStatusBar from './components/UserStatusBar.jsx';
 
 // Theme context for sharing theme across components
 export const ThemeContext = createContext(null);
 
-export default function App() {
+function AppContent() {
   const [mode, setMode] = useState('menu');
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [editLevel, setEditLevel] = useState(null);
@@ -150,5 +152,14 @@ export default function App() {
     }}>
       Error: Invalid state
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <UserProvider>
+      <UserStatusBar />
+      <AppContent />
+    </UserProvider>
   );
 }
