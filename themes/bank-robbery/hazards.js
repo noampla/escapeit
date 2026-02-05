@@ -147,6 +147,9 @@ export function checkHazardAt(grid, x, y, gameState) {
       }
 
       if (tile.type === 'guard' && !cameraImmune) {
+        // Skip sleeping guards - they can't see
+        if (tile.config?.asleep) continue;
+
         const direction = tile.config?.direction || 'right';
         const range = HAZARD_TYPES.guard.range;
         const visionTiles = getCameraVisionTiles(grid, cx, cy, direction, range);
@@ -211,6 +214,9 @@ export function getAllHazardZones(grid) {
       }
 
       if (tile.type === 'guard') {
+        // Skip sleeping guards - they can't see
+        if (tile.config?.asleep) continue;
+
         const direction = tile.config?.direction || 'right';
         const range = HAZARD_TYPES.guard.range;
         const visionTiles = getCameraVisionTiles(grid, x, y, direction, range);

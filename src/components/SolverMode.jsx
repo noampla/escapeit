@@ -477,6 +477,23 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const startInteraction = useCallback((type, targetPos, progressColor = null, duration = null, visualTargetPos = null) => {
     soundManager.play('interact');
     soundManager.startProgress();
+
+    // Try to call theme's onStart hook (only if interaction supports it)
+    try {
+      const currentGrid = gridRef.current;
+      const currentGS = gameStateRef.current;
+      const newGrid = cloneGrid(currentGrid);
+      const startResult = theme?.executeInteraction?.(type, currentGS, newGrid, targetPos.x, targetPos.y, 'start');
+
+      // Only apply grid changes if onStart actually returned something
+      if (startResult && startResult.modifyGrid) {
+        gridRef.current = newGrid; // Update ref IMMEDIATELY to prevent race condition with moveEntities
+        setGrid(newGrid);
+      }
+    } catch (e) {
+      // onStart is optional, ignore errors
+    }
+
     setInteractionState({
       type,
       startTime: Date.now(),
@@ -486,12 +503,32 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       progressColor,
       duration: duration || INTERACTION_DURATION,
     });
-  }, []);
+  }, [theme]);
 
   const cancelInteraction = useCallback(() => {
     soundManager.stopProgress();
+
+    // Try to call theme's onCancel hook (only if interaction supports it)
+    if (interactionStateRef.current) {
+      try {
+        const currentGrid = gridRef.current;
+        const currentGS = gameStateRef.current;
+        const newGrid = cloneGrid(currentGrid);
+        const { type, targetPos } = interactionStateRef.current;
+        const cancelResult = theme?.executeInteraction?.(type, currentGS, newGrid, targetPos.x, targetPos.y, 'cancel');
+
+        // Only apply grid changes if onCancel actually returned something
+        if (cancelResult && cancelResult.modifyGrid) {
+          gridRef.current = newGrid; // Update ref IMMEDIATELY to prevent race condition with moveEntities
+          setGrid(newGrid);
+        }
+      } catch (e) {
+        // onCancel is optional, ignore errors
+      }
+    }
+
     setInteractionState(null);
-  }, []);
+  }, [theme]);
 
   const handleMouseInteraction = useCallback((x, y) => {
     const pos = playerPosRef.current;
@@ -596,7 +633,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
       // Apply grid changes
       if (result.modifyGrid) {
+        console.log('[COMPLETE] Applying grid changes');
+        gridRef.current = newGrid; // Update ref IMMEDIATELY to prevent race condition with moveEntities
         setGrid(newGrid);
+      } else {
+        console.log('[COMPLETE] No grid changes to apply, modifyGrid=', result.modifyGrid);
       }
 
       // Apply inventory/state changes
@@ -1540,17 +1581,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   position: 'relative',
                 }}>
                   <InventoryIcon theme={theme} itemType={item.itemType} size={20} itemState={item} />
-                  <span style={{
-                    position: 'absolute',
-                    bottom: -6,
-                    right: -4,
-                    fontSize: 8,
-                    color: '#a8c8ff',
-                    background: 'rgba(34, 68, 120, 0.9)',
-                    padding: '1px 3px',
-                    borderRadius: 3,
-                    fontWeight: 'bold',
-                  }}>E</span>
                 </div>
               ))}
             </div>
@@ -1737,6 +1767,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             interactionProgress={(interactionState || mouseHoldState)?.progress || 0}
             interactionProgressColor={(interactionState || mouseHoldState)?.progressColor}
             theme={theme}
+            gameState={gameState}
           />
 
           {/* Inline interaction menu next to player */}

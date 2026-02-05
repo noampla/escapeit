@@ -111,8 +111,8 @@ export class ThemeLoader {
     return this.interactions?.getInteractionLabel?.(interactionId) || 'Interact...';
   }
 
-  executeInteraction(interactionId, gameState, grid, x, y) {
-    return this.interactions?.executeInteraction?.(interactionId, gameState, grid, x, y) || {
+  executeInteraction(interactionId, gameState, grid, x, y, phase = 'complete') {
+    return this.interactions?.executeInteraction?.(interactionId, gameState, grid, x, y, phase) || {
       success: false,
       error: 'Interaction not found'
     };
@@ -249,6 +249,16 @@ export class ThemeLoader {
   // === Entity Movement ===
   moveEntities(grid, gameState) {
     return this.tiles?.moveEntities?.(grid, gameState) || null;
+  }
+
+  // === Player Rendering ===
+
+  // Render player with theme-specific appearance based on worn items
+  renderPlayer(ctx, x, y, size, direction, gameState) {
+    if (this.tiles?.renderPlayer) {
+      return this.tiles.renderPlayer(ctx, x, y, size, direction, gameState);
+    }
+    return false; // Return false to use default player rendering
   }
 
   // === NEW: UI Theming ===

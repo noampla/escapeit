@@ -428,6 +428,222 @@ export const INTERACTIONS = {
     }
   },
 
+  'poison-guard': {
+    label: 'Use Poison on Guard',
+    duration: 2000,
+    progressColor: '#884499',
+    requirements: {
+      inventory: ['poison'],
+      // Custom check handles guard detection and positioning
+    },
+    // Return the guard's position for visual progress bar
+    getVisualTarget: (gameState, grid, x, y) => {
+      const directions = [
+        { dx: 0, dy: -1, dir: 'up' },
+        { dx: 0, dy: 1, dir: 'down' },
+        { dx: -1, dy: 0, dir: 'left' },
+        { dx: 1, dy: 0, dir: 'right' }
+      ];
+
+      for (const { dx, dy, dir } of directions) {
+        const gx = x + dx;
+        const gy = y + dy;
+
+        if (gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[0].length) continue;
+
+        const guardTile = grid[gy][gx];
+        if (guardTile.type !== 'guard') continue;
+        if (guardTile.config?.asleep) continue;
+
+        const guardDirection = guardTile.config?.direction || 'right';
+        const isBehind = (guardDirection === dir);
+
+        if (isBehind) {
+          return { x: gx, y: gy };
+        }
+      }
+
+      return null;
+    },
+    // Custom check: find nearby guard where player is behind them
+    checkCustom: (gameState, tile, grid, x, y) => {
+      // This is called for the player's position (x, y)
+      // We need to check adjacent tiles for guards
+      const directions = [
+        { dx: 0, dy: -1, dir: 'up' },
+        { dx: 0, dy: 1, dir: 'down' },
+        { dx: -1, dy: 0, dir: 'left' },
+        { dx: 1, dy: 0, dir: 'right' }
+      ];
+
+      for (const { dx, dy, dir } of directions) {
+        const gx = x + dx;
+        const gy = y + dy;
+
+        // Check bounds
+        if (gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[0].length) continue;
+
+        const guardTile = grid[gy][gx];
+
+        // Check if it's a guard
+        if (guardTile.type !== 'guard') continue;
+
+        // Skip sleeping guards
+        if (guardTile.config?.asleep) continue;
+
+        // Check if player is behind the guard
+        const guardDirection = guardTile.config?.direction || 'right';
+
+        // Player is behind if the direction from player to guard is the SAME as guard's facing direction
+        // Example: Guard faces RIGHT, player is to the LEFT → dir='right' (player→guard) = BEHIND
+        // Example: Guard faces RIGHT, player is to the RIGHT → dir='left' (player→guard) = FRONT (blocked)
+        const isBehind = (guardDirection === dir);
+
+        if (isBehind) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+    // Called when interaction starts (E key pressed)
+    onStart: (gameState, grid, x, y) => {
+      // Find the target guard again
+      const directions = [
+        { dx: 0, dy: -1, dir: 'up' },
+        { dx: 0, dy: 1, dir: 'down' },
+        { dx: -1, dy: 0, dir: 'left' },
+        { dx: 1, dy: 0, dir: 'right' }
+      ];
+
+      for (const { dx, dy, dir } of directions) {
+        const gx = x + dx;
+        const gy = y + dy;
+
+        if (gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[0].length) continue;
+
+        const guardTile = grid[gy][gx];
+        if (guardTile.type !== 'guard' || guardTile.config?.asleep) continue;
+
+        const guardDirection = guardTile.config?.direction || 'right';
+        const isBehind = (guardDirection === dir);
+
+        if (isBehind) {
+          // Immediately freeze the guard by setting poisoning flag (not asleep yet!)
+          grid[gy][gx] = {
+            ...guardTile,
+            config: {
+              ...guardTile.config,
+              poisoning: true
+            }
+          };
+
+          return {
+            success: true,
+            modifyGrid: true
+          };
+        }
+      }
+
+      return { success: false };
+    },
+    // Called when interaction is cancelled (E key released early)
+    onCancel: (gameState, grid, x, y) => {
+      // Find the guard that is being poisoned (has poisoning flag set)
+      const directions = [
+        { dx: 0, dy: -1 },
+        { dx: 0, dy: 1 },
+        { dx: -1, dy: 0 },
+        { dx: 1, dy: 0 }
+      ];
+
+      for (const { dx, dy } of directions) {
+        const gx = x + dx;
+        const gy = y + dy;
+
+        if (gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[0].length) continue;
+
+        const guardTile = grid[gy][gx];
+        if (guardTile?.type === 'guard' && guardTile.config?.poisoning) {
+          // Resume guard movement by removing poisoning flag
+          grid[gy][gx] = {
+            ...guardTile,
+            config: {
+              ...guardTile.config,
+              poisoning: false
+            }
+          };
+
+          return {
+            success: true,
+            modifyGrid: true
+          };
+        }
+      }
+
+      return { success: false };
+    },
+    execute: (gameState, grid, x, y) => {
+      console.log('[POISON] Execute called at', x, y);
+
+      // Check if player has poison
+      const poisonIdx = gameState.inventory.findIndex(item => item.itemType === 'poison');
+      if (poisonIdx === -1) {
+        console.log('[POISON] No poison in inventory');
+        return { success: false, error: 'Need poison bottle!' };
+      }
+
+      // Find the guard that is being poisoned (has poisoning flag set)
+      // Search entire grid in case guard moved during interaction
+      let guardPos = null;
+      const GRID_ROWS = grid.length;
+      const GRID_COLS = grid[0]?.length || 0;
+
+      for (let gy = 0; gy < GRID_ROWS; gy++) {
+        for (let gx = 0; gx < GRID_COLS; gx++) {
+          const tile = grid[gy][gx];
+          if (tile.type === 'guard' && tile.config?.poisoning) {
+            guardPos = { x: gx, y: gy };
+            console.log('[POISON] Found poisoning guard at', gx, gy);
+            break;
+          }
+        }
+        if (guardPos) break;
+      }
+
+      if (!guardPos) {
+        console.log('[POISON] No poisoning guard found on grid');
+        return { success: false, error: 'Guard escaped!' };
+      }
+
+      const guardTile = grid[guardPos.y][guardPos.x];
+      console.log('[POISON] Guard before sleep:', guardTile.config);
+
+      // Put guard to sleep permanently (remove poisoning flag, add asleep)
+      grid[guardPos.y][guardPos.x] = {
+        ...guardTile,
+        config: {
+          ...guardTile.config,
+          poisoning: false,
+          asleep: true
+        }
+      };
+
+      console.log('[POISON] Guard after sleep:', grid[guardPos.y][guardPos.x].config);
+
+      // Remove poison from inventory
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== poisonIdx);
+
+      console.log('[POISON] Returning success with modifyGrid=true');
+      return {
+        success: true,
+        message: '💤 Guard knocked out with poison!',
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
 };
 
 // Check if requirements are met
@@ -510,7 +726,7 @@ export function getInteractionLabel(interactionId) {
 }
 
 // Execute an interaction
-export function executeInteraction(interactionId, gameState, grid, x, y) {
+export function executeInteraction(interactionId, gameState, grid, x, y, phase = 'complete') {
   const interaction = INTERACTIONS[interactionId];
   if (!interaction) {
     return { success: false, error: 'Unknown interaction' };
@@ -521,6 +737,24 @@ export function executeInteraction(interactionId, gameState, grid, x, y) {
     return { success: false, error: 'Invalid position' };
   }
 
+  // Handle interaction lifecycle phases
+  if (phase === 'start') {
+    if (interaction.onStart) {
+      return interaction.onStart(gameState, grid, x, y);
+    }
+    // No onStart handler - return null so SolverMode knows to ignore it
+    return null;
+  }
+
+  if (phase === 'cancel') {
+    if (interaction.onCancel) {
+      return interaction.onCancel(gameState, grid, x, y);
+    }
+    // No onCancel handler - return null so SolverMode knows to ignore it
+    return null;
+  }
+
+  // Default phase: 'complete'
   // Check requirements
   if (!checkRequirements(interaction.requirements, gameState, tile, interaction, grid, x, y)) {
     return { success: false, error: 'Requirements not met' };

@@ -224,6 +224,17 @@ export const TILE_TYPES = {
     pickable: false // Can't pick up with F - must collect with E into bag
   },
 
+  // Poison bottle item tile
+  'item-poison': {
+    label: 'Poison Bottle',
+    color: '#884499',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'poison',
+    tooltip: 'Knocks out guards. Press F to pick up, then E on a guard to use.',
+    walkable: true
+  },
+
   // Walking Guard
   guard: {
     label: 'Guard',
@@ -951,12 +962,53 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Poison bottle item tile
+  if (tile.type === 'item-poison') {
+    // Bottle body (glass - purple tint)
+    ctx.fillStyle = '#aa88cc';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.05, size * 0.15, size * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bottle neck
+    ctx.fillStyle = '#9977bb';
+    ctx.fillRect(cx - size * 0.08, cy - size * 0.2, size * 0.16, size * 0.15);
+
+    // Cork/cap
+    ctx.fillStyle = '#553333';
+    ctx.fillRect(cx - size * 0.09, cy - size * 0.25, size * 0.18, size * 0.05);
+
+    // Skull symbol on bottle (danger)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy + size * 0.05, size * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Skull eye sockets
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.04, cy + size * 0.02, size * 0.02, 0, Math.PI * 2);
+    ctx.arc(cx + size * 0.04, cy + size * 0.02, size * 0.02, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Skull nose
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + size * 0.06);
+    ctx.lineTo(cx - size * 0.02, cy + size * 0.1);
+    ctx.lineTo(cx + size * 0.02, cy + size * 0.1);
+    ctx.closePath();
+    ctx.fill();
+
+    return true;
+  }
+
   // Guard
   if (tile.type === 'guard') {
     const direction = tile.config?.direction || 'right';
+    const isAsleep = tile.config?.asleep || false;
 
-    // Guard body (blue uniform)
-    ctx.fillStyle = '#2244aa';
+    // Guard body (blue uniform, darker if asleep)
+    ctx.fillStyle = isAsleep ? '#1a3388' : '#2244aa';
     ctx.beginPath();
     ctx.ellipse(cx, cy + size * 0.15, size * 0.25, size * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -968,7 +1020,7 @@ export function renderTile(ctx, tile, cx, cy, size) {
     ctx.fill();
 
     // Cap
-    ctx.fillStyle = '#1a3388';
+    ctx.fillStyle = isAsleep ? '#0d1a44' : '#1a3388';
     ctx.beginPath();
     ctx.ellipse(cx, cy - size * 0.22, size * 0.16, size * 0.08, 0, 0, Math.PI);
     ctx.fill();
@@ -979,23 +1031,32 @@ export function renderTile(ctx, tile, cx, cy, size) {
     ctx.arc(cx - size * 0.08, cy + size * 0.05, size * 0.06, 0, Math.PI * 2);
     ctx.fill();
 
-    // Direction indicator (facing arrow)
-    ctx.save();
-    ctx.translate(cx, cy);
+    if (isAsleep) {
+      // Draw "Zzz" to indicate sleeping
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${size * 0.3}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('💤', cx + size * 0.25, cy - size * 0.25);
+    } else {
+      // Direction indicator (facing arrow) - only if awake
+      ctx.save();
+      ctx.translate(cx, cy);
 
-    const rotations = { up: -Math.PI / 2, down: Math.PI / 2, left: Math.PI, right: 0 };
-    ctx.rotate(rotations[direction] || 0);
+      const rotations = { up: -Math.PI / 2, down: Math.PI / 2, left: Math.PI, right: 0 };
+      ctx.rotate(rotations[direction] || 0);
 
-    // Arrow
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(size * 0.3, 0);
-    ctx.lineTo(size * 0.15, -size * 0.08);
-    ctx.lineTo(size * 0.15, size * 0.08);
-    ctx.closePath();
-    ctx.fill();
+      // Arrow
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(size * 0.3, 0);
+      ctx.lineTo(size * 0.15, -size * 0.08);
+      ctx.lineTo(size * 0.15, size * 0.08);
+      ctx.closePath();
+      ctx.fill();
 
-    ctx.restore();
+      ctx.restore();
+    }
 
     return true;
   }
@@ -1186,6 +1247,12 @@ export function moveEntities(grid, gameState) {
   // Now move each guard
   for (const guard of guards) {
     const { x, y, tile } = guard;
+
+    // Skip asleep or poisoning guards - they don't move
+    if (tile.config?.asleep || tile.config?.poisoning) {
+      continue;
+    }
+
     const direction = tile.config?.direction || 'right';
     const dirData = GUARD_DIRECTIONS[direction];
 
@@ -1226,4 +1293,58 @@ export function moveEntities(grid, gameState) {
   }
 
   return anyMoved ? newGrid : null;
+}
+
+// === PLAYER RENDERING ===
+
+/**
+ * Render the player with visual indication of worn items
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} size - Tile size
+ * @param {string} direction - Player direction ('up', 'down', 'left', 'right')
+ * @param {Object} gameState - Current game state with worn items
+ */
+export function renderPlayer(ctx, x, y, size, direction, gameState = {}) {
+  const worn = gameState.worn || {};
+
+  // Check if wearing guard uniform
+  const wearingUniform = worn.body === 'uniform';
+
+  if (wearingUniform) {
+    // Render player as guard (blue uniform)
+
+    // Guard body (blue uniform)
+    ctx.fillStyle = '#2244aa';
+    ctx.beginPath();
+    ctx.ellipse(x, y + size * 0.15, size * 0.25, size * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Guard head
+    ctx.fillStyle = '#ffcc99';
+    ctx.beginPath();
+    ctx.arc(x, y - size * 0.15, size * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cap
+    ctx.fillStyle = '#1a3388';
+    ctx.beginPath();
+    ctx.ellipse(x, y - size * 0.22, size * 0.16, size * 0.08, 0, 0, Math.PI);
+    ctx.fill();
+
+    // Badge
+    ctx.fillStyle = '#ffdd00';
+    ctx.beginPath();
+    ctx.arc(x - size * 0.08, y + size * 0.05, size * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Render default player (civilian)
+    ctx.font = `${size * 0.65}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🧑', x, y);
+  }
+
+  return true; // Return true to indicate custom rendering was done
 }

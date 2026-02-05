@@ -68,6 +68,12 @@ export const ITEM_TYPES = {
     emoji: null, // Custom rendered
     color: '#55aa55',
     description: 'Cold hard cash. Requires equipped bag to collect.'
+  },
+  poison: {
+    label: 'Poison Bottle',
+    emoji: null, // Custom rendered
+    color: '#884499',
+    description: 'Use on guards to knock them out. Press E on a guard.'
   }
 };
 
@@ -410,6 +416,49 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     // Amount text in bright green
     ctx.fillStyle = '#66ff66';
     ctx.fillText(amountText, cx, textY);
+
+    return true;
+  }
+
+  // Poison bottle item (in inventory)
+  if (itemType === 'poison') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Bottle body (glass - purple tint)
+    ctx.fillStyle = '#aa88cc';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.05, size * 0.15, size * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bottle neck
+    ctx.fillStyle = '#9977bb';
+    ctx.fillRect(cx - size * 0.08, cy - size * 0.2, size * 0.16, size * 0.15);
+
+    // Cork/cap
+    ctx.fillStyle = '#553333';
+    ctx.fillRect(cx - size * 0.09, cy - size * 0.25, size * 0.18, size * 0.05);
+
+    // Skull symbol on bottle (danger)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy + size * 0.05, size * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Skull eye sockets
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.04, cy + size * 0.02, size * 0.02, 0, Math.PI * 2);
+    ctx.arc(cx + size * 0.04, cy + size * 0.02, size * 0.02, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Skull nose
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + size * 0.06);
+    ctx.lineTo(cx - size * 0.02, cy + size * 0.1);
+    ctx.lineTo(cx + size * 0.02, cy + size * 0.1);
+    ctx.closePath();
+    ctx.fill();
 
     return true;
   }

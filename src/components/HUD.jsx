@@ -159,7 +159,6 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
           {inventory.map((item, i) => {
             // Use theme's getItemLabel for proper labeling (handles state like filled/empty, colors)
             const label = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
-            const isWearable = theme?.isItemWearable?.(item.itemType);
             return (
               <div key={i} style={{
                 color: '#ffffff',
@@ -175,18 +174,6 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
               }}>
                 <InventoryItemIcon itemType={item.itemType} itemState={item} />
                 <span style={{ flex: 1 }}>{label}</span>
-                {isWearable && (
-                  <span style={{
-                    color: '#aaddff',
-                    fontSize: 10,
-                    fontFamily: 'monospace',
-                    background: 'rgba(100, 150, 200, 0.2)',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                  }}>
-                    T:wear
-                  </span>
-                )}
               </div>
             );
           })}
@@ -244,16 +231,6 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
               }}>
                 <InventoryItemIcon itemType={itemType} itemState={{}} />
                 <span style={{ flex: 1 }}>{label}</span>
-                <span style={{
-                  color: '#ffaa88',
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                  background: 'rgba(200, 100, 50, 0.2)',
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                }}>
-                  T:remove
-                </span>
               </div>
             );
           })}

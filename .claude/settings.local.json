@@ -5,7 +5,8 @@
       "Bash(timeout:*)",
       "Bash(npx firebase login)",
       "Bash(npx firebase:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(node -c:*)"
     ]
   }
 }

@@ -17,7 +17,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {} }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -168,12 +168,21 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
     // Player
     if (playerPos) {
       const ppx = (playerPos.x - offsetX) * TILE_SIZE, ppy = (playerPos.y - offsetY) * TILE_SIZE;
-      ctx.font = '26px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🧑', ppx + TILE_SIZE / 2, ppy + TILE_SIZE / 2);
+      const centerX = ppx + TILE_SIZE / 2;
+      const centerY = ppy + TILE_SIZE / 2;
 
-      // Direction indicator
+      // Try theme-specific player rendering first
+      const themeRendered = theme?.renderPlayer?.(ctx, centerX, centerY, TILE_SIZE, playerDirection, gameState);
+
+      if (!themeRendered) {
+        // Default player rendering (emoji)
+        ctx.font = '26px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🧑', centerX, centerY);
+      }
+
+      // Direction indicator (always show for both default and theme-rendered players)
       const dirOffsets = {
         up: { x: 0, y: -8 },
         down: { x: 0, y: 8 },
@@ -181,8 +190,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
         right: { x: 8, y: 0 },
       };
       const offset = dirOffsets[playerDirection] || dirOffsets.down;
-      const arrowX = ppx + TILE_SIZE / 2 + offset.x;
-      const arrowY = ppy + TILE_SIZE / 2 + offset.y;
+      const arrowX = centerX + offset.x;
+      const arrowY = centerY + offset.y;
 
       ctx.fillStyle = 'rgba(255, 255, 100, 0.9)';
       ctx.beginPath();
@@ -211,7 +220,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState]);
 
   useEffect(() => {
     draw();
