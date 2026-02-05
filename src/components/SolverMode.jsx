@@ -10,6 +10,7 @@ import { InteractionEngine } from '../engine/interactionEngine';
 import { useUser } from '../contexts/UserContext.jsx';
 import { submitScore } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
+import soundManager from '../engine/soundManager.js';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -166,6 +167,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [startTime, setStartTime] = useState(Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [inlineMenu, setInlineMenu] = useState(null); // { actions: [{label, action, key}] }
+  const [soundEnabled, setSoundEnabled] = useState(() => soundManager.enabled);
 
   const messageTimerRef = useRef(null);
   const gridRef = useRef(grid);
@@ -202,11 +204,18 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     setPlayerPos({ ...startPos });
   }, [startPos]);
 
+  const toggleSound = useCallback(() => {
+    const newEnabled = soundManager.toggle();
+    setSoundEnabled(newEnabled);
+  }, []);
+
   const loseLife = useCallback(() => {
     const newLives = livesRef.current - 1;
     setLives(newLives);
+    soundManager.play('damage');
     if (newLives <= 0) {
       setGameOver('fail');
+      soundManager.play('lose');
       showMessage('GAME OVER', 999999);
       return 0;
     }
@@ -274,6 +283,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }));
     const ITEM_TYPES = theme?.getItemTypes() || {};
     const itemDef = ITEM_TYPES[dropped.itemType];
+    soundManager.play('drop');
     showMessage(`Dropped: ${itemDef?.emoji || ''} ${itemDef?.label || dropped.itemType}`);
     setDropMenuOpen(false);
   }, [showMessage, theme]);
@@ -345,6 +355,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }));
     // Get item label from theme
     const itemLabel = theme?.getItemLabel?.(itemType, itemObj) || itemType;
+    soundManager.play('pickup');
     // Show special message for wearable items
     if (theme?.isWearable?.(itemType)) {
       showMessage(`Picked up: ${itemLabel} (Press E to wear)`);
@@ -395,6 +406,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   }, [interactableTiles]);
 
   const startInteraction = useCallback((type, targetPos, progressColor = null, duration = null) => {
+    soundManager.play('interact');
+    soundManager.startProgress();
     setInteractionState({
       type,
       startTime: Date.now(),
@@ -406,6 +419,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   }, []);
 
   const cancelInteraction = useCallback(() => {
+    soundManager.stopProgress();
     setInteractionState(null);
   }, []);
 
@@ -485,6 +499,10 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const result = theme?.executeInteraction?.(interactionType, tempGameState, newGrid, targetPos.x, targetPos.y);
 
     if (result?.success) {
+      // Play interaction-specific sound (theme can define custom sounds per interaction)
+      const interactionSound = result.sound || theme?.getInteractionSound?.(interactionType) || 'interactComplete';
+      soundManager.play(interactionSound);
+
       // Apply grid changes
       if (result.modifyGrid) {
         setGrid(newGrid);
@@ -506,6 +524,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         showMessage(result.message);
       }
     } else if (result?.error) {
+      soundManager.play('blocked');
       showMessage(result.error);
     }
 
@@ -565,6 +584,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
     }
 
+    soundManager.play('blocked');
     showMessage('No item here to pick up. Stand on an item and press F.');
   }, [showMessage, pickUpItem, theme, maxInventory]);
 
@@ -599,6 +619,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Skip item pickups - those use F key now
       if (c.type.startsWith('item-')) {
         if (possibleActions.length === 0) {
+          soundManager.play('blocked');
           showMessage('Press F to pick up items.');
           return;
         }
@@ -619,6 +640,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
 
     if (possibleActions.length === 0) {
+      soundManager.play('blocked');
       showMessage('Nothing to interact with here.');
       return;
     }
@@ -665,7 +687,10 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const prev = playerPosRef.current;
     const nx = prev.x + d.dx, ny = prev.y + d.dy;
 
-    if (nx < 0 || nx >= GRID_COLS || ny < 0 || ny >= GRID_ROWS) return;
+    if (nx < 0 || nx >= GRID_COLS || ny < 0 || ny >= GRID_ROWS) {
+      soundManager.play('blocked');
+      return;
+    }
 
     const currentGrid = gridRef.current;
     const targetCell = currentGrid[ny][nx];
@@ -719,6 +744,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
       // Handle blocked movement with message
       if (!moveResult.allowed) {
+        soundManager.play('blocked');
         if (moveResult.message) {
           showMessage(moveResult.message);
         }
@@ -726,6 +752,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
 
       // Movement allowed by theme
+      soundManager.play('walk');
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
 
@@ -743,6 +770,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     // Fallback: use standard canMoveTo check if theme doesn't handle this tile
     if (canMoveTo(currentGrid, nx, ny)) {
+      soundManager.play('walk');
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
       revealTargetTile();
@@ -1018,12 +1046,16 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       const duration = interactionState.duration || INTERACTION_DURATION;
       const progress = Math.min(elapsed / duration, 1);
 
+      // Update progress sound pitch
+      soundManager.updateProgress(progress);
+
       setInteractionState(prev => {
         if (!prev) return null;
         return { ...prev, progress };
       });
 
       if (progress >= 1) {
+        soundManager.stopProgress();
         completeInteraction(interactionState.type, interactionState.targetPos);
       }
     }, 16);
@@ -1143,6 +1175,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     if (allComplete) {
       setGameState(prev => ({ ...prev, reachedExit: true }));
       setGameOver('win');
+      soundManager.play('win');
       showMessage('YOU ESCAPED!', 999999);
 
       // Submit score to leaderboard (only for named users, not in test mode)
@@ -1528,14 +1561,16 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 20,
+        gap: 24,
       }}>
         <div style={{
           color: '#a8e8a8',
           fontSize: 12,
           fontFamily: 'monospace',
           display: 'flex',
-          gap: 20,
+          gap: 16,
+          flexWrap: 'wrap',
+          justifyContent: 'center',
         }}>
           <span><strong>WASD/Arrows:</strong> Move</span>
           <span><strong>E:</strong> Interact</span>
@@ -1543,6 +1578,28 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           <span><strong>Q:</strong> Drop Item</span>
           <span><strong>R:</strong> Restart</span>
         </div>
+        <button
+          onClick={toggleSound}
+          style={{
+            background: 'rgba(40, 55, 40, 0.6)',
+            border: '1px solid rgba(68, 170, 68, 0.3)',
+            borderRadius: 8,
+            padding: '6px 10px',
+            color: soundEnabled ? '#a8e8a8' : '#888888',
+            fontSize: 12,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            transition: 'all 0.2s',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(50, 70, 50, 0.8)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(40, 55, 40, 0.6)'}
+          title={soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+        >
+          <span>{soundEnabled ? '🔊' : '🔇'}</span>
+        </button>
       </div>
 
       {/* Drop menu */}

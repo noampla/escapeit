@@ -1,4 +1,6 @@
 // Theme Loader - Dynamically loads theme modules
+import soundManager from './soundManager.js';
+
 export class ThemeLoader {
   constructor(themeId) {
     this.themeId = themeId;
@@ -7,6 +9,7 @@ export class ThemeLoader {
     this.items = null;
     this.interactions = null;
     this.hazards = null;
+    this.sounds = null;
   }
 
   async load() {
@@ -23,6 +26,22 @@ export class ThemeLoader {
       this.items = itemsModule;
       this.interactions = interactionsModule;
       this.hazards = hazardsModule;
+
+      // Try to load theme-specific sounds (optional module)
+      try {
+        const soundsModule = await import(`../../themes/${this.themeId}/sounds.js`);
+        this.sounds = soundsModule;
+        // Register theme sounds with soundManager
+        soundManager.setThemeSounds({
+          themeId: this.themeId,
+          basePath: soundsModule.SOUNDS_PATH || `/themes/${this.themeId}/sounds/`,
+          sounds: soundsModule.SOUNDS || {}
+        });
+      } catch {
+        // No sounds.js for this theme - use engine defaults
+        this.sounds = null;
+        soundManager.clearThemeSounds();
+      }
 
       return this;
     } catch (error) {
@@ -314,6 +333,63 @@ export class ThemeLoader {
       return this.interactions.customPickup(gameState, grid, playerPos, direction, maxInventory);
     }
     return null;
+  }
+
+  // === Sound Methods ===
+
+  /**
+   * Play a sound effect
+   * Checks theme-specific sounds first, falls back to engine defaults
+   *
+   * @param {string} soundType - Sound type (walk, blocked, pickup, drop, interact, etc.)
+   * @param {Object} options - Optional: { volume, playbackRate }
+   */
+  playSound(soundType, options = {}) {
+    soundManager.play(soundType, options);
+  }
+
+  /**
+   * Get the sound to play for a specific interaction
+   * Themes can define custom sounds per interaction in INTERACTION_SOUNDS
+   */
+  getInteractionSound(interactionId) {
+    return this.sounds?.INTERACTION_SOUNDS?.[interactionId] || 'interactComplete';
+  }
+
+  /**
+   * Play the sound associated with an interaction completion
+   */
+  playInteractionSound(interactionId, options = {}) {
+    const soundType = this.getInteractionSound(interactionId);
+    soundManager.play(soundType, options);
+  }
+
+  /**
+   * Check if sounds are enabled
+   */
+  isSoundEnabled() {
+    return soundManager.enabled;
+  }
+
+  /**
+   * Toggle sounds on/off
+   */
+  toggleSound() {
+    return soundManager.toggle();
+  }
+
+  /**
+   * Set sound enabled state
+   */
+  setSoundEnabled(enabled) {
+    soundManager.setEnabled(enabled);
+  }
+
+  /**
+   * Set master volume
+   */
+  setSoundVolume(volume) {
+    soundManager.setVolume(volume);
   }
 }
 
