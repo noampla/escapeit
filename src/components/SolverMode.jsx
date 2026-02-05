@@ -239,6 +239,21 @@ export default function SolverMode({ level, onBack }) {
 
     const pos = playerPosRef.current;
     const currentGrid = gridRef.current;
+    const dropped = inv[index];
+    const playerDir = playerDirectionRef.current;
+
+    // Check if theme has custom drop handler for this item
+    const customResult = theme?.customDrop?.(dropped, gameStateRef.current, currentGrid, pos, playerDir);
+    if (customResult?.handled) {
+      if (customResult.newGrid) setGrid(customResult.newGrid);
+      if (customResult.newInventory !== undefined) {
+        setGameState(prev => ({ ...prev, inventory: customResult.newInventory }));
+      }
+      if (customResult.message) showMessage(customResult.message);
+      setDropMenuOpen(false);
+      return;
+    }
+
     const cell = currentGrid[pos.y][pos.x];
     // Allow dropping on ground-type tiles (uses theme's ground tiles)
     if (!groundTiles.includes(cell.type)) {
@@ -246,7 +261,6 @@ export default function SolverMode({ level, onBack }) {
       return;
     }
 
-    const dropped = inv[index];
     const newGrid = cloneGrid(currentGrid);
     newGrid[pos.y][pos.x] = { type: `item-${dropped.itemType}`, config: {} };
     setGrid(newGrid);
@@ -498,7 +512,19 @@ export default function SolverMode({ level, onBack }) {
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
     const pos = playerPosRef.current;
+    const playerDir = playerDirectionRef.current;
     const currentCell = currentGrid[pos.y][pos.x];
+
+    // Check if theme has custom pickup handler
+    const customResult = theme?.customPickup?.(currentGS, currentGrid, pos, playerDir, maxInventory);
+    if (customResult?.handled) {
+      if (customResult.newGrid) setGrid(customResult.newGrid);
+      if (customResult.newInventory !== undefined) {
+        setGameState(prev => ({ ...prev, inventory: customResult.newInventory }));
+      }
+      if (customResult.message) showMessage(customResult.message);
+      return;
+    }
 
     // Check if standing on an item
     if (currentCell.type.startsWith('item-')) {
@@ -534,7 +560,7 @@ export default function SolverMode({ level, onBack }) {
     }
 
     showMessage('No item here to pick up. Stand on an item and press F.');
-  }, [showMessage, pickUpItem, theme]);
+  }, [showMessage, pickUpItem, theme, maxInventory]);
 
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;

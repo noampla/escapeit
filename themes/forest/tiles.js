@@ -27,7 +27,7 @@ export const TILE_TYPES = {
     label: 'Water',
     color: '#2266aa',
     category: 'basic',
-    tooltip: 'Blocks movement. Use Rope + Wood nearby (hold E) to build a raft. Use Bucket nearby (hold E) to fill it.',
+    tooltip: 'Blocks movement. Build a raft (hold E with Rope + Wood), then face water and press Q to place it.',
     walkable: false
   },
   snow: {
@@ -41,7 +41,7 @@ export const TILE_TYPES = {
     label: 'Raft',
     color: '#6699aa',
     category: null,
-    tooltip: 'Walkable water (created by building a raft).',
+    tooltip: 'Walkable water. Face it and press F to pick up, Q to place on water.',
     walkable: true
   },
   campfire: {
@@ -133,7 +133,7 @@ export const TILE_TYPES = {
     category: 'interactive',
     isItemTile: true,
     itemType: 'raft',
-    tooltip: 'Collectible raft. Press F to pick up. Place on water to travel.',
+    tooltip: 'Collectible raft. Press F to pick up. Face water and press Q to place.',
     walkable: true
   },
 
@@ -299,8 +299,8 @@ export function getTileEmoji(tileType) {
 
 // === TILE CLASSIFICATIONS ===
 
-// Tiles that items can be dropped on
-export const GROUND_TILES = ['ground', 'campfire', 'raft', 'floor', 'start'];
+// Tiles that items can be dropped on (raft excluded - can't drop items while on water)
+export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start'];
 
 // Tiles player can interact with (E key)
 export const INTERACTABLE_TILES = ['tree', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];

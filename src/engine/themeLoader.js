@@ -297,6 +297,24 @@ export class ThemeLoader {
   getWearableEffects(itemType) {
     return this.items?.WEARABLES?.[itemType]?.effects || {};
   }
+
+  // Custom drop handler - allows theme to handle special item drops (e.g., raft on adjacent water)
+  // Returns { handled: true, newGrid, newInventory, message } if theme handles it, null otherwise
+  customDrop(itemObj, gameState, grid, playerPos, direction) {
+    if (this.interactions?.customDrop) {
+      return this.interactions.customDrop(itemObj, gameState, grid, playerPos, direction);
+    }
+    return null;
+  }
+
+  // Custom pickup handler - allows theme to handle special pickups (e.g., raft tile -> water)
+  // Returns { handled: true, newGrid, newInventory, message } if theme handles it, null otherwise
+  customPickup(gameState, grid, playerPos, direction, maxInventory) {
+    if (this.interactions?.customPickup) {
+      return this.interactions.customPickup(gameState, grid, playerPos, direction, maxInventory);
+    }
+    return null;
+  }
 }
 
 export default ThemeLoader;

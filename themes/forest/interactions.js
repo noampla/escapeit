@@ -88,52 +88,6 @@ export const INTERACTIONS = {
     }
   },
 
-  'place-raft': {
-    label: 'Place Raft',
-    duration: 1000,
-    requirements: { inventory: ['raft'], tile: 'water' },
-    execute: (gameState, grid, x, y) => {
-      const raftIdx = findItemIndex(gameState.inventory, 'raft');
-
-      if (raftIdx === -1) {
-        return { success: false, message: 'No raft in inventory!' };
-      }
-
-      // Place raft on water
-      grid[y][x] = { type: 'raft', config: {} };
-
-      // Remove raft from inventory
-      gameState.inventory = gameState.inventory.filter((_, i) => i !== raftIdx);
-
-      return {
-        success: true,
-        message: 'Raft placed! You can walk on it.',
-        modifyGrid: true,
-        modifyInventory: true
-      };
-    }
-  },
-
-  'pickup-raft': {
-    label: 'Pick Up Raft',
-    duration: 1000,
-    requirements: { tile: 'raft' },
-    execute: (gameState, grid, x, y) => {
-      // Remove raft from grid
-      grid[y][x] = { type: 'water', config: {} };
-
-      // Add raft to inventory
-      gameState.inventory.push({ itemType: 'raft', filled: false });
-
-      return {
-        success: true,
-        message: 'Picked up raft!',
-        modifyGrid: true,
-        modifyInventory: true
-      };
-    }
-  },
-
   'extinguish-fire': {
     label: 'Extinguish Fire',
     duration: 1500,
@@ -391,4 +345,114 @@ export function executeInteraction(interactionId, gameState, grid, x, y) {
 
   // Execute the interaction
   return interaction.execute(gameState, grid, x, y);
+}
+
+// === Custom Drop/Pickup Handlers for Raft ===
+
+// Direction to offset mapping
+const DIRECTION_OFFSETS = {
+  up: { dx: 0, dy: -1 },
+  down: { dx: 0, dy: 1 },
+  left: { dx: -1, dy: 0 },
+  right: { dx: 1, dy: 0 }
+};
+
+// Clone grid helper
+function cloneGrid(grid) {
+  return grid.map(row => row.map(cell => ({ ...cell, config: { ...cell.config } })));
+}
+
+// Custom drop handler - handles raft placement on adjacent water tile
+// Returns { handled: true, newGrid, newInventory, message } if handled, null otherwise
+export function customDrop(itemObj, gameState, grid, playerPos, direction) {
+  // Only handle raft drops
+  if (itemObj.itemType !== 'raft') {
+    return null; // Let default drop handle other items
+  }
+
+  // Get facing tile position
+  const offset = DIRECTION_OFFSETS[direction];
+  if (!offset) {
+    return { handled: true, message: "Face a direction to place the raft." };
+  }
+
+  const targetX = playerPos.x + offset.dx;
+  const targetY = playerPos.y + offset.dy;
+
+  // Check bounds
+  if (targetY < 0 || targetY >= grid.length || targetX < 0 || targetX >= grid[0].length) {
+    return { handled: true, message: "Can't place raft here - out of bounds." };
+  }
+
+  const targetTile = grid[targetY][targetX];
+
+  // Raft can only be placed on water
+  if (targetTile.type !== 'water') {
+    return { handled: true, message: "Face water to place the raft (Q)." };
+  }
+
+  // Place raft on water
+  const newGrid = cloneGrid(grid);
+  newGrid[targetY][targetX] = { type: 'raft', config: {} };
+
+  // Remove raft from inventory
+  const raftIdx = gameState.inventory.findIndex(item => item.itemType === 'raft');
+  const newInventory = gameState.inventory.filter((_, i) => i !== raftIdx);
+
+  return {
+    handled: true,
+    newGrid,
+    newInventory,
+    message: '🛶 Raft placed on water!'
+  };
+}
+
+// Custom pickup handler - handles raft pickup from adjacent raft tile
+// Returns { handled: true, newGrid, newInventory, message } if handled, null otherwise
+export function customPickup(gameState, grid, playerPos, direction, maxInventory) {
+  // Get facing tile position
+  const offset = DIRECTION_OFFSETS[direction];
+  if (!offset) {
+    return null; // No direction, let default pickup handle
+  }
+
+  const targetX = playerPos.x + offset.dx;
+  const targetY = playerPos.y + offset.dy;
+
+  // Check bounds
+  if (targetY < 0 || targetY >= grid.length || targetX < 0 || targetX >= grid[0].length) {
+    return null; // Out of bounds, let default pickup handle (will show no item message)
+  }
+
+  const targetTile = grid[targetY][targetX];
+
+  // Only handle raft tile pickup
+  if (targetTile.type !== 'raft') {
+    return null; // Not a raft, let default pickup handle
+  }
+
+  // Check if standing on the raft (can't pick up raft you're standing on)
+  const currentTile = grid[playerPos.y][playerPos.x];
+  if (currentTile.type === 'raft') {
+    return { handled: true, message: "Can't pick up raft while standing on it!" };
+  }
+
+  // Check inventory capacity
+  if (gameState.inventory.length >= maxInventory) {
+    return { handled: true, message: `Inventory full! (${maxInventory} items max) Press Q to drop items.` };
+  }
+
+  // Pick up raft - convert raft tile to water
+  const newGrid = cloneGrid(grid);
+  newGrid[targetY][targetX] = { type: 'water', config: {} };
+
+  // Add raft to inventory
+  const newInventory = [...gameState.inventory, { itemType: 'raft', filled: false }];
+
+  return {
+    handled: true,
+    newGrid,
+    newInventory,
+    message: '🛶 Picked up raft!'
+  };
 }
