@@ -171,6 +171,30 @@ export const TILE_TYPES = {
     itemType: 'drill',
     tooltip: 'Power drill. Pick up (F) and use to drill through vault doors.',
     walkable: true
+  },
+
+  // Bomb item tile (placed on ground)
+  'item-bomb': {
+    label: 'Bomb',
+    color: '#cc2222',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'bomb',
+    tooltip: 'Explosive bomb. Pick up (F) and place near vault doors. Use detonator to explode.',
+    walkable: true
+  },
+
+  // Detonator item tile
+  'item-detonator': {
+    label: 'Detonator',
+    color: '#ffcc00',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'detonator',
+    configurable: true,
+    defaultConfig: { minSafeDistance: 2, maxRange: 6 },
+    tooltip: 'Remote detonator. Pick up (F) and use (E) to detonate placed bombs. Stay at safe distance!',
+    walkable: true
   }
 };
 
@@ -215,6 +239,10 @@ export const CONFIG_HELP = {
   },
   laser: {
     direction: 'Direction the laser beam fires (perpendicular to the wall it is on).'
+  },
+  'item-detonator': {
+    minSafeDistance: 'Minimum distance from bomb to survive explosion (tiles).',
+    maxRange: 'Maximum distance from which detonator can trigger bomb (tiles).'
   }
 };
 
@@ -281,6 +309,22 @@ export const CONFIG_SCHEMA = {
       label: 'Direction',
       options: 'CAMERA_DIRECTIONS',
       default: 'down'
+    }
+  },
+  'item-detonator': {
+    minSafeDistance: {
+      type: 'number',
+      label: 'Min Safe Distance',
+      min: 1,
+      max: 10,
+      default: 2
+    },
+    maxRange: {
+      type: 'number',
+      label: 'Max Range',
+      min: 2,
+      max: 15,
+      default: 6
     }
   }
 };
@@ -662,6 +706,82 @@ export function renderTile(ctx, tile, cx, cy, size) {
     // Trigger
     ctx.fillStyle = '#222';
     ctx.fillRect(drillX - size * 0.1, drillY + size * 0.02, size * 0.08, size * 0.1);
+
+    return true;
+  }
+
+  // Bomb item tile
+  if (tile.type === 'item-bomb') {
+    // Bomb body (cylinder shape)
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.1, size * 0.22, size * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Red stripes
+    ctx.fillStyle = '#cc2222';
+    ctx.fillRect(cx - size * 0.18, cy - size * 0.05, size * 0.36, size * 0.08);
+    ctx.fillRect(cx - size * 0.18, cy + size * 0.12, size * 0.36, size * 0.08);
+
+    // Fuse/wire on top
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - size * 0.18);
+    ctx.quadraticCurveTo(cx + size * 0.15, cy - size * 0.3, cx + size * 0.1, cy - size * 0.38);
+    ctx.stroke();
+
+    // Blinking light
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.18, size * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Light glow
+    ctx.fillStyle = 'rgba(255, 68, 68, 0.3)';
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.18, size * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
+  // Detonator item tile
+  if (tile.type === 'item-detonator') {
+    // Detonator box body
+    ctx.fillStyle = '#333';
+    ctx.fillRect(cx - size * 0.2, cy - size * 0.15, size * 0.4, size * 0.35);
+
+    // Yellow warning stripes
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(cx - size * 0.2, cy - size * 0.15, size * 0.4, size * 0.06);
+    ctx.fillRect(cx - size * 0.2, cy + size * 0.14, size * 0.4, size * 0.06);
+
+    // Red button on top
+    ctx.fillStyle = '#cc0000';
+    ctx.beginPath();
+    ctx.arc(cx, cy + size * 0.02, size * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Button highlight
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.03, cy - size * 0.01, size * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Antenna
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.12, cy - size * 0.15);
+    ctx.lineTo(cx + size * 0.12, cy - size * 0.35);
+    ctx.stroke();
+
+    // Antenna tip
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.12, cy - size * 0.35, size * 0.03, 0, Math.PI * 2);
+    ctx.fill();
 
     return true;
   }

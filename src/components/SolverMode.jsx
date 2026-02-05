@@ -343,11 +343,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
     setGrid(newGrid);
 
-    // Preserve config properties like lockColor for any item
-    const itemObj = { itemType, filled: false };
-    if (cell.config?.lockColor) {
-      itemObj.lockColor = cell.config.lockColor;
-    }
+    // Preserve all config properties from tile to inventory item
+    const itemObj = { itemType, filled: false, ...cell.config }
     setGameState(prev => ({
       ...prev,
       inventory: [...prev.inventory, itemObj],
@@ -405,13 +402,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     return valid;
   }, [interactableTiles]);
 
-  const startInteraction = useCallback((type, targetPos, progressColor = null, duration = null) => {
+  const startInteraction = useCallback((type, targetPos, progressColor = null, duration = null, visualTargetPos = null) => {
     soundManager.play('interact');
     soundManager.startProgress();
     setInteractionState({
       type,
       startTime: Date.now(),
-      targetPos,
+      targetPos, // Position passed to execute function
+      visualTargetPos: visualTargetPos || targetPos, // Position for progress bar display
       progress: 0,
       progressColor,
       duration: duration || INTERACTION_DURATION,
@@ -499,6 +497,22 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const result = theme?.executeInteraction?.(interactionType, tempGameState, newGrid, targetPos.x, targetPos.y);
 
     if (result?.success) {
+      // Handle fatal interactions (instant death)
+      if (result.fatal) {
+        // Apply grid changes first (e.g., bomb explosion visuals)
+        if (result.modifyGrid) {
+          setGrid(newGrid);
+        }
+        // Show message and trigger game over
+        soundManager.play('explosion');
+        soundManager.play('lose');
+        setLives(0);
+        setGameOver('fail');
+        showMessage(result.message || 'You died!', 999999);
+        cancelInteraction();
+        return;
+      }
+
       // Play interaction-specific sound (theme can define custom sounds per interaction)
       const interactionSound = result.sound || theme?.getInteractionSound?.(interactionType) || 'interactComplete';
       soundManager.play(interactionSound);
@@ -601,9 +615,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Always check interactions at player's current position first (for self-targeted actions like wear/remove)
     const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y, true) || [];
     for (const interaction of selfInteractions) {
+      // For self-interactions, execute at player position but optionally show progress at visualTarget (e.g., bomb)
+      const execPos = { x: playerPos.x, y: playerPos.y };
+      const visualPos = interaction.visualTarget || execPos;
       possibleActions.push({
         label: interaction.label,
-        action: () => startInteraction(interaction.id, { x: playerPos.x, y: playerPos.y }, interaction.progressColor, interaction.duration),
+        action: () => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos),
       });
     }
 
@@ -630,9 +647,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         for (const interaction of targetInteractions) {
           // Avoid duplicates
           if (!possibleActions.find(a => a.label === interaction.label)) {
+            // For facing tile interactions, execute at the facing tile, show progress there too
+            const execPos = p;
+            const visualPos = interaction.visualTarget || p;
             possibleActions.push({
               label: interaction.label,
-              action: () => startInteraction(interaction.id, p, interaction.progressColor, interaction.duration),
+              action: () => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos),
             });
           }
         }
@@ -968,7 +988,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Get interactions at target tile
       const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
       for (const interaction of targetInteractions) {
-        possibleActions.push(() => startInteraction(interaction.id, p, interaction.progressColor, interaction.duration));
+        const execPos = p;
+        const visualPos = interaction.visualTarget || p;
+        possibleActions.push(() => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos));
       }
 
       // Also check interactions at player's current position
@@ -976,7 +998,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       for (const interaction of selfInteractions) {
         // Avoid duplicates by checking if we already have this interaction type
         if (!targetInteractions.find(t => t.id === interaction.id)) {
-          possibleActions.push(() => startInteraction(interaction.id, { x: pos.x, y: pos.y }, interaction.progressColor, interaction.duration));
+          const execPos = { x: pos.x, y: pos.y };
+          const visualPos = interaction.visualTarget || execPos;
+          possibleActions.push(() => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos));
         }
       }
 
@@ -1471,7 +1495,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             viewportBounds={viewportBounds}
             onHoldStart={handleMouseInteraction}
             onHoldEnd={() => setMouseHoldState(null)}
-            interactionTarget={(interactionState || mouseHoldState)?.targetPos}
+            interactionTarget={(interactionState || mouseHoldState)?.visualTargetPos || (interactionState || mouseHoldState)?.targetPos}
             interactionProgress={(interactionState || mouseHoldState)?.progress || 0}
             interactionProgressColor={(interactionState || mouseHoldState)?.progressColor}
             theme={theme}

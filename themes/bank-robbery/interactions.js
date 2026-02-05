@@ -190,6 +190,148 @@ export const INTERACTIONS = {
     }
   },
 
+  'place-bomb': {
+    label: 'Place Bomb',
+    duration: 800,
+    progressColor: '#cc2222', // Red progress bar
+    requirements: { tileAny: ['floor', 'start', 'exit'], facingOnly: true },
+    checkCustom: (gameState) => {
+      return gameState.inventory?.some(item => item.itemType === 'bomb');
+    },
+    execute: (gameState, grid, x, y) => {
+      const bombIdx = gameState.inventory.findIndex(item => item.itemType === 'bomb');
+      if (bombIdx === -1) {
+        return { success: false, error: 'No bomb in inventory!' };
+      }
+
+      // Place bomb on target tile
+      grid[y][x] = { type: 'item-bomb', config: {} };
+
+      // Remove bomb from inventory
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== bombIdx);
+
+      return {
+        success: true,
+        message: 'Bomb placed. Get to safe distance and detonate!',
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
+  'detonate': {
+    label: 'Detonate',
+    duration: 500,
+    progressColor: '#ffcc00', // Yellow progress bar
+    requirements: { anyTile: true },
+    checkCustom: (gameState) => {
+      return gameState.inventory?.some(item => item.itemType === 'detonator');
+    },
+    // Find the closest bomb to show progress on
+    getVisualTarget: (gameState, grid, playerX, playerY) => {
+      const detonator = gameState.inventory?.find(item => item.itemType === 'detonator');
+      const maxRange = detonator?.maxRange ?? 6;
+
+      let closestBomb = null;
+      let closestDistance = Infinity;
+
+      for (let gy = 0; gy < grid.length; gy++) {
+        for (let gx = 0; gx < grid[gy].length; gx++) {
+          if (grid[gy][gx].type === 'item-bomb') {
+            const distance = Math.abs(gx - playerX) + Math.abs(gy - playerY);
+            if (distance <= maxRange && distance < closestDistance) {
+              closestDistance = distance;
+              closestBomb = { x: gx, y: gy };
+            }
+          }
+        }
+      }
+
+      return closestBomb; // Returns bomb position or null if no bomb in range
+    },
+    execute: (gameState, grid, x, y) => {
+      const detonator = gameState.inventory?.find(item => item.itemType === 'detonator');
+      if (!detonator) {
+        return { success: false, error: 'No detonator!' };
+      }
+
+      // Get detonator range settings (from item config or defaults)
+      const minSafeDistance = detonator.minSafeDistance ?? 2;
+      const maxRange = detonator.maxRange ?? 6;
+
+      // Find player position (x, y is the tile being interacted with, which is player pos for anyTile)
+      const playerX = x;
+      const playerY = y;
+
+      // Find all placed bombs on the grid
+      const bombs = [];
+      for (let gy = 0; gy < grid.length; gy++) {
+        for (let gx = 0; gx < grid[gy].length; gx++) {
+          if (grid[gy][gx].type === 'item-bomb') {
+            const distance = Math.abs(gx - playerX) + Math.abs(gy - playerY); // Manhattan distance
+            bombs.push({ x: gx, y: gy, distance });
+          }
+        }
+      }
+
+      if (bombs.length === 0) {
+        return { success: false, error: 'No bombs placed! Place a bomb first.' };
+      }
+
+      // Check if any bomb is too close (player dies)
+      const tooClose = bombs.filter(b => b.distance < minSafeDistance);
+      if (tooClose.length > 0) {
+        // Player is too close - this will be fatal
+        return {
+          success: true,
+          message: 'TOO CLOSE! The explosion killed you!',
+          fatal: true, // Signal to game engine to kill player
+          modifyState: { lives: 0 }
+        };
+      }
+
+      // Check if any bomb is in range
+      const inRange = bombs.filter(b => b.distance <= maxRange);
+      if (inRange.length === 0) {
+        return { success: false, error: `Out of range! Get within ${maxRange} tiles of a bomb.` };
+      }
+
+      // Explode all bombs in range
+      let vaultsOpened = 0;
+      for (const bomb of inRange) {
+        // Remove the bomb
+        grid[bomb.y][bomb.x] = { type: 'floor', config: { floorColor: 'gray' } };
+
+        // Check adjacent tiles for vault doors and open them
+        const adjacent = [
+          { x: bomb.x, y: bomb.y - 1 },
+          { x: bomb.x, y: bomb.y + 1 },
+          { x: bomb.x - 1, y: bomb.y },
+          { x: bomb.x + 1, y: bomb.y },
+        ];
+
+        for (const adj of adjacent) {
+          if (adj.y >= 0 && adj.y < grid.length && adj.x >= 0 && adj.x < grid[0].length) {
+            if (grid[adj.y][adj.x].type === 'vault-door') {
+              grid[adj.y][adj.x] = { type: 'vault-door-open', config: {} };
+              vaultsOpened++;
+            }
+          }
+        }
+      }
+
+      const bombWord = inRange.length === 1 ? 'bomb' : 'bombs';
+      const vaultMsg = vaultsOpened > 0 ? ` ${vaultsOpened} vault${vaultsOpened > 1 ? 's' : ''} opened!` : '';
+
+      return {
+        success: true,
+        message: `BOOM! ${inRange.length} ${bombWord} detonated!${vaultMsg}`,
+        sound: 'explosion',
+        modifyGrid: true
+      };
+    }
+  },
+
 };
 
 // Check if requirements are met
@@ -241,12 +383,19 @@ export function getAvailableInteractions(gameState, grid, x, y, isSelfCheck = fa
 
   for (const [id, interaction] of Object.entries(INTERACTIONS)) {
     if (checkRequirements(interaction.requirements, gameState, tile, interaction, grid, x, y, isSelfCheck)) {
-      available.push({
+      const interactionData = {
         id,
         label: interaction.label,
         duration: interaction.duration,
         progressColor: interaction.progressColor || null
-      });
+      };
+
+      // Check if interaction has a custom visual target (e.g., detonate shows progress on bomb)
+      if (interaction.getVisualTarget) {
+        interactionData.visualTarget = interaction.getVisualTarget(gameState, grid, x, y);
+      }
+
+      available.push(interactionData);
     }
   }
 

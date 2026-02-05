@@ -41,6 +41,18 @@ export const ITEM_TYPES = {
     emoji: null, // Custom rendered
     color: '#ff8800',
     description: 'Power drill for opening vault doors'
+  },
+  bomb: {
+    label: 'Bomb',
+    emoji: null, // Custom rendered
+    color: '#cc2222',
+    description: 'Explosive. Place near vault doors and detonate remotely.'
+  },
+  detonator: {
+    label: 'Detonator',
+    emoji: null, // Custom rendered
+    color: '#ffcc00',
+    description: 'Triggers placed bombs. Stay at safe distance!'
   }
 };
 
@@ -185,6 +197,76 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     // Trigger
     ctx.fillStyle = '#222';
     ctx.fillRect(cx - size * 0.1, cy + size * 0.02, size * 0.08, size * 0.1);
+
+    return true;
+  }
+
+  // Bomb item (in inventory)
+  if (itemType === 'bomb') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Bomb body (cylinder shape)
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.05, size * 0.2, size * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Red stripes
+    ctx.fillStyle = '#cc2222';
+    ctx.fillRect(cx - size * 0.16, cy - size * 0.08, size * 0.32, size * 0.07);
+    ctx.fillRect(cx - size * 0.16, cy + size * 0.08, size * 0.32, size * 0.07);
+
+    // Fuse/wire on top
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - size * 0.2);
+    ctx.quadraticCurveTo(cx + size * 0.12, cy - size * 0.28, cx + size * 0.08, cy - size * 0.35);
+    ctx.stroke();
+
+    // Blinking light
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.2, size * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
+  // Detonator item (in inventory)
+  if (itemType === 'detonator') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Detonator box body
+    ctx.fillStyle = '#333';
+    ctx.fillRect(cx - size * 0.18, cy - size * 0.12, size * 0.36, size * 0.3);
+
+    // Yellow warning stripes
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(cx - size * 0.18, cy - size * 0.12, size * 0.36, size * 0.05);
+    ctx.fillRect(cx - size * 0.18, cy + size * 0.13, size * 0.36, size * 0.05);
+
+    // Red button on top
+    ctx.fillStyle = '#cc0000';
+    ctx.beginPath();
+    ctx.arc(cx, cy + size * 0.02, size * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Button highlight
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.02, cy, size * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Antenna
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.1, cy - size * 0.12);
+    ctx.lineTo(cx + size * 0.1, cy - size * 0.3);
+    ctx.stroke();
 
     return true;
   }
