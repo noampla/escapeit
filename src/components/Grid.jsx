@@ -17,7 +17,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, theme }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -131,8 +131,18 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
       const itx = (interactionTarget.x - offsetX) * TILE_SIZE;
       const ity = (interactionTarget.y - offsetY) * TILE_SIZE;
 
+      // Use custom color or default green
+      const progressColor = interactionProgressColor || '#44ff44';
+      // Parse color for overlay (create semi-transparent version)
+      const overlayColor = interactionProgressColor
+        ? `${interactionProgressColor}4d` // Add ~30% alpha
+        : 'rgba(68, 170, 68, 0.3)';
+      const borderColor = interactionProgressColor
+        ? `${interactionProgressColor}cc` // Add ~80% alpha
+        : 'rgba(68, 170, 68, 0.8)';
+
       // Semi-transparent overlay
-      ctx.fillStyle = 'rgba(68, 170, 68, 0.3)';
+      ctx.fillStyle = overlayColor;
       ctx.fillRect(itx, ity, TILE_SIZE, TILE_SIZE);
 
       // Progress bar at bottom of tile
@@ -146,11 +156,11 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
       ctx.fillRect(barX, barY, barWidth, barHeight);
 
       // Progress fill
-      ctx.fillStyle = '#44ff44';
+      ctx.fillStyle = progressColor;
       ctx.fillRect(barX, barY, barWidth * interactionProgress, barHeight);
 
       // Border
-      ctx.strokeStyle = 'rgba(68, 170, 68, 0.8)';
+      ctx.strokeStyle = borderColor;
       ctx.lineWidth = 1;
       ctx.strokeRect(barX, barY, barWidth, barHeight);
     }
@@ -201,7 +211,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, theme]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme]);
 
   useEffect(() => {
     draw();

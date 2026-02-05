@@ -165,6 +165,31 @@ export const INTERACTIONS = {
     }
   },
 
+  'drill-vault': {
+    label: 'Drill Vault',
+    duration: 4000,
+    progressColor: '#ff8844', // Orange progress bar for drilling
+    requirements: { tile: 'vault-door' },
+    checkCustom: (gameState) => {
+      return gameState.inventory?.some(item => item.itemType === 'drill');
+    },
+    execute: (gameState, grid, x, y) => {
+      const hasDrill = gameState.inventory?.some(item => item.itemType === 'drill');
+      if (!hasDrill) {
+        return { success: false, error: 'Need a drill!' };
+      }
+
+      // Open the vault door (drill stays in inventory - reusable)
+      grid[y][x] = { type: 'vault-door-open', config: {} };
+
+      return {
+        success: true,
+        message: 'Drilled through the vault door!',
+        modifyGrid: true
+      };
+    }
+  },
+
 };
 
 // Check if requirements are met
@@ -219,7 +244,8 @@ export function getAvailableInteractions(gameState, grid, x, y, isSelfCheck = fa
       available.push({
         id,
         label: interaction.label,
-        duration: interaction.duration
+        duration: interaction.duration,
+        progressColor: interaction.progressColor || null
       });
     }
   }

@@ -35,6 +35,12 @@ export const ITEM_TYPES = {
     emoji: null, // Custom rendered
     color: '#ccddee',
     description: 'Blocks laser beams when placed on the ground'
+  },
+  drill: {
+    label: 'Drill',
+    emoji: null, // Custom rendered
+    color: '#ff8800',
+    description: 'Power drill for opening vault doors'
   }
 };
 
@@ -146,6 +152,39 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     ctx.beginPath();
     ctx.arc(cx, cy + s * 0.4, s * 0.08, 0, Math.PI * 2);
     ctx.fill();
+
+    return true;
+  }
+
+  // Drill item
+  if (itemType === 'drill') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Drill body (main housing - orange)
+    ctx.fillStyle = '#ff8800';
+    ctx.fillRect(cx - size * 0.25, cy - size * 0.12, size * 0.4, size * 0.24);
+
+    // Drill chuck (front part - metal)
+    ctx.fillStyle = '#666';
+    ctx.fillRect(cx + size * 0.15, cy - size * 0.08, size * 0.12, size * 0.16);
+
+    // Drill bit (pointed metal)
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.27, cy - size * 0.04);
+    ctx.lineTo(cx + size * 0.4, cy);
+    ctx.lineTo(cx + size * 0.27, cy + size * 0.04);
+    ctx.closePath();
+    ctx.fill();
+
+    // Handle (black grip)
+    ctx.fillStyle = '#333';
+    ctx.fillRect(cx - size * 0.25, cy + size * 0.08, size * 0.2, size * 0.15);
+
+    // Trigger
+    ctx.fillStyle = '#222';
+    ctx.fillRect(cx - size * 0.1, cy + size * 0.02, size * 0.08, size * 0.1);
 
     return true;
   }

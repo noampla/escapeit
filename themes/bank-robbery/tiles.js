@@ -146,6 +146,31 @@ export const TILE_TYPES = {
     tooltip: 'Laser tripwire. Place on a wall or floor boundary. Fires a beam perpendicular to the wall until it hits another wall.',
     walkable: false,
     attachToWall: true
+  },
+
+  // Vault
+  'vault-door': {
+    label: 'Vault Door',
+    color: '#2a2a2a',
+    category: 'interactive',
+    tooltip: 'Heavy vault door. Requires a drill to open. Hold E while facing with drill in inventory.',
+    walkable: false
+  },
+  'vault-door-open': {
+    label: 'Open Vault Door',
+    color: '#1a1a1a',
+    walkable: true
+  },
+
+  // Drill item tile
+  'item-drill': {
+    label: 'Drill',
+    color: '#ffaa00',
+    category: 'interactive',
+    isItemTile: true,
+    itemType: 'drill',
+    tooltip: 'Power drill. Pick up (F) and use to drill through vault doors.',
+    walkable: true
   }
 };
 
@@ -513,6 +538,134 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Vault Door
+  if (tile.type === 'vault-door') {
+    // Heavy steel vault door
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Steel plate texture
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(cx - size * 0.45, cy - size * 0.45, size * 0.9, size * 0.9);
+
+    // Circular vault mechanism
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer ring
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.32, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner ring
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.22, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Spokes on the wheel
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * size * 0.12, cy + Math.sin(angle) * size * 0.12);
+      ctx.lineTo(cx + Math.cos(angle) * size * 0.28, cy + Math.sin(angle) * size * 0.28);
+      ctx.stroke();
+    }
+
+    // Center bolt
+    ctx.fillStyle = '#555';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Corner bolts
+    const boltPositions = [
+      { x: -0.38, y: -0.38 }, { x: 0.38, y: -0.38 },
+      { x: -0.38, y: 0.38 }, { x: 0.38, y: 0.38 }
+    ];
+    ctx.fillStyle = '#4a4a4a';
+    for (const pos of boltPositions) {
+      ctx.beginPath();
+      ctx.arc(cx + pos.x * size, cy + pos.y * size, size * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    return true;
+  }
+
+  // Open Vault Door
+  if (tile.type === 'vault-door-open') {
+    // Dark interior visible
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Steel frame
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(cx - size/2, cy - size/2, size * 0.15, size);
+    ctx.fillRect(cx + size * 0.35, cy - size/2, size * 0.15, size);
+    ctx.fillRect(cx - size/2, cy - size/2, size, size * 0.1);
+    ctx.fillRect(cx - size/2, cy + size * 0.4, size, size * 0.1);
+
+    // Door swung open on right side
+    ctx.fillStyle = '#3a3a3a';
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.35, cy - size * 0.4);
+    ctx.lineTo(cx + size * 0.5, cy - size * 0.3);
+    ctx.lineTo(cx + size * 0.5, cy + size * 0.3);
+    ctx.lineTo(cx + size * 0.35, cy + size * 0.4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Partial vault wheel visible on open door
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.42, cy, size * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
+  // Drill item tile
+  if (tile.type === 'item-drill') {
+    // Draw drill on the ground
+    const drillX = cx;
+    const drillY = cy;
+
+    // Drill body (main housing)
+    ctx.fillStyle = '#ff8800';
+    ctx.fillRect(drillX - size * 0.25, drillY - size * 0.12, size * 0.4, size * 0.24);
+
+    // Drill chuck (front part)
+    ctx.fillStyle = '#666';
+    ctx.fillRect(drillX + size * 0.15, drillY - size * 0.08, size * 0.12, size * 0.16);
+
+    // Drill bit
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.moveTo(drillX + size * 0.27, drillY - size * 0.04);
+    ctx.lineTo(drillX + size * 0.4, drillY);
+    ctx.lineTo(drillX + size * 0.27, drillY + size * 0.04);
+    ctx.closePath();
+    ctx.fill();
+
+    // Handle
+    ctx.fillStyle = '#333';
+    ctx.fillRect(drillX - size * 0.25, drillY + size * 0.08, size * 0.2, size * 0.15);
+
+    // Trigger
+    ctx.fillStyle = '#222';
+    ctx.fillRect(drillX - size * 0.1, drillY + size * 0.02, size * 0.08, size * 0.1);
+
+    return true;
+  }
+
   // Security Camera
   if (tile.type === 'camera') {
     const direction = tile.config?.direction || 'down';
@@ -590,7 +743,7 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['floor', 'start', 'exit'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['door-key', 'door-card', 'floor', 'start', 'exit'];
+export const INTERACTABLE_TILES = ['door-key', 'door-card', 'vault-door', 'floor', 'start', 'exit'];
 
 // Tiles to ignore for floor color detection when picking up items
 export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'camera', 'laser'];
@@ -643,6 +796,20 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       return {
         allowed: false,
         message: `Locked! Need a ${doorColor} keycard`
+      };
+    }
+
+    case 'vault-door': {
+      const hasDrill = inventory?.some(item => item.itemType === 'drill');
+      if (hasDrill) {
+        return {
+          allowed: false,
+          message: 'Face the vault and hold E to drill through'
+        };
+      }
+      return {
+        allowed: false,
+        message: 'Heavy vault door. Need a drill to open.'
       };
     }
 

@@ -394,12 +394,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     return valid;
   }, [interactableTiles]);
 
-  const startInteraction = useCallback((type, targetPos) => {
+  const startInteraction = useCallback((type, targetPos, progressColor = null, duration = null) => {
     setInteractionState({
       type,
       startTime: Date.now(),
       targetPos,
       progress: 0,
+      progressColor,
+      duration: duration || INTERACTION_DURATION,
     });
   }, []);
 
@@ -581,7 +583,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     for (const interaction of selfInteractions) {
       possibleActions.push({
         label: interaction.label,
-        action: () => startInteraction(interaction.id, { x: playerPos.x, y: playerPos.y }),
+        action: () => startInteraction(interaction.id, { x: playerPos.x, y: playerPos.y }, interaction.progressColor, interaction.duration),
       });
     }
 
@@ -609,7 +611,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           if (!possibleActions.find(a => a.label === interaction.label)) {
             possibleActions.push({
               label: interaction.label,
-              action: () => startInteraction(interaction.id, p),
+              action: () => startInteraction(interaction.id, p, interaction.progressColor, interaction.duration),
             });
           }
         }
@@ -939,7 +941,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Get interactions at target tile
       const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
       for (const interaction of targetInteractions) {
-        possibleActions.push(() => startInteraction(interaction.id, p));
+        possibleActions.push(() => startInteraction(interaction.id, p, interaction.progressColor, interaction.duration));
       }
 
       // Also check interactions at player's current position
@@ -947,7 +949,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       for (const interaction of selfInteractions) {
         // Avoid duplicates by checking if we already have this interaction type
         if (!targetInteractions.find(t => t.id === interaction.id)) {
-          possibleActions.push(() => startInteraction(interaction.id, { x: pos.x, y: pos.y }));
+          possibleActions.push(() => startInteraction(interaction.id, { x: pos.x, y: pos.y }, interaction.progressColor, interaction.duration));
         }
       }
 
@@ -1013,7 +1015,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - interactionState.startTime;
-      const progress = Math.min(elapsed / INTERACTION_DURATION, 1);
+      const duration = interactionState.duration || INTERACTION_DURATION;
+      const progress = Math.min(elapsed / duration, 1);
 
       setInteractionState(prev => {
         if (!prev) return null;
@@ -1033,7 +1036,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - mouseHoldState.startTime;
-      const progress = Math.min(elapsed / INTERACTION_DURATION, 1);
+      const duration = mouseHoldState.duration || INTERACTION_DURATION;
+      const progress = Math.min(elapsed / duration, 1);
 
       setMouseHoldState(prev => {
         if (!prev) return null;
@@ -1437,6 +1441,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             onHoldEnd={() => setMouseHoldState(null)}
             interactionTarget={(interactionState || mouseHoldState)?.targetPos}
             interactionProgress={(interactionState || mouseHoldState)?.progress || 0}
+            interactionProgressColor={(interactionState || mouseHoldState)?.progressColor}
             theme={theme}
           />
 
