@@ -15,5 +15,15 @@ service cloud.firestore {
     match /leaderboards/{document=**} {
       allow read, write: if true;
     }
+
+    // Dev tasks collection - hidden developer task management (easter egg)
+    match /dev_tasks/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Dev persons collection - task assignees (easter egg)
+    match /dev_persons/{document=**} {
+      allow read, write: if true;
+    }
   }
 }

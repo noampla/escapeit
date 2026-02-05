@@ -8,6 +8,8 @@ import ThemeLoader from './engine/themeLoader';
 import { migrateLevels } from './utils/storage';
 import { UserProvider } from './contexts/UserContext.jsx';
 import UserStatusBar from './components/UserStatusBar.jsx';
+import DevTasksPanel from './components/DevTasksPanel.jsx';
+import useDevMode from './hooks/useDevMode.js';
 
 // Theme context for sharing theme across components
 export const ThemeContext = createContext(null);
@@ -18,6 +20,9 @@ function AppContent() {
   const [editLevel, setEditLevel] = useState(null);
   const [selectedTheme, setSelectedTheme] = useState(null);
   const [theme, setTheme] = useState(null);
+
+  // Dev panel easter egg (Ctrl+Shift+D or type "devmode")
+  const { isDevPanelOpen, closeDevPanel } = useDevMode();
 
   // Run migration on mount
   useEffect(() => {
@@ -47,23 +52,29 @@ function AppContent() {
   // Main menu
   if (mode === 'menu') {
     return (
-      <MainMenu
-        onCreateNew={() => setMode('theme-select-build')}
-        onPlayLevels={() => setMode('selectLevel')}
-      />
+      <>
+        <MainMenu
+          onCreateNew={() => setMode('theme-select-build')}
+          onPlayLevels={() => setMode('selectLevel')}
+        />
+        <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
+      </>
     );
   }
 
   // Theme selection for building
   if (mode === 'theme-select-build') {
     return (
-      <ThemeSelect
-        onSelectTheme={(themeId) => {
-          setSelectedTheme(themeId);
-          setMode('build');
-        }}
-        onBack={() => setMode('menu')}
-      />
+      <>
+        <ThemeSelect
+          onSelectTheme={(themeId) => {
+            setSelectedTheme(themeId);
+            setMode('build');
+          }}
+          onBack={() => setMode('menu')}
+        />
+        <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
+      </>
     );
   }
 
@@ -91,6 +102,7 @@ function AppContent() {
           }}
           editLevel={editLevel}
         />
+        <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
       </ThemeContext.Provider>
     );
   }
@@ -98,19 +110,22 @@ function AppContent() {
   // Level selection
   if (mode === 'selectLevel') {
     return (
-      <LevelSelect
-        onBack={() => setMode('menu')}
-        onSelect={(level) => {
-          setSelectedLevel(level);
-          setSelectedTheme(level.themeId || 'forest'); // Fallback to forest
-          setMode('solve');
-        }}
-        onEdit={(level) => {
-          setEditLevel(level);
-          setSelectedTheme(level.themeId || 'forest');
-          setMode('build');
-        }}
-      />
+      <>
+        <LevelSelect
+          onBack={() => setMode('menu')}
+          onSelect={(level) => {
+            setSelectedLevel(level);
+            setSelectedTheme(level.themeId || 'forest'); // Fallback to forest
+            setMode('solve');
+          }}
+          onEdit={(level) => {
+            setEditLevel(level);
+            setSelectedTheme(level.themeId || 'forest');
+            setMode('build');
+          }}
+        />
+        <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
+      </>
     );
   }
 
@@ -137,6 +152,7 @@ function AppContent() {
             setTheme(null);
           }}
         />
+        <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
       </ThemeContext.Provider>
     );
   }
