@@ -715,9 +715,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }, targetCell.config);
 
     if (moveResult) {
-      // Always reveal tile when attempting movement (for fog of war)
-      revealTargetTile();
-
       // Handle life loss from hazards
       if (moveResult.loseLife) {
         const remaining = loseLife();
@@ -739,6 +736,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         setGrid(newGrid);
         setPlayerPos({ x: nx, y: ny });
         setMoveCount(prev => prev + 1);
+        revealTargetTile();
         return;
       }
 
@@ -755,6 +753,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       soundManager.play('walk');
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
+      revealTargetTile();
 
       // Immediate hazard check on entering a new tile
       const hazard = theme?.checkHazardAt?.(currentGrid, nx, ny, currentGS);
