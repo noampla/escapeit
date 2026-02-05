@@ -169,6 +169,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [inlineMenu, setInlineMenu] = useState(null); // { actions: [{label, action, key}] }
   const [soundEnabled, setSoundEnabled] = useState(() => soundManager.enabled);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
   const messageTimerRef = useRef(null);
   const gridRef = useRef(grid);
@@ -185,6 +186,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const interactionStateRef = useRef(interactionState);
   const interactionKeyReleasedRef = useRef(true); // Track if E/number key was released since last interaction
   const lastHazardDamageRef = useRef(0); // Track last time we took continuous hazard damage
+  const revealedTilesRef = useRef(revealedTiles);
 
   gridRef.current = grid;
   gameStateRef.current = gameState;
@@ -192,6 +194,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   livesRef.current = lives;
   gameOverRef.current = gameOver;
   interactionStateRef.current = interactionState;
+  revealedTilesRef.current = revealedTiles;
 
   const showMessage = useCallback((msg, duration = 1500) => {
     setMessage(msg);
@@ -502,7 +505,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     else if (dx === 1) dir = 'RIGHT';
 
     const currentGrid = gridRef.current;
-    const currentGS = gameStateRef.current;
+    const currentGS = { ...gameStateRef.current, revealedTiles: revealedTilesRef.current };
 
     // Get available interactions from theme (exclude wear/remove - those use T key)
     const allInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, x, y) || [];
@@ -557,6 +560,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       collectedItems: [...(currentGS.collectedItems || [])],
       worn: { ...(currentGS.worn || {}) },
       containers: currentGS.containers ? JSON.parse(JSON.stringify(currentGS.containers)) : {},
+      revealedTiles: revealedTilesRef.current, // For visibility checks in interactions
     };
 
     // Execute interaction through theme
@@ -704,7 +708,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;
-    const currentGS = gameStateRef.current;
+    const currentGS = { ...gameStateRef.current, revealedTiles: revealedTilesRef.current };
     const targets = getInteractTargets();
     const playerDir = playerDirectionRef.current;
     const playerPos = playerPosRef.current;
@@ -958,7 +962,23 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         onBack();
         return;
       }
-      if (key === 'r') { restart(); return; }
+      if (key === 'r') {
+        if (showRestartConfirm) {
+          // Already showing confirm, do nothing (handled by Y/N)
+          return;
+        }
+        setShowRestartConfirm(true);
+        return;
+      }
+      if (showRestartConfirm) {
+        if (key === 'y') {
+          setShowRestartConfirm(false);
+          restart();
+        } else if (key === 'n' || key === 'escape') {
+          setShowRestartConfirm(false);
+        }
+        return;
+      }
 
       if (key === 'e' && !interactionStateRef.current && !inlineMenu) {
         // Only start new interaction if E was released since last interaction completed
@@ -1077,7 +1097,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
       const keys = keysDown.current;
       const currentGrid = gridRef.current;
-      const currentGS = gameStateRef.current;
+      const currentGS = { ...gameStateRef.current, revealedTiles: revealedTilesRef.current };
       const pos = playerPosRef.current;
       const playerDir = playerDirectionRef.current;
 
@@ -2019,6 +2039,66 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         </div>
       )}
 
+      {/* Restart Confirmation */}
+      {showRestartConfirm && !gameOver && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 250,
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(60, 45, 30, 0.98), rgba(40, 30, 20, 0.98))',
+            borderRadius: 16,
+            padding: '28px 40px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(200, 150, 100, 0.4)',
+            textAlign: 'center',
+          }}>
+            <h3 style={{ color: '#f8d8a8', margin: '0 0 16px 0', fontSize: 20, fontWeight: '700' }}>
+              Restart Level?
+            </h3>
+            <p style={{ color: '#ccbb99', margin: '0 0 20px 0', fontSize: 14 }}>
+              Your progress will be lost.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => { setShowRestartConfirm(false); restart(); }}
+                style={{
+                  padding: '10px 24px',
+                  background: 'linear-gradient(145deg, #5a4a2a, #4a3a1a)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Yes (Y)
+              </button>
+              <button
+                onClick={() => setShowRestartConfirm(false)}
+                style={{
+                  padding: '10px 24px',
+                  background: 'linear-gradient(145deg, #3a3a3a, #2a2a2a)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: '#ccc',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                No (N)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Game Over Screen */}
       {gameOver && (

@@ -224,13 +224,36 @@ export const INTERACTIONS = {
     duration: 500,
     progressColor: '#ffcc00', // Yellow progress bar
     requirements: { anyTile: true },
-    checkCustom: (gameState) => {
-      return gameState.inventory?.some(item => item.itemType === 'detonator');
+    checkCustom: (gameState, tile, grid, x, y) => {
+      // Must have detonator
+      if (!gameState.inventory?.some(item => item.itemType === 'detonator')) {
+        return false;
+      }
+
+      // Must have at least one visible bomb in range
+      const detonator = gameState.inventory?.find(item => item.itemType === 'detonator');
+      const maxRange = detonator?.maxRange ?? 6;
+      const revealedTiles = gameState.revealedTiles;
+
+      for (let gy = 0; gy < grid.length; gy++) {
+        for (let gx = 0; gx < grid[gy].length; gx++) {
+          if (grid[gy][gx].type === 'item-bomb') {
+            const distance = Math.abs(gx - x) + Math.abs(gy - y);
+            // Check if bomb is in range AND visible
+            const isVisible = !revealedTiles || revealedTiles.has(`${gx},${gy}`);
+            if (distance <= maxRange && isVisible) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
     },
-    // Find the closest bomb to show progress on
+    // Find the closest visible bomb to show progress on
     getVisualTarget: (gameState, grid, playerX, playerY) => {
       const detonator = gameState.inventory?.find(item => item.itemType === 'detonator');
       const maxRange = detonator?.maxRange ?? 6;
+      const revealedTiles = gameState.revealedTiles;
 
       let closestBomb = null;
       let closestDistance = Infinity;
@@ -239,7 +262,9 @@ export const INTERACTIONS = {
         for (let gx = 0; gx < grid[gy].length; gx++) {
           if (grid[gy][gx].type === 'item-bomb') {
             const distance = Math.abs(gx - playerX) + Math.abs(gy - playerY);
-            if (distance <= maxRange && distance < closestDistance) {
+            // Only consider visible bombs
+            const isVisible = !revealedTiles || revealedTiles.has(`${gx},${gy}`);
+            if (distance <= maxRange && distance < closestDistance && isVisible) {
               closestDistance = distance;
               closestBomb = { x: gx, y: gy };
             }
@@ -247,7 +272,7 @@ export const INTERACTIONS = {
         }
       }
 
-      return closestBomb; // Returns bomb position or null if no bomb in range
+      return closestBomb; // Returns bomb position or null if no visible bomb in range
     },
     execute: (gameState, grid, x, y) => {
       const detonator = gameState.inventory?.find(item => item.itemType === 'detonator');
@@ -258,24 +283,29 @@ export const INTERACTIONS = {
       // Get detonator range settings (from item config or defaults)
       const minSafeDistance = detonator.minSafeDistance ?? 2;
       const maxRange = detonator.maxRange ?? 6;
+      const revealedTiles = gameState.revealedTiles;
 
       // Find player position (x, y is the tile being interacted with, which is player pos for anyTile)
       const playerX = x;
       const playerY = y;
 
-      // Find all placed bombs on the grid
+      // Find all placed VISIBLE bombs on the grid
       const bombs = [];
       for (let gy = 0; gy < grid.length; gy++) {
         for (let gx = 0; gx < grid[gy].length; gx++) {
           if (grid[gy][gx].type === 'item-bomb') {
-            const distance = Math.abs(gx - playerX) + Math.abs(gy - playerY); // Manhattan distance
-            bombs.push({ x: gx, y: gy, distance });
+            // Only include visible bombs
+            const isVisible = !revealedTiles || revealedTiles.has(`${gx},${gy}`);
+            if (isVisible) {
+              const distance = Math.abs(gx - playerX) + Math.abs(gy - playerY); // Manhattan distance
+              bombs.push({ x: gx, y: gy, distance });
+            }
           }
         }
       }
 
       if (bombs.length === 0) {
-        return { success: false, error: 'No bombs placed! Place a bomb first.' };
+        return { success: false, error: 'No visible bombs! You need to see the bomb to detonate it.' };
       }
 
       // Check if any bomb is too close (player dies)

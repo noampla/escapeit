@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useContext, useMemo } from 'react';
+import { useState, useCallback, useRef, useContext, useMemo, useEffect } from 'react';
 import Grid from './Grid';
 import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
@@ -233,6 +233,23 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     // No mission check needed - SolverMode automatically adds the default escape mission
     setTestMode(true);
   };
+
+  // R key to start testing
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      // Don't trigger if typing in an input
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+
+      if (e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        handleTest();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const handleLoadLevel = (level) => {
     if (!saved && (grid.some(row => row.some(cell => cell.type !== 'empty')) || missions.length > 0)) {
