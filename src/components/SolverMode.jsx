@@ -567,6 +567,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       targetPos: { x, y },
       dir,
       label: interaction.label,
+      duration: interaction.duration,
+      progressColor: interaction.progressColor,
+      visualTarget: interaction.visualTarget,
     }));
 
     if (possibleActions.length > 1) {
@@ -580,7 +583,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             label,
             action: () => {
               setInteractionChoices(null);
-              startInteraction(action.type, action.targetPos);
+              startInteraction(action.type, action.targetPos, action.progressColor, action.duration, action.visualTarget);
             },
           };
         }),
@@ -589,7 +592,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
 
     const action = possibleActions[0];
-    startInteraction(action.type, action.targetPos);
+    startInteraction(action.type, action.targetPos, action.progressColor, action.duration, action.visualTarget);
   }, [theme, showMessage, startInteraction]);
 
   const completeInteraction = useCallback((interactionType, targetPos) => {
