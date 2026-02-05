@@ -210,7 +210,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       creatorId,
       creatorName,
     };
-    saveLevel(level).then(() => setSaved(true));
+    saveLevel(level)
+      .then(() => {
+        setSaved(true);
+        console.log('Level saved successfully:', level.id, level.name);
+      })
+      .catch(err => {
+        console.error('Failed to save level:', err);
+        alert('Failed to save level. Check console for details.');
+      });
   };
 
   const handleClear = () => {

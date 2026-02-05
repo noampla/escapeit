@@ -22,7 +22,18 @@
     "buttonHoverShadow": "0 8px 28px rgba(255, 215, 0, 0.4)"
   },
   "missions": {
-    "types": ["collect", "reach", "escape"],
+    "types": ["collect", "collect-amount", "reach", "escape"],
+    "config": {
+      "collect-amount": {
+        "label": "Collect Money",
+        "amountLabel": "Amount ($)",
+        "min": 1000,
+        "max": 10000000,
+        "step": 10000,
+        "default": 100000,
+        "checkField": "containers.bag.contents"
+      }
+    },
     "targetOptions": {
       "collect": ["key", "card"]
     },

@@ -38,13 +38,31 @@ export default function PropertiesPanel({
   const missionTypes = useMemo(() => {
     const themeMissionIds = theme?.getMissionTypes?.();
     if (themeMissionIds && themeMissionIds.length > 0) {
-      return BASE_MISSION_TYPES.filter(mt => themeMissionIds.includes(mt.id));
+      // Filter BASE_MISSION_TYPES and apply theme-specific labels
+      return BASE_MISSION_TYPES
+        .filter(mt => themeMissionIds.includes(mt.id))
+        .map(mt => {
+          const themeConfig = theme?.getMissionConfig?.(mt.id);
+          return themeConfig?.label ? { ...mt, label: themeConfig.label } : mt;
+        });
     }
     return BASE_MISSION_TYPES;
   }, [theme]);
 
   const getTargetOptions = (missionType) => theme?.getMissionTargetOptions?.(missionType) || [];
   const missionDef = (type) => missionTypes.find(mt => mt.id === type) || BASE_MISSION_TYPES.find(mt => mt.id === type);
+
+  // Get amount config for a mission type from theme
+  const getAmountConfig = (missionType) => {
+    const themeConfig = theme?.getMissionConfig?.(missionType);
+    return {
+      min: themeConfig?.min ?? 1,
+      max: themeConfig?.max ?? 1000000,
+      step: themeConfig?.step ?? 1,
+      default: themeConfig?.default ?? 100,
+      label: themeConfig?.amountLabel ?? 'Amount',
+    };
+  };
 
   const addMission = () => {
     const defaultType = missionTypes.find(mt => mt.id === 'escape')?.id || missionTypes[0]?.id || 'escape';
@@ -335,6 +353,24 @@ export default function PropertiesPanel({
                     )}
                   </div>
                 )}
+
+                {def?.needsAmount && (() => {
+                  const amtCfg = getAmountConfig(m.type);
+                  return (
+                    <div style={{ marginBottom: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ color: '#888', fontSize: 10 }}>{amtCfg.label}:</span>
+                      <input
+                        style={{ ...inputStyle, width: 90, padding: '3px 6px' }}
+                        type="number"
+                        min={amtCfg.min}
+                        max={amtCfg.max}
+                        step={amtCfg.step}
+                        value={m.targetAmount || amtCfg.default}
+                        onChange={e => updateMission(i, 'targetAmount', Number(e.target.value))}
+                      />
+                    </div>
+                  );
+                })()}
 
                 <input
                   style={{ ...inputStyle, padding: '4px 6px' }}

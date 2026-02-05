@@ -118,7 +118,11 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
   const [modalLevel, setModalLevel] = useState(null);
 
   useEffect(() => {
-    loadLevels().then(setLevels);
+    console.log('LevelSelect: useEffect triggered');
+    loadLevels().then(loaded => {
+      console.log('LevelSelect: setting levels, count:', loaded.length);
+      setLevels(loaded);
+    });
   }, []);
 
   const handleDelete = (id, name) => {
@@ -142,10 +146,14 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
 
   return (
     <div style={{
-      padding: '60px 50px',
+      height: '100vh',
+      overflowY: 'auto',
+      background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 50%, #0a0a0a 100%)',
+    }}>
+    <div style={{
+      padding: '60px 50px 100px',
       maxWidth: 900,
       margin: '0 auto',
-      background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 50%, #0a0a0a 100%)',
       minHeight: '100vh',
       position: 'relative',
     }}>
@@ -208,7 +216,9 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, zIndex: 10, position: 'relative' }}>
+          {console.log('RENDERING levels:', levels.length, levels.map(l => l.name))}
           {levels.map(level => {
+            console.log('Rendering level:', level.id, level.name, level.themeId);
             const theme = getThemeById(level.themeId || 'forest');
             const isCreator = userId && level.creatorId === userId;
             return (
@@ -354,6 +364,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
           onClose={() => setModalLevel(null)}
         />
       )}
+    </div>
     </div>
   );
 }

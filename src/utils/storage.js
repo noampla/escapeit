@@ -30,8 +30,23 @@ export async function saveLevels(levels) {
 }
 
 export async function loadLevels() {
+  console.log('loadLevels: fetching from Firebase...');
   const snapshot = await getDocs(collection(db, COLLECTION));
-  return snapshot.docs.map(d => restoreLevel(d.data()));
+  // Use document ID as the level's id (in case data.id is missing/different)
+  const levels = snapshot.docs.map(d => {
+    const data = restoreLevel(d.data());
+    return { ...data, id: d.id }; // Ensure doc ID is used
+  });
+  console.log('loadLevels: got', levels.length, 'levels:', levels.map(l => `${l.id}: ${l.name} (${l.themeId})`));
+
+  // Check for duplicate IDs (shouldn't happen with doc IDs)
+  const ids = levels.map(l => l.id);
+  const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+  if (duplicates.length > 0) {
+    console.warn('DUPLICATE IDs FOUND:', duplicates);
+  }
+
+  return levels;
 }
 
 export async function saveLevel(level) {
@@ -46,7 +61,7 @@ export async function deleteLevel(id) {
 export async function loadLevelsByCreator(creatorId) {
   const q = query(collection(db, COLLECTION), where('creatorId', '==', creatorId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => restoreLevel(d.data()));
+  return snapshot.docs.map(d => ({ ...restoreLevel(d.data()), id: d.id }));
 }
 
 export function generateId() {

@@ -1,8 +1,15 @@
 // Mission checking logic
 
 // Check if a single mission is complete
-// theme parameter is optional - used for extinguish to get hazard tile types
+// theme parameter is optional - used for theme-specific missions and extinguish hazard types
 export function checkMissionComplete(mission, gameState, grid, theme = null) {
+  // First, check if theme handles this mission type
+  if (theme?.checkMissionComplete) {
+    const themeResult = theme.checkMissionComplete(mission, gameState);
+    if (themeResult !== null) return themeResult;
+  }
+
+  // Engine-handled mission types
   switch (mission.type) {
     case 'collect':
       return gameState.collectedItems.includes(mission.targetId);

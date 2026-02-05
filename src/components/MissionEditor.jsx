@@ -5,12 +5,17 @@ import { ThemeContext } from '../App';
 export default function MissionEditor({ missions, onChange, lives, onLivesChange, fixedOrder, onFixedOrderChange, inventoryCapacity, onInventoryCapacityChange }) {
   const theme = useContext(ThemeContext);
 
-  // Get mission types from theme, fallback to base types
+  // Get mission types from theme, with theme-specific labels
   const missionTypes = useMemo(() => {
     const themeMissionIds = theme?.getMissionTypes?.();
     if (themeMissionIds && themeMissionIds.length > 0) {
-      // Filter BASE_MISSION_TYPES to only include types available in this theme
-      return BASE_MISSION_TYPES.filter(mt => themeMissionIds.includes(mt.id));
+      // Filter BASE_MISSION_TYPES and apply theme-specific labels
+      return BASE_MISSION_TYPES
+        .filter(mt => themeMissionIds.includes(mt.id))
+        .map(mt => {
+          const themeConfig = theme?.getMissionConfig?.(mt.id);
+          return themeConfig?.label ? { ...mt, label: themeConfig.label } : mt;
+        });
     }
     return BASE_MISSION_TYPES;
   }, [theme]);
@@ -18,6 +23,18 @@ export default function MissionEditor({ missions, onChange, lives, onLivesChange
   // Get target options for a mission type from theme
   const getTargetOptions = (missionType) => {
     return theme?.getMissionTargetOptions?.(missionType) || [];
+  };
+
+  // Get amount config for a mission type from theme
+  const getAmountConfig = (missionType) => {
+    const themeConfig = theme?.getMissionConfig?.(missionType);
+    return {
+      min: themeConfig?.min ?? 1,
+      max: themeConfig?.max ?? 1000000,
+      step: themeConfig?.step ?? 1,
+      default: themeConfig?.default ?? 100,
+      label: themeConfig?.amountLabel ?? 'Amount',
+    };
   };
 
   const addMission = () => {
@@ -125,6 +142,23 @@ export default function MissionEditor({ missions, onChange, lives, onLivesChange
                 />
               )
             )}
+            {def?.needsAmount && (() => {
+              const amtCfg = getAmountConfig(m.type);
+              return (
+                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <span style={{ color: '#888', fontSize: 10 }}>{amtCfg.label}:</span>
+                  <input
+                    style={{ ...inputStyle, width: 80 }}
+                    type="number"
+                    min={amtCfg.min}
+                    max={amtCfg.max}
+                    step={amtCfg.step}
+                    value={m.targetAmount || amtCfg.default}
+                    onChange={e => updateMission(i, 'targetAmount', Number(e.target.value))}
+                  />
+                </div>
+              );
+            })()}
             <input
               style={{ ...inputStyle, flex: 1 }}
               value={m.description || ''}

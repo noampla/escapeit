@@ -215,6 +215,32 @@ export class ThemeLoader {
     };
   }
 
+  // Get theme-specific config for a mission type (label, amount range, etc.)
+  getMissionConfig(missionType) {
+    return this.theme?.missions?.config?.[missionType] || null;
+  }
+
+  // Check if a mission is complete (theme-specific logic)
+  // Returns true if complete, false otherwise
+  checkMissionComplete(mission, gameState) {
+    const config = this.getMissionConfig(mission.type);
+
+    // For amount-based missions, check the field specified in config
+    if (config?.checkField) {
+      const targetAmount = mission.targetAmount || config.default || 0;
+      // Navigate the checkField path (e.g., "containers.bag.contents")
+      const parts = config.checkField.split('.');
+      let value = gameState;
+      for (const part of parts) {
+        value = value?.[part];
+        if (value === undefined) return false;
+      }
+      return value >= targetAmount;
+    }
+
+    return null; // Let engine handle with default logic
+  }
+
   // Get hazard tile types (for 'extinguish' mission checking)
   getHazardTileTypes() {
     return this.tiles?.HAZARD_TILE_TYPES || ['fire'];

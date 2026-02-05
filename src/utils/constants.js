@@ -17,11 +17,14 @@ export const DIRECTION_LIST = ['up', 'down', 'left', 'right'];
 
 // Base mission types (theme-independent structure)
 // Target options come from theme.getMissionTargetOptions()
+// Base mission types - structural definitions only
+// Theme-specific config (labels, amounts, etc.) comes from theme.getMissionConfig()
 export const BASE_MISSION_TYPES = [
-  { id: 'collect', label: 'Find Item', needsTarget: true, targetLabel: 'Item type' },
+  { id: 'collect', label: 'Find Item', needsTarget: true },
+  { id: 'collect-amount', label: 'Collect Amount', needsAmount: true }, // Generic amount-based mission
   { id: 'rescue', label: 'Rescue', needsTarget: false },
   { id: 'extinguish', label: 'Extinguish All Hazards', needsTarget: false },
-  { id: 'reach', label: 'Reach Location', needsTarget: true, targetLabel: 'Coords (x,y)', coordBased: true },
+  { id: 'reach', label: 'Reach Location', needsTarget: true, coordBased: true },
   { id: 'escape', label: 'Reach Exit', needsTarget: false },
 ];
 
