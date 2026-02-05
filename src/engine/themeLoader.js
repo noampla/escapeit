@@ -246,6 +246,11 @@ export class ThemeLoader {
     return this.tiles?.HAZARD_TILE_TYPES || ['fire'];
   }
 
+  // === Entity Movement ===
+  moveEntities(grid, gameState) {
+    return this.tiles?.moveEntities?.(grid, gameState) || null;
+  }
+
   // === NEW: UI Theming ===
 
   // Get UI color scheme

@@ -11,6 +11,7 @@ import { useUser } from '../contexts/UserContext.jsx';
 import { submitScore } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
 import soundManager from '../engine/soundManager.js';
+import { moveEntities } from '../engine/entities.js';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -187,6 +188,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const interactionKeyReleasedRef = useRef(true); // Track if E/number key was released since last interaction
   const lastHazardDamageRef = useRef(0); // Track last time we took continuous hazard damage
   const revealedTilesRef = useRef(revealedTiles);
+  const dropMenuOpenRef = useRef(dropMenuOpen);
+  const inlineMenuRef = useRef(inlineMenu);
+  const showRestartConfirmRef = useRef(showRestartConfirm);
 
   gridRef.current = grid;
   gameStateRef.current = gameState;
@@ -195,6 +199,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   gameOverRef.current = gameOver;
   interactionStateRef.current = interactionState;
   revealedTilesRef.current = revealedTiles;
+  dropMenuOpenRef.current = dropMenuOpen;
+  inlineMenuRef.current = inlineMenu;
+  showRestartConfirmRef.current = showRestartConfirm;
 
   const showMessage = useCallback((msg, duration = 1500) => {
     setMessage(msg);
@@ -918,6 +925,17 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
   }, [theme, showMessage, loseLife, respawn, cancelInteraction]);
 
+  // Store callback refs so keyboard handler doesn't need to depend on them
+  const callbacksRef = useRef({});
+  callbacksRef.current = {
+    doInteract,
+    doPickup,
+    doToggleWear,
+    dropItem,
+    onBack,
+    restart,
+  };
+
   useEffect(() => {
     const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'f', 'r', 'q', 't', '1', '2', '3', '4', '5']);
 
@@ -942,61 +960,61 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
 
       // Handle inline menu number selection
-      if (inlineMenu && ['1', '2', '3', '4', '5'].includes(key)) {
+      if (inlineMenuRef.current && ['1', '2', '3', '4', '5'].includes(key)) {
         const actionIndex = parseInt(key) - 1;
-        if (actionIndex < inlineMenu.actions.length) {
+        if (actionIndex < inlineMenuRef.current.actions.length) {
           // Number key just pressed, wait for hold to start action
           return;
         }
       }
 
       if (key === 'escape') {
-        if (inlineMenu) {
+        if (inlineMenuRef.current) {
           setInlineMenu(null);
           return;
         }
-        if (dropMenuOpen) {
+        if (dropMenuOpenRef.current) {
           setDropMenuOpen(false);
           return;
         }
-        onBack();
+        callbacksRef.current.onBack();
         return;
       }
       if (key === 'r') {
-        if (showRestartConfirm) {
+        if (showRestartConfirmRef.current) {
           // Already showing confirm, do nothing (handled by Y/N)
           return;
         }
         setShowRestartConfirm(true);
         return;
       }
-      if (showRestartConfirm) {
+      if (showRestartConfirmRef.current) {
         if (key === 'y') {
           setShowRestartConfirm(false);
-          restart();
+          callbacksRef.current.restart();
         } else if (key === 'n' || key === 'escape') {
           setShowRestartConfirm(false);
         }
         return;
       }
 
-      if (key === 'e' && !interactionStateRef.current && !inlineMenu) {
+      if (key === 'e' && !interactionStateRef.current && !inlineMenuRef.current) {
         // Only start new interaction if E was released since last interaction completed
         if (interactionKeyReleasedRef.current) {
-          doInteract();
+          callbacksRef.current.doInteract();
         }
         return;
       }
 
-      if (key === 'f' && !interactionStateRef.current && !inlineMenu) {
-        doPickup();
+      if (key === 'f' && !interactionStateRef.current && !inlineMenuRef.current) {
+        callbacksRef.current.doPickup();
         return;
       }
 
-      if (key === 't' && !interactionStateRef.current && !inlineMenu) {
+      if (key === 't' && !interactionStateRef.current && !inlineMenuRef.current) {
         // T key for toggling wearables
         if (interactionKeyReleasedRef.current) {
-          doToggleWear();
+          callbacksRef.current.doToggleWear();
         }
         return;
       }
@@ -1007,11 +1025,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
 
       // Number keys to drop items when drop menu is open
-      if (dropMenuOpen && ['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(key)) {
+      if (dropMenuOpenRef.current && ['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(key)) {
         const currentGS = gameStateRef.current;
         const itemIndex = parseInt(key) - 1;
         if (itemIndex < currentGS.inventory.length) {
-          dropItem(itemIndex);
+          callbacksRef.current.dropItem(itemIndex);
         }
         return;
       }
@@ -1025,9 +1043,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       keyPressOrder.current = keyPressOrder.current.filter(k => k !== key);
 
       // Handle inline menu action release
-      if (inlineMenu && ['1', '2', '3', '4', '5'].includes(key)) {
+      if (inlineMenuRef.current && ['1', '2', '3', '4', '5'].includes(key)) {
         const actionIndex = parseInt(key) - 1;
-        if (actionIndex < inlineMenu.actions.length && interactionStateRef.current) {
+        if (actionIndex < inlineMenuRef.current.actions.length && interactionStateRef.current) {
           // Action was held and completed, clear menu
           setInlineMenu(null);
         }
@@ -1061,7 +1079,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
     };
-  }, [onBack, restart, doInteract, doPickup, doToggleWear, cancelInteraction, showMessage, dropMenuOpen, inlineMenu]);
+  }, []); // Empty deps - all callbacks accessed via callbacksRef
 
   // Check for number key holds when inline menu is active
   useEffect(() => {
@@ -1255,12 +1273,30 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const interval = setInterval(() => {
       setTick(t => {
         const newTick = t + 1;
-        setHazardZones(getAllHazardZones(gridRef.current));
+        // Only update hazard zones every 2 ticks (every 1 second) to reduce render load
+        if (newTick % 2 === 0) {
+          setHazardZones(getAllHazardZones(gridRef.current));
+        }
         return newTick;
       });
     }, 500);
     return () => clearInterval(interval);
   }, [gameOver]);
+
+  // Separate slower interval for entity movement to avoid interfering with input
+  useEffect(() => {
+    if (gameOver) return;
+    const interval = setInterval(() => {
+      // Move entities if theme supports it (only when not interacting)
+      if (theme && !interactionStateRef.current) {
+        const newGrid = moveEntities(gridRef.current, theme, gameStateRef.current);
+        if (newGrid) {
+          setGrid(newGrid);
+        }
+      }
+    }, 1000); // 1 second interval to minimize interference with input
+    return () => clearInterval(interval);
+  }, [gameOver, theme]);
 
   // Continuous hazard damage (e.g., cameras deal 1 life per 5 seconds)
   useEffect(() => {

@@ -222,6 +222,18 @@ export const TILE_TYPES = {
     tooltip: 'Cold hard cash! Requires equipped bag to collect. Hold E to grab.',
     walkable: true,
     pickable: false // Can't pick up with F - must collect with E into bag
+  },
+
+  // Walking Guard
+  guard: {
+    label: 'Guard',
+    color: '#2244aa',
+    category: 'hazard',
+    configurable: true,
+    defaultConfig: { direction: 'right' },
+    tooltip: 'Walking guard. Patrols back and forth.',
+    walkable: false,
+    isMovingEntity: true // Mark as moving entity for engine
   }
 };
 
@@ -236,8 +248,15 @@ export const FLOOR_COLORS = {
   marble: { label: 'Marble', color: '#5a5a5a' }
 };
 
-// Camera direction options
+// Camera and Guard direction options
 export const CAMERA_DIRECTIONS = {
+  up: { label: 'Up', dx: 0, dy: -1 },
+  down: { label: 'Down', dx: 0, dy: 1 },
+  left: { label: 'Left', dx: -1, dy: 0 },
+  right: { label: 'Right', dx: 1, dy: 0 }
+};
+
+export const GUARD_DIRECTIONS = {
   up: { label: 'Up', dx: 0, dy: -1 },
   down: { label: 'Down', dx: 0, dy: 1 },
   left: { label: 'Left', dx: -1, dy: 0 },
@@ -276,6 +295,9 @@ export const CONFIG_HELP = {
   },
   'item-money': {
     amount: 'Amount of cash in this stack.'
+  },
+  guard: {
+    direction: 'Initial direction the guard walks.'
   }
 };
 
@@ -376,6 +398,14 @@ export const CONFIG_SCHEMA = {
       min: 100,
       max: 5000000,
       default: 50000
+    }
+  },
+  guard: {
+    direction: {
+      type: 'select',
+      label: 'Direction',
+      options: 'GUARD_DIRECTIONS',
+      default: 'right'
     }
   }
 };
@@ -921,6 +951,55 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Guard
+  if (tile.type === 'guard') {
+    const direction = tile.config?.direction || 'right';
+
+    // Guard body (blue uniform)
+    ctx.fillStyle = '#2244aa';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.15, size * 0.25, size * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Guard head
+    ctx.fillStyle = '#ffcc99';
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.15, size * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cap
+    ctx.fillStyle = '#1a3388';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - size * 0.22, size * 0.16, size * 0.08, 0, 0, Math.PI);
+    ctx.fill();
+
+    // Badge
+    ctx.fillStyle = '#ffdd00';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.08, cy + size * 0.05, size * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Direction indicator (facing arrow)
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    const rotations = { up: -Math.PI / 2, down: Math.PI / 2, left: Math.PI, right: 0 };
+    ctx.rotate(rotations[direction] || 0);
+
+    // Arrow
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(size * 0.3, 0);
+    ctx.lineTo(size * 0.15, -size * 0.08);
+    ctx.lineTo(size * 0.15, size * 0.08);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+
+    return true;
+  }
+
   // Security Camera
   if (tile.type === 'camera') {
     const direction = tile.config?.direction || 'down';
@@ -1007,7 +1086,7 @@ export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key
 export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
 
 // Hazard tile types
-export const HAZARD_TILE_TYPES = ['camera', 'laser'];
+export const HAZARD_TILE_TYPES = ['camera', 'laser', 'guard'];
 
 // === MOVEMENT RULES ===
 
@@ -1077,4 +1156,74 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
 // Check if player meets exit requirements (bank robbery has no key requirement)
 export function checkExitRequirements(gameState, exitConfig) {
   return { allowed: true };
+}
+
+// === ENTITY MOVEMENT ===
+
+/**
+ * Move all entities (guards) on the grid
+ * Called every tick by the engine
+ */
+export function moveEntities(grid, gameState) {
+  const GRID_ROWS = grid.length;
+  const GRID_COLS = grid[0]?.length || 0;
+
+  // Clone grid to avoid mutation
+  const newGrid = grid.map(row => row.map(cell => ({ ...cell, config: { ...cell.config } })));
+
+  let anyMoved = false;
+
+  // First, find all guards and their positions (to avoid moving same guard twice)
+  const guards = [];
+  for (let y = 0; y < GRID_ROWS; y++) {
+    for (let x = 0; x < GRID_COLS; x++) {
+      if (newGrid[y][x].type === 'guard') {
+        guards.push({ x, y, tile: newGrid[y][x] });
+      }
+    }
+  }
+
+  // Now move each guard
+  for (const guard of guards) {
+    const { x, y, tile } = guard;
+    const direction = tile.config?.direction || 'right';
+    const dirData = GUARD_DIRECTIONS[direction];
+
+    if (!dirData) continue;
+
+    const { dx, dy } = dirData;
+    const nextX = x + dx;
+    const nextY = y + dy;
+
+    // Check if next position is valid and walkable
+    const canMove =
+      nextX >= 0 && nextX < GRID_COLS &&
+      nextY >= 0 && nextY < GRID_ROWS &&
+      isWalkable(newGrid[nextY][nextX].type, gameState);
+
+    if (canMove) {
+      // Move guard to next position
+      const guardTile = { ...tile, config: { ...tile.config } };
+
+      // Swap tiles - guard moves forward, leaves floor behind
+      newGrid[nextY][nextX] = guardTile;
+      newGrid[y][x] = { type: 'floor', config: {} };
+
+      anyMoved = true;
+    } else {
+      // Hit wall or boundary - reverse direction
+      const reverseDirections = {
+        up: 'down',
+        down: 'up',
+        left: 'right',
+        right: 'left'
+      };
+
+      const newDir = reverseDirections[direction] || 'right';
+      newGrid[y][x].config.direction = newDir;
+      anyMoved = true;
+    }
+  }
+
+  return anyMoved ? newGrid : null;
 }

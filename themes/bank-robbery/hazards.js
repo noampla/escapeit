@@ -14,6 +14,13 @@ export const HAZARD_TYPES = {
     damage: 1,
     message: 'Cut by laser tripwire!',
     renderColor: 'rgba(255, 20, 20, 0.6)'
+  },
+  guard: {
+    name: 'Guard',
+    damage: 1,
+    message: 'Spotted by guard!',
+    renderColor: 'rgba(50, 100, 255, 0.25)',
+    range: 4 // Guards have a default vision range
   }
 };
 
@@ -139,6 +146,22 @@ export function checkHazardAt(grid, x, y, gameState) {
         }
       }
 
+      if (tile.type === 'guard' && !cameraImmune) {
+        const direction = tile.config?.direction || 'right';
+        const range = HAZARD_TYPES.guard.range;
+        const visionTiles = getCameraVisionTiles(grid, cx, cy, direction, range);
+
+        if (visionTiles.some(vt => vt.x === x && vt.y === y)) {
+          return {
+            type: 'guard',
+            damage: HAZARD_TYPES.guard.damage,
+            message: HAZARD_TYPES.guard.message,
+            continuous: true,
+            interval: 5000
+          };
+        }
+      }
+
       if (tile.type === 'laser') {
         const direction = tile.config?.direction || 'down';
         const beamTiles = getLaserBeamTiles(grid, cx, cy, direction);
@@ -180,6 +203,24 @@ export function getAllHazardZones(grid) {
             y: vt.y,
             hazardType: 'camera',
             renderColor: HAZARD_TYPES.camera.renderColor,
+            distance: vt.distance,
+            sourceX: x,
+            sourceY: y
+          });
+        }
+      }
+
+      if (tile.type === 'guard') {
+        const direction = tile.config?.direction || 'right';
+        const range = HAZARD_TYPES.guard.range;
+        const visionTiles = getCameraVisionTiles(grid, x, y, direction, range);
+
+        for (const vt of visionTiles) {
+          zones.push({
+            x: vt.x,
+            y: vt.y,
+            hazardType: 'guard',
+            renderColor: HAZARD_TYPES.guard.renderColor,
             distance: vt.distance,
             sourceX: x,
             sourceY: y
@@ -229,6 +270,25 @@ export function renderHazardOverlay(ctx, grid, tileSize, offsetX = 0, offsetY = 
 
     // Draw subtle grid pattern in vision area
     ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 1, py + 1, tileSize - 2, tileSize - 2);
+  }
+
+  // Render guard vision cones (blue tint)
+  for (const zone of zones) {
+    if (zone.hazardType !== 'guard') continue;
+
+    const px = (zone.x - offsetX) * tileSize;
+    const py = (zone.y - offsetY) * tileSize;
+
+    // Fade effect based on distance (closer = more visible)
+    const alpha = 0.35 - (zone.distance - 1) * 0.05;
+
+    ctx.fillStyle = `rgba(50, 100, 255, ${Math.max(0.1, alpha)})`;
+    ctx.fillRect(px, py, tileSize, tileSize);
+
+    // Draw subtle grid pattern in vision area
+    ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
     ctx.lineWidth = 1;
     ctx.strokeRect(px + 1, py + 1, tileSize - 2, tileSize - 2);
   }
