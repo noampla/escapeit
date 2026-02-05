@@ -184,7 +184,7 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
                     padding: '2px 6px',
                     borderRadius: 4,
                   }}>
-                    E:wear
+                    T:wear
                   </span>
                 )}
               </div>
@@ -252,7 +252,7 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
                   padding: '2px 6px',
                   borderRadius: 4,
                 }}>
-                  E:remove
+                  T:remove
                 </span>
               </div>
             );

@@ -417,7 +417,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     soundManager.play('pickup');
     // Show special message for wearable items
     if (theme?.isWearable?.(itemType)) {
-      showMessage(`Picked up: ${itemLabel} (Press E to wear)`);
+      showMessage(`Picked up: ${itemLabel} (Press T to wear)`);
     } else {
       showMessage(`Picked up: ${itemLabel}`);
     }
@@ -504,8 +504,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
 
-    // Get available interactions from theme
-    const interactions = theme?.getAvailableInteractions?.(currentGS, currentGrid, x, y) || [];
+    // Get available interactions from theme (exclude wear/remove - those use T key)
+    const allInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, x, y) || [];
+    const interactions = allInteractions.filter(i =>
+      !i.id.includes('wear') && !i.id.includes('remove')
+    );
 
     if (interactions.length === 0) {
       showMessage('Nothing to interact with here.');
@@ -666,6 +669,39 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     showMessage('No item here to pick up. Stand on an item and press F.');
   }, [showMessage, pickUpItem, theme, maxInventory]);
 
+  // Toggle wearable items (T key) - separate from main interactions
+  const doToggleWear = useCallback(() => {
+    const currentGS = gameStateRef.current;
+    const currentGrid = gridRef.current;
+    const playerPos = playerPosRef.current;
+
+    // Get self-interactions and filter for wear/remove only
+    const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y, true) || [];
+    const wearInteractions = selfInteractions.filter(i =>
+      i.id.includes('wear') || i.id.includes('remove')
+    );
+
+    if (wearInteractions.length === 0) {
+      // Check if player has any wearables in inventory
+      const hasWearables = currentGS.inventory?.some(item => theme?.isWearable?.(item.itemType));
+      const isWearing = currentGS.worn && Object.values(currentGS.worn).some(v => v);
+
+      if (!hasWearables && !isWearing) {
+        soundManager.play('blocked');
+        showMessage('No wearable items in inventory.');
+      } else {
+        soundManager.play('blocked');
+        showMessage('Cannot wear/remove right now.');
+      }
+      return;
+    }
+
+    // Execute the first available wear/remove action
+    const interaction = wearInteractions[0];
+    const execPos = { x: playerPos.x, y: playerPos.y };
+    startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, execPos);
+  }, [theme, showMessage, startInteraction]);
+
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
@@ -677,8 +713,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const possibleActions = [];
 
     // Always check interactions at player's current position first (for self-targeted actions like wear/remove)
+    // But exclude wearable interactions - those are handled by T key
     const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y, true) || [];
-    for (const interaction of selfInteractions) {
+    const nonWearSelfInteractions = selfInteractions.filter(i =>
+      !i.id.includes('wear') && !i.id.includes('remove')
+    );
+    for (const interaction of nonWearSelfInteractions) {
       // For self-interactions, execute at player position but optionally show progress at visualTarget (e.g., bomb)
       const execPos = { x: playerPos.x, y: playerPos.y };
       const visualPos = interaction.visualTarget || execPos;
@@ -707,7 +747,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         // Continue to show self-interactions if any
       } else if (p.x !== playerPos.x || p.y !== playerPos.y) {
         // Get interactions at target tile from theme (only if different from player pos)
-        const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
+        // Exclude wear/remove - those use T key
+        const allTargetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
+        const targetInteractions = allTargetInteractions.filter(i =>
+          !i.id.includes('wear') && !i.id.includes('remove')
+        );
         for (const interaction of targetInteractions) {
           // Avoid duplicates
           if (!possibleActions.find(a => a.label === interaction.label)) {
@@ -871,7 +915,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   }, [theme, showMessage, loseLife, respawn, cancelInteraction]);
 
   useEffect(() => {
-    const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'f', 'r', 'q', '1', '2', '3', '4', '5']);
+    const gameKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'e', 'f', 'r', 'q', 't', '1', '2', '3', '4', '5']);
 
     const onKeyDown = (e) => {
       const key = e.key.toLowerCase();
@@ -929,6 +973,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         return;
       }
 
+      if (key === 't' && !interactionStateRef.current && !inlineMenu) {
+        // T key for toggling wearables
+        if (interactionKeyReleasedRef.current) {
+          doToggleWear();
+        }
+        return;
+      }
+
       if (key === 'q') {
         setDropMenuOpen(prev => !prev);
         return;
@@ -961,8 +1013,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         }
       }
 
-      if (key === 'e') {
-        // Mark E as released so new interactions can start
+      if (key === 'e' || key === 't') {
+        // Mark E/T as released so new interactions can start
         interactionKeyReleasedRef.current = true;
 
         if (interactionStateRef.current) {
@@ -989,7 +1041,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
     };
-  }, [onBack, restart, doInteract, doPickup, cancelInteraction, showMessage, dropMenuOpen, inlineMenu]);
+  }, [onBack, restart, doInteract, doPickup, doToggleWear, cancelInteraction, showMessage, dropMenuOpen, inlineMenu]);
 
   // Check for number key holds when inline menu is active
   useEffect(() => {
@@ -1049,17 +1101,23 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Get available interactions from theme
       const possibleActions = [];
 
-      // Get interactions at target tile
-      const targetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
+      // Get interactions at target tile (exclude wear/remove - those use T key)
+      const allTargetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
+      const targetInteractions = allTargetInteractions.filter(i =>
+        !i.id.includes('wear') && !i.id.includes('remove')
+      );
       for (const interaction of targetInteractions) {
         const execPos = p;
         const visualPos = interaction.visualTarget || p;
         possibleActions.push(() => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos));
       }
 
-      // Also check interactions at player's current position
+      // Also check interactions at player's current position (exclude wear/remove - those use T key)
       const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, pos.x, pos.y) || [];
-      for (const interaction of selfInteractions) {
+      const nonWearSelfInteractions = selfInteractions.filter(i =>
+        !i.id.includes('wear') && !i.id.includes('remove')
+      );
+      for (const interaction of nonWearSelfInteractions) {
         // Avoid duplicates by checking if we already have this interaction type
         if (!targetInteractions.find(t => t.id === interaction.id)) {
           const execPos = { x: pos.x, y: pos.y };
@@ -1722,6 +1780,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           <span><strong>WASD/Arrows:</strong> Move</span>
           <span><strong>E:</strong> Interact</span>
           <span><strong>F:</strong> Pick up</span>
+          <span><strong>T:</strong> Wear/Remove</span>
           <span><strong>Q:</strong> Drop Item</span>
           <span><strong>R:</strong> Restart</span>
         </div>
@@ -1875,7 +1934,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                           fontWeight: 'normal',
                           textTransform: 'none',
                         }}>
-                          (Press E to wear)
+                          (Press T to wear)
                         </span>
                       </div>
                     </div>

@@ -69,7 +69,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [inventoryCapacity, setInventoryCapacity] = useState(() => editLevel?.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY);
   const [fixedOrder, setFixedOrder] = useState(() => editLevel?.fixedOrder || false);
   const [levelName, setLevelName] = useState(() => editLevel?.name || '');
-  const [levelId] = useState(() => editLevel?.id || generateId());
+  const [levelId, setLevelId] = useState(() => editLevel?.id || generateId());
   const [saved, setSaved] = useState(false);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -240,14 +240,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         return;
       }
     }
-    // Load all level data
+    // Load all level data including ID
+    setLevelId(level.id);
     setGrid(level.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } }))));
     setMissions(level.missions || []);
     setLives(level.lives || DEFAULT_LIVES);
     setInventoryCapacity(level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY);
     setFixedOrder(level.fixedOrder || false);
     setLevelName(level.name || '');
-    setSaved(false);
+    setSaved(true); // Level was just loaded from DB, so it's "saved"
     setUndoStack([]);
     setRedoStack([]);
     setLoadMenuOpen(false);
