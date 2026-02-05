@@ -82,7 +82,58 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Built a raft! You can now place it on water.',
+        message: 'Built a raft! You can now place it on water with E.',
+        modifyInventory: true
+      };
+    }
+  },
+
+  'place-raft': {
+    label: 'Place Raft',
+    duration: 1500,
+    requirements: {
+      inventory: ['raft'],
+      tile: 'water'
+    },
+    execute: (gameState, grid, x, y) => {
+      // Find raft in inventory
+      const raftIdx = findItemIndex(gameState.inventory, 'raft');
+      if (raftIdx === -1) {
+        return { success: false, message: 'No raft in inventory!' };
+      }
+
+      // Place raft on water tile
+      grid[y][x] = { type: 'raft', config: {} };
+
+      // Remove raft from inventory
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== raftIdx);
+
+      return {
+        success: true,
+        message: '🛶 Raft placed on water!',
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
+  'pickup-raft': {
+    label: 'Pick Up Raft',
+    duration: 1500,
+    requirements: {
+      tile: 'raft'
+    },
+    execute: (gameState, grid, x, y) => {
+      // Replace raft tile with water
+      grid[y][x] = { type: 'water', config: {} };
+
+      // Add raft to inventory
+      gameState.inventory.push({ itemType: 'raft', filled: false });
+
+      return {
+        success: true,
+        message: '🛶 Picked up raft!',
+        modifyGrid: true,
         modifyInventory: true
       };
     }
@@ -268,7 +319,7 @@ export function getAvailableInteractions(gameState, grid, x, y) {
       available.push({
         id,
         label: interaction.label,
-        duration: interaction.duration
+        duration: interaction.duration || 1500 // Explicit fallback
       });
     }
   }
@@ -327,7 +378,7 @@ export function getInteractionLabel(interactionId) {
 }
 
 // Execute an interaction
-export function executeInteraction(interactionId, gameState, grid, x, y) {
+export function executeInteraction(interactionId, gameState, grid, x, y, phase = 'complete') {
   const interaction = INTERACTIONS[interactionId];
   if (!interaction) {
     return { success: false, error: 'Unknown interaction' };
@@ -338,6 +389,24 @@ export function executeInteraction(interactionId, gameState, grid, x, y) {
     return { success: false, error: 'Invalid position' };
   }
 
+  // Handle interaction lifecycle phases
+  if (phase === 'start') {
+    if (interaction.onStart) {
+      return interaction.onStart(gameState, grid, x, y);
+    }
+    // No onStart handler - return null so SolverMode knows to ignore it
+    return null;
+  }
+
+  if (phase === 'cancel') {
+    if (interaction.onCancel) {
+      return interaction.onCancel(gameState, grid, x, y);
+    }
+    // No onCancel handler - return null so SolverMode knows to ignore it
+    return null;
+  }
+
+  // Default phase: 'complete'
   // Check requirements
   if (!checkRequirements(interaction.requirements, gameState, tile, interaction)) {
     return { success: false, error: 'Requirements not met' };
@@ -362,49 +431,11 @@ function cloneGrid(grid) {
   return grid.map(row => row.map(cell => ({ ...cell, config: { ...cell.config } })));
 }
 
-// Custom drop handler - handles raft placement on adjacent water tile
+// Custom drop handler - rafts now drop on player tile (use E to place on water instead)
 // Returns { handled: true, newGrid, newInventory, message } if handled, null otherwise
 export function customDrop(itemObj, gameState, grid, playerPos, direction) {
-  // Only handle raft drops
-  if (itemObj.itemType !== 'raft') {
-    return null; // Let default drop handle other items
-  }
-
-  // Get facing tile position
-  const offset = DIRECTION_OFFSETS[direction];
-  if (!offset) {
-    return { handled: true, message: "Face a direction to place the raft." };
-  }
-
-  const targetX = playerPos.x + offset.dx;
-  const targetY = playerPos.y + offset.dy;
-
-  // Check bounds
-  if (targetY < 0 || targetY >= grid.length || targetX < 0 || targetX >= grid[0].length) {
-    return { handled: true, message: "Can't place raft here - out of bounds." };
-  }
-
-  const targetTile = grid[targetY][targetX];
-
-  // Raft can only be placed on water
-  if (targetTile.type !== 'water') {
-    return { handled: true, message: "Face water to place the raft (Q)." };
-  }
-
-  // Place raft on water
-  const newGrid = cloneGrid(grid);
-  newGrid[targetY][targetX] = { type: 'raft', config: {} };
-
-  // Remove raft from inventory
-  const raftIdx = gameState.inventory.findIndex(item => item.itemType === 'raft');
-  const newInventory = gameState.inventory.filter((_, i) => i !== raftIdx);
-
-  return {
-    handled: true,
-    newGrid,
-    newInventory,
-    message: '🛶 Raft placed on water!'
-  };
+  // Let default drop handler handle all items (including raft)
+  return null;
 }
 
 // Custom pickup handler - handles raft pickup from adjacent raft tile
