@@ -2,14 +2,22 @@
   "name": "Mad Science Lab",
   "description": "Escape the lab before the experiment goes wrong! Mix chemicals, avoid hazards, and find the antidote.",
   "messages": {
+    "cardDoorUnlockHint": "Face the door and hold E to unlock with {color} keycard",
+    "cardDoorLocked": "Access denied! Need a {color} keycard",
+    "needKeycard": "Need a {color} keycard!",
+    "cardDoorUnlocked": "Access granted! {color} door unlocked."
   },
   "tiles": {
     "empty": "Empty",
     "wall": "Wall",
     "floor": "Lab Floor",
     "start": "Entry Point (Start)",
-    "exit": "Emergency Exit"
+    "exit": "Emergency Exit",
+    "door-card": "Security Door",
+    "door-card-open": "Open Security Door",
+    "item-card": "Keycard"
   },
   "items": {
+    "card": "Keycard"
   }
 }
