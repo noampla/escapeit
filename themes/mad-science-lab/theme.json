@@ -1,0 +1,41 @@
+{
+  "id": "mad-science-lab",
+  "name": "Mad Science Lab",
+  "description": "Escape the lab before the experiment goes wrong!",
+  "emoji": "🧪",
+  "version": "1.0.0",
+  "author": "Claude",
+  "primaryColor": "#39ff14",
+  "backgroundColor": "#0a0a0f",
+  "accentColor": "#00ffcc",
+  "startTile": "start",
+  "exitTiles": ["exit"],
+  "ui": {
+    "primaryColor": "#39ff14",
+    "backgroundColor": "#0a0a0f",
+    "accentColor": "#00ffcc",
+    "dangerColor": "#ff3366",
+    "panelBackground": "linear-gradient(135deg, #0a0a0f 0%, #0f1a1a 25%, #0a0f0a 50%, #050808 100%)",
+    "hudBackground": "linear-gradient(180deg, rgba(10, 15, 15, 0.95) 0%, rgba(5, 10, 10, 0.95) 100%)",
+    "messageBackground": "linear-gradient(145deg, rgba(20, 40, 30, 0.95) 0%, rgba(10, 20, 15, 0.95) 100%)",
+    "buttonBackground": "linear-gradient(145deg, #1a2a2a 0%, #0f1a1a 100%)",
+    "buttonHoverShadow": "0 8px 28px rgba(57, 255, 20, 0.4)",
+    "notificationColors": {
+      "success": { "bg": "rgba(57, 255, 20, 0.9)", "text": "#0a0a0f", "border": "#39ff14" },
+      "info": { "bg": "rgba(0, 255, 204, 0.9)", "text": "#0a0a0f", "border": "#00ffcc" },
+      "warning": { "bg": "rgba(255, 200, 0, 0.9)", "text": "#0a0a0f", "border": "#ffc800" },
+      "error": { "bg": "rgba(255, 51, 102, 0.9)", "text": "#ffffff", "border": "#ff3366" },
+      "danger": { "bg": "rgba(180, 30, 60, 0.95)", "text": "#ffd0d0", "border": "#b41e3c" }
+    }
+  },
+  "missions": {
+    "types": ["collect", "rescue", "reach", "escape"],
+    "targetOptions": {
+      "collect": ["antidote", "keycard"]
+    },
+    "defaultMission": {
+      "type": "escape",
+      "description": "Reach the emergency exit"
+    }
+  }
+}

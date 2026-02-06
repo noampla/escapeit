@@ -4,7 +4,7 @@ import SolverMode from './components/SolverMode';
 import LevelSelect from './components/LevelSelect';
 import MainMenu from './components/MainMenu';
 import ThemeSelect from './components/ThemeSelect';
-import ThemeLoader from './engine/themeLoader';
+import ThemeLoader, { preloadAllThemeTranslations } from './engine/themeLoader';
 import { migrateLevels } from './utils/storage';
 import { UserProvider } from './contexts/UserContext.jsx';
 import { LanguageProvider } from './contexts/LanguageContext.jsx';
@@ -26,9 +26,10 @@ function AppContent() {
   // Dev panel easter egg (Ctrl+Shift+D or type "devmode")
   const { isDevPanelOpen, closeDevPanel } = useDevMode();
 
-  // Run migration on mount
+  // Run migration and preload theme translations on mount
   useEffect(() => {
     migrateLevels();
+    preloadAllThemeTranslations();
   }, []);
 
   // Load theme when selected

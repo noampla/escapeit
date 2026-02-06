@@ -1,0 +1,15 @@
+{
+  "name": "Mad Science Lab",
+  "description": "Escape the lab before the experiment goes wrong! Mix chemicals, avoid hazards, and find the antidote.",
+  "messages": {
+  },
+  "tiles": {
+    "empty": "Empty",
+    "wall": "Wall",
+    "floor": "Lab Floor",
+    "start": "Entry Point (Start)",
+    "exit": "Emergency Exit"
+  },
+  "items": {
+  }
+}

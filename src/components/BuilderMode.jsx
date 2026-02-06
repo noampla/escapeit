@@ -88,13 +88,35 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [viewportCenter, setViewportCenter] = useState({ x: 50, y: 50 });
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef(null);
-  const containerRef = useRef(null);
+  const gridContainerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
 
-  // Calculate viewport bounds based on center and container size
+  // Measure container size to fill available space
+  // Re-run when returning from test mode
+  useEffect(() => {
+    if (testMode) return; // Don't measure when in test mode
+    const container = gridContainerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setContainerSize({ width: rect.width - 40, height: rect.height - 40 }); // padding
+    };
+
+    // Small delay to ensure container is rendered
+    const timer = setTimeout(updateSize, 50);
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [testMode]);
+
+  // Calculate viewport bounds to fill container
   const viewportBounds = useMemo(() => {
-    // Default to showing ~20x15 tiles if no container measured yet
-    const tilesX = 20;
-    const tilesY = 15;
+    const tilesX = Math.max(10, Math.floor(containerSize.width / TILE_SIZE));
+    const tilesY = Math.max(8, Math.floor(containerSize.height / TILE_SIZE));
     const halfX = Math.floor(tilesX / 2);
     const halfY = Math.floor(tilesY / 2);
 
@@ -104,7 +126,13 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     const maxY = Math.min(grid.length - 1, viewportCenter.y + halfY);
 
     return { minX, minY, maxX, maxY };
-  }, [viewportCenter, grid]);
+  }, [viewportCenter, grid, containerSize]);
+
+  // Check if we can pan in each direction
+  const canPanLeft = viewportBounds.minX > 0;
+  const canPanRight = viewportBounds.maxX < grid[0].length - 1;
+  const canPanUp = viewportBounds.minY > 0;
+  const canPanDown = viewportBounds.maxY < grid.length - 1;
 
   // Pan viewport with arrow keys (when not typing) or middle mouse drag
   const handlePan = useCallback((dx, dy) => {
@@ -481,7 +509,56 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       {/* Main area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} />}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', padding: 20, position: 'relative' }}>
+        <div ref={gridContainerRef} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: 20, position: 'relative' }}>
+          {/* Pan arrows */}
+          {canPanUp && (
+            <div
+              onClick={() => handlePan(0, -5)}
+              style={{
+                position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+                color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', zIndex: 10,
+                padding: '4px 20px', userSelect: 'none',
+              }}
+              onMouseEnter={e => e.target.style.color = 'rgba(255,255,255,0.8)'}
+              onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.4)'}
+            >▲</div>
+          )}
+          {canPanDown && (
+            <div
+              onClick={() => handlePan(0, 5)}
+              style={{
+                position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+                color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', zIndex: 10,
+                padding: '4px 20px', userSelect: 'none',
+              }}
+              onMouseEnter={e => e.target.style.color = 'rgba(255,255,255,0.8)'}
+              onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.4)'}
+            >▼</div>
+          )}
+          {canPanLeft && (
+            <div
+              onClick={() => handlePan(-5, 0)}
+              style={{
+                position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', zIndex: 10,
+                padding: '20px 4px', userSelect: 'none',
+              }}
+              onMouseEnter={e => e.target.style.color = 'rgba(255,255,255,0.8)'}
+              onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.4)'}
+            >◀</div>
+          )}
+          {canPanRight && (
+            <div
+              onClick={() => handlePan(5, 0)}
+              style={{
+                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', zIndex: 10,
+                padding: '20px 4px', userSelect: 'none',
+              }}
+              onMouseEnter={e => e.target.style.color = 'rgba(255,255,255,0.8)'}
+              onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.4)'}
+            >▶</div>
+          )}
           <Grid
             grid={grid}
             onClick={handleGridClick}

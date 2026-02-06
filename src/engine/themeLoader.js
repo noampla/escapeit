@@ -1,6 +1,27 @@
 // Theme Loader - Dynamically loads theme modules
 import soundManager from './soundManager.js';
 import { getThemeMessage, getThemeItemLabel, registerThemeTranslations } from '../i18n';
+import { AVAILABLE_THEMES } from '../utils/themeRegistry';
+
+/**
+ * Preload translations for all registered themes
+ * Call this at app startup so theme names/descriptions are available in ThemeSelect
+ */
+export async function preloadAllThemeTranslations() {
+  const languages = ['en', 'he'];
+
+  for (const theme of AVAILABLE_THEMES) {
+    for (const lang of languages) {
+      try {
+        const i18nModule = await import(`../../themes/${theme.id}/i18n/${lang}.json`);
+        const data = i18nModule.default || i18nModule;
+        registerThemeTranslations(theme.id, lang, data);
+      } catch {
+        // No i18n file for this theme/language - that's OK
+      }
+    }
+  }
+}
 
 export class ThemeLoader {
   constructor(themeId) {

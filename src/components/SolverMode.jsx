@@ -4,7 +4,7 @@ import { findTile, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
 import { getAllHazardZones } from '../engine/hazards';
 import { checkAllMissions, checkMissionComplete } from '../engine/missions';
-import { DIRECTIONS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { DIRECTIONS, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { InteractionEngine } from '../engine/interactionEngine';
 import { useUser } from '../contexts/UserContext.jsx';
@@ -195,6 +195,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [inlineMenu, setInlineMenu] = useState(null); // { actions: [{label, action, key}] }
   const [soundEnabled, setSoundEnabled] = useState(() => soundManager.enabled);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const gridContainerRef = useRef(null);
 
   const messageTimerRef = useRef(null);
   const gridRef = useRef(grid);
@@ -1492,11 +1494,28 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
   }, [playerPos, gameOver, level, showMessage, grid, gameState, exitTiles, theme]);
 
-  // Calculate viewport centered on player for infinite grid support
-  const viewportBounds = useMemo(() =>
-    calculatePlayerViewport(playerPos, grid),
-    [playerPos, grid]
-  );
+  // Measure container to fill available space
+  useEffect(() => {
+    const container = gridContainerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setContainerSize({ width: rect.width - 40, height: rect.height - 40 });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // Calculate viewport centered on player, sized to fill container
+  const viewportBounds = useMemo(() => {
+    const tilesX = Math.max(10, Math.floor(containerSize.width / TILE_SIZE));
+    const tilesY = Math.max(8, Math.floor(containerSize.height / TILE_SIZE));
+    return calculatePlayerViewport(playerPos, grid, tilesX, tilesY);
+  }, [playerPos, grid, containerSize]);
 
   return (
     <div style={{
@@ -1786,12 +1805,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         <NotificationPanel />
 
         {/* Game Area - Flexible, centered */}
-        <div style={{
+        <div ref={gridContainerRef} style={{
           flex: 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '20px',
+          overflow: 'hidden',
           position: 'relative',
         }}>
         <div style={{ position: 'relative' }}>

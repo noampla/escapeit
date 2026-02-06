@@ -15,6 +15,14 @@ export const AVAILABLE_THEMES = [
     emoji: '🏦',
     difficulty: 'Hard',
     author: 'Claude'
+  },
+  {
+    id: 'mad-science-lab',
+    name: 'Mad Science Lab',
+    description: 'Escape the lab before the experiment goes wrong',
+    emoji: '🧪',
+    difficulty: 'Medium',
+    author: 'Claude'
   }
 ];
 
