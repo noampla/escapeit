@@ -12,8 +12,11 @@ export const ITEM_TYPES = {
 };
 
 // Render item on canvas (custom rendering)
-export function renderItem(ctx, itemType, cx, cy, size, state = {}) {
+// x, y are TOP-LEFT corner of the tile
+export function renderItem(ctx, itemType, x, y, size, state = {}) {
   if (itemType === 'card') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
     const lockColor = state?.lockColor || 'red';
     const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
 
@@ -49,29 +52,9 @@ export function renderItem(ctx, itemType, cx, cy, size, state = {}) {
   return false;
 }
 
-// Render item in inventory
-export function renderInventoryItem(ctx, itemType, cx, cy, size, state = {}) {
-  if (itemType === 'card') {
-    const lockColor = state?.lockColor || 'red';
-    const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
-
-    // Card body (slightly smaller for inventory)
-    const scale = 0.8;
-    ctx.fillStyle = '#e8e8f0';
-    ctx.fillRect(cx - size * 0.25 * scale, cy - size * 0.16 * scale, size * 0.5 * scale, size * 0.32 * scale);
-
-    // Colored stripe
-    ctx.fillStyle = colorData.color;
-    ctx.fillRect(cx - size * 0.25 * scale, cy - size * 0.16 * scale, size * 0.5 * scale, size * 0.09 * scale);
-
-    // Chip
-    ctx.fillStyle = '#daa520';
-    ctx.fillRect(cx - size * 0.15 * scale, cy + size * 0.02 * scale, size * 0.12 * scale, size * 0.08 * scale);
-
-    return true;
-  }
-
-  return false;
+// Render item in inventory (same as renderItem)
+export function renderInventoryItem(ctx, itemType, x, y, size, state = {}) {
+  return renderItem(ctx, itemType, x, y, size, state);
 }
 
 // Get emoji for item

@@ -7,53 +7,16 @@ export const INTERACTIONS = {
     label: 'Use Keycard',
     duration: 800,
     requirements: {
-      tileAny: ['door-card']
+      tile: 'door-card'
     },
     checkCustom: (gameState, tile) => {
       const doorColor = tile.config?.lockColor || 'red';
       return gameState.inventory?.some(item =>
         item.itemType === 'card' && item.lockColor === doorColor
       );
-    }
-  }
-};
-
-// Get available interactions at a position
-export function getAvailableInteractions(gameState, grid, x, y) {
-  const tile = grid[y]?.[x];
-  if (!tile) return [];
-
-  const available = [];
-
-  // Check unlock card door
-  if (tile.type === 'door-card') {
-    const doorColor = tile.config?.lockColor || 'red';
-    const hasMatchingCard = gameState.inventory?.some(item =>
-      item.itemType === 'card' && item.lockColor === doorColor
-    );
-    if (hasMatchingCard) {
-      available.push('unlock-card-door');
-    }
-  }
-
-  return available;
-}
-
-// Get label for an interaction
-export function getInteractionLabel(interactionId) {
-  const interaction = INTERACTIONS[interactionId];
-  return interaction?.label || interactionId;
-}
-
-// Execute an interaction
-export function executeInteraction(interactionId, gameState, grid, x, y) {
-  const tile = grid[y]?.[x];
-  if (!tile) {
-    return { success: false, message: 'Invalid position' };
-  }
-
-  switch (interactionId) {
-    case 'unlock-card-door': {
+    },
+    execute: (gameState, grid, x, y) => {
+      const tile = grid[y][x];
       const doorColor = tile.config?.lockColor || 'red';
       const colorLabel = LOCK_COLORS[doorColor]?.label || doorColor;
 
@@ -71,8 +34,7 @@ export function executeInteraction(interactionId, gameState, grid, x, y) {
       }
 
       // Remove card from inventory
-      const newInventory = [...gameState.inventory];
-      newInventory.splice(cardIndex, 1);
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== cardIndex);
 
       // Open the door
       grid[y][x] = { type: 'door-card-open', config: {} };
@@ -82,15 +44,96 @@ export function executeInteraction(interactionId, gameState, grid, x, y) {
         messageKey: 'cardDoorUnlocked',
         messageParams: { color: colorLabel },
         modifyGrid: true,
-        modifyInventory: true,
-        newInventory
+        modifyInventory: true
       };
     }
-
-    default:
-      return {
-        success: false,
-        message: 'Unknown interaction'
-      };
   }
+};
+
+// Check if interaction requirements are met
+function checkRequirements(requirements, gameState, tile, interaction) {
+  if (!requirements) return true;
+
+  // Check tile requirement
+  if (requirements.tile && tile.type !== requirements.tile) {
+    return false;
+  }
+
+  // Check tileAny requirement
+  if (requirements.tileAny && !requirements.tileAny.includes(tile.type)) {
+    return false;
+  }
+
+  // Check custom requirement
+  if (interaction.checkCustom && !interaction.checkCustom(gameState, tile)) {
+    return false;
+  }
+
+  return true;
+}
+
+// Get available interactions at a position
+export function getAvailableInteractions(gameState, grid, x, y) {
+  const tile = grid[y]?.[x];
+  if (!tile) return [];
+
+  const available = [];
+
+  for (const [id, interaction] of Object.entries(INTERACTIONS)) {
+    if (checkRequirements(interaction.requirements, gameState, tile, interaction)) {
+      available.push({
+        id,
+        label: interaction.label,
+        duration: interaction.duration,
+        progressColor: interaction.progressColor || null
+      });
+    }
+  }
+
+  return available;
+}
+
+// Get label for an interaction
+export function getInteractionLabel(interactionId) {
+  const interaction = INTERACTIONS[interactionId];
+  return interaction?.label || interactionId;
+}
+
+// Execute an interaction
+export function executeInteraction(interactionId, gameState, grid, x, y, phase = 'complete') {
+  const interaction = INTERACTIONS[interactionId];
+  if (!interaction) {
+    return { success: false, error: 'Unknown interaction' };
+  }
+
+  const tile = grid[y]?.[x];
+  if (!tile) {
+    return { success: false, error: 'Invalid position' };
+  }
+
+  // Handle interaction lifecycle phases
+  if (phase === 'start') {
+    if (interaction.onStart) {
+      return interaction.onStart(gameState, grid, x, y);
+    }
+    // No onStart handler - return null so SolverMode knows to ignore it
+    return null;
+  }
+
+  if (phase === 'cancel') {
+    if (interaction.onCancel) {
+      return interaction.onCancel(gameState, grid, x, y);
+    }
+    // No onCancel handler - return null so SolverMode knows to ignore it
+    return null;
+  }
+
+  // Default phase: 'complete'
+  // Check requirements
+  if (!checkRequirements(interaction.requirements, gameState, tile, interaction)) {
+    return { success: false, error: 'Requirements not met' };
+  }
+
+  // Execute the interaction
+  return interaction.execute(gameState, grid, x, y);
 }
