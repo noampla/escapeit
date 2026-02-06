@@ -7,6 +7,8 @@ import ThemeSelect from './components/ThemeSelect';
 import ThemeLoader from './engine/themeLoader';
 import { migrateLevels } from './utils/storage';
 import { UserProvider } from './contexts/UserContext.jsx';
+import { LanguageProvider } from './contexts/LanguageContext.jsx';
+import { NotificationProvider } from './contexts/NotificationContext.jsx';
 import UserStatusBar from './components/UserStatusBar.jsx';
 import DevTasksPanel from './components/DevTasksPanel.jsx';
 import useDevMode from './hooks/useDevMode.js';
@@ -143,15 +145,17 @@ function AppContent() {
 
     return (
       <ThemeContext.Provider value={theme}>
-        <SolverMode
-          level={selectedLevel}
-          onBack={() => {
-            setMode('menu');
-            setSelectedLevel(null);
-            setSelectedTheme(null);
-            setTheme(null);
-          }}
-        />
+        <NotificationProvider themeColors={theme?.getNotificationColors?.()}>
+          <SolverMode
+            level={selectedLevel}
+            onBack={() => {
+              setMode('menu');
+              setSelectedLevel(null);
+              setSelectedTheme(null);
+              setTheme(null);
+            }}
+          />
+        </NotificationProvider>
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
       </ThemeContext.Provider>
     );
@@ -173,9 +177,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <UserProvider>
-      <UserStatusBar />
-      <AppContent />
-    </UserProvider>
+    <LanguageProvider>
+      <UserProvider>
+        <UserStatusBar />
+        <AppContent />
+      </UserProvider>
+    </LanguageProvider>
   );
 }

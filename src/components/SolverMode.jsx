@@ -8,10 +8,13 @@ import { DIRECTIONS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { InteractionEngine } from '../engine/interactionEngine';
 import { useUser } from '../contexts/UserContext.jsx';
+import { useLanguage } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { submitScore } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
 import soundManager from '../engine/soundManager.js';
 import { moveEntities } from '../engine/entities.js';
+import NotificationPanel from './NotificationPanel';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -113,7 +116,27 @@ function initializeRevealedTiles(startX, startY, grid) {
 
 export default function SolverMode({ level, onBack, isTestMode = false }) {
   const theme = useContext(ThemeContext);
+  const themeId = theme?.themeId || 'forest';
+  const { t, isRTL, language, setLanguage, getItemLabel, getTileLabel, getMessage } = useLanguage();
+
+  // Keep theme's language in sync with app language
+  useEffect(() => {
+    if (theme?.setLanguage) {
+      theme.setLanguage(language);
+    }
+  }, [theme, language]);
+
+  // Helper to get localized mission description
+  const getMissionDescription = (mission) => {
+    if (mission.description) return mission.description;
+    const targetLabel = mission.targetId
+      ? getTileLabel(themeId, mission.targetId, mission.targetId)
+      : '';
+    const typeKey = `missionTypes.${mission.type}`;
+    return t(typeKey, { target: targetLabel });
+  };
   const { userId, displayName } = useUser();
+  const notification = useNotification();
   const interactionEngine = useMemo(() => theme ? new InteractionEngine(theme) : null, [theme]);
 
   // Get theme-specific values with defaults
@@ -132,7 +155,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       return levelMissions;
     }
     // Add the theme's default mission (usually "reach exit/car")
-    const defaultMission = theme?.getDefaultMission?.() || { type: 'escape', description: 'Reach the exit' };
+    // Use theme's default mission but don't use hardcoded description - let getMissionDescription localize it
+    const themeDefault = theme?.getDefaultMission?.();
+    const defaultMission = themeDefault ? { ...themeDefault, description: '' } : { type: 'escape', description: '' };
     return [...levelMissions, defaultMission];
   }, [level.missions, theme]);
 
@@ -202,13 +227,20 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   inlineMenuRef.current = inlineMenu;
   showRestartConfirmRef.current = showRestartConfirm;
 
-  const showMessage = useCallback((msg, duration = 1500) => {
-    setMessage(msg);
-    if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
-    if (duration < 99999) {
-      messageTimerRef.current = setTimeout(() => setMessage(null), duration);
-    }
-  }, []);
+  // Notification helper using translation keys
+  const showNotification = useCallback((key, type = 'info', params = {}, duration = null) => {
+    if (!notification) return;
+    notification.notify(key, type, params, duration);
+  }, [notification]);
+
+  // Raw message notification for dynamic/theme content
+  // Attempts to translate theme messages using getMessage, falls back to raw text
+  const showMessage = useCallback((msg, duration = 1500, type = 'info') => {
+    if (!notification) return;
+    // Try to translate via theme's translateMessage if available
+    const translatedMsg = theme?.translateMessage?.(msg, {}, msg) || msg;
+    notification.notifyRaw(translatedMsg, type, duration);
+  }, [notification, theme]);
 
   const respawn = useCallback(() => {
     setPlayerPos({ ...startPos });
@@ -226,11 +258,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     if (newLives <= 0) {
       setGameOver('fail');
       soundManager.play('lose');
-      showMessage('GAME OVER', 999999);
+      showNotification('notifications.gameOver', 'danger', {}, 999999);
       return 0;
     }
     return newLives;
-  }, [showMessage]);
+  }, [showNotification]);
 
   const restart = useCallback(() => {
     setGrid(convertLegacyItems(level.grid));
@@ -273,7 +305,10 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       if (customResult.newInventory !== undefined) {
         setGameState(prev => ({ ...prev, inventory: customResult.newInventory }));
       }
-      if (customResult.message) showMessage(customResult.message);
+      const dropMsg = customResult.messageKey
+        ? getMessage(themeId, customResult.messageKey, customResult.messageParams || {})
+        : customResult.message;
+      if (dropMsg) showMessage(dropMsg, 1500, 'info');
       setDropMenuOpen(false);
       return;
     }
@@ -281,7 +316,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const cell = currentGrid[pos.y][pos.x];
     // Allow dropping on ground-type tiles (uses theme's ground tiles)
     if (!groundTiles.includes(cell.type)) {
-      showMessage("Can't drop here!");
+      showNotification('notifications.cantDropHere', 'error');
       return;
     }
 
@@ -294,10 +329,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }));
     const ITEM_TYPES = theme?.getItemTypes() || {};
     const itemDef = ITEM_TYPES[dropped.itemType];
+    const droppedLabel = getItemLabel(themeId, dropped.itemType, itemDef?.label || dropped.itemType);
     soundManager.play('drop');
-    showMessage(`Dropped: ${itemDef?.emoji || ''} ${itemDef?.label || dropped.itemType}`);
+    showNotification('notifications.dropped', 'info', { emoji: itemDef?.emoji || '', label: droppedLabel });
     setDropMenuOpen(false);
-  }, [showMessage, theme]);
+  }, [showNotification, theme, getItemLabel, themeId]);
 
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;
@@ -306,7 +342,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const TILE_TYPES = theme?.getTileTypes?.() || {};
     const tileDef = TILE_TYPES[cell.type];
     if (tileDef?.pickable === false) {
-      showMessage("Can't pick this up! Use E to interact.");
+      showNotification('notifications.cantPickUp', 'error');
       return false;
     }
 
@@ -316,7 +352,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const isContainer = theme?.isContainer?.(itemType);
 
     if (!isContainer && currentGS.inventory.length >= maxInventory) {
-      showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+      showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
       return false;
     }
 
@@ -410,9 +446,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       soundManager.play('pickup');
       if (existingContainer) {
         const totalCapacity = existingContainer.capacity + newCapacity;
-        showMessage(`+$${newCapacity.toLocaleString()} capacity! (Total: $${totalCapacity.toLocaleString()})`);
+        showNotification('notifications.capacityBonus', 'success', { capacity: newCapacity.toLocaleString(), total: totalCapacity.toLocaleString() });
       } else {
-        showMessage(`${itemLabel} equipped!`);
+        showNotification('notifications.equipped', 'success', { label: itemLabel });
       }
       return true;
     }
@@ -426,12 +462,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     soundManager.play('pickup');
     // Show special message for wearable items
     if (theme?.isWearable?.(itemType)) {
-      showMessage(`Picked up: ${itemLabel} (Press T to wear)`);
+      showNotification('notifications.pickedUpWearable', 'success', { label: itemLabel });
     } else {
-      showMessage(`Picked up: ${itemLabel}`);
+      showNotification('notifications.pickedUp', 'success', { label: itemLabel });
     }
     return true;
-  }, [showMessage, maxInventory, theme]);
+  }, [showNotification, maxInventory, theme]);
 
   const getInteractTargets = useCallback(() => {
     const pos = playerPosRef.current;
@@ -536,7 +572,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const isAdjacent = (Math.abs(dx) === 1 && dy === 0) || (dx === 0 && Math.abs(dy) === 1);
 
     if (!isAdjacent) {
-      showMessage('Too far away!');
+      showNotification('notifications.tooFar', 'warning');
       return;
     }
 
@@ -557,7 +593,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     );
 
     if (interactions.length === 0) {
-      showMessage('Nothing to interact with here.');
+      showNotification('notifications.nothingHere', 'info');
       return;
     }
 
@@ -624,7 +660,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         soundManager.play('lose');
         setLives(0);
         setGameOver('fail');
-        showMessage(result.message || 'You died!', 999999);
+        const failMsg = result.messageKey ? getMessage(themeId, result.messageKey, result.messageParams || {}) : (result.message || t('notifications.gameOver'));
+        showMessage(failMsg, 999999, 'danger');
         cancelInteraction();
         return;
       }
@@ -654,13 +691,16 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         }));
       }
 
-      // Show message
-      if (result.message) {
-        showMessage(result.message);
+      // Show message (translate if messageKey provided)
+      if (result.messageKey) {
+        const msg = getMessage(themeId, result.messageKey, result.messageParams || {});
+        showMessage(msg, 1500, 'success');
+      } else if (result.message) {
+        showMessage(result.message, 1500, 'success');
       }
     } else if (result?.error) {
       soundManager.play('blocked');
-      showMessage(result.error);
+      showMessage(result.error, 1500, 'error');
     }
 
     // Mark that E/number key must be released before starting new interaction
@@ -682,14 +722,17 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       if (customResult.newInventory !== undefined) {
         setGameState(prev => ({ ...prev, inventory: customResult.newInventory }));
       }
-      if (customResult.message) showMessage(customResult.message);
+      const pickupMsg = customResult.messageKey
+        ? getMessage(themeId, customResult.messageKey, customResult.messageParams || {})
+        : customResult.message;
+      if (pickupMsg) showMessage(pickupMsg, 1500, 'info');
       return;
     }
 
     // Check if standing on an item
     if (currentCell.type.startsWith('item-')) {
       if (currentGS.inventory.length >= maxInventory) {
-        showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+        showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
         return;
       }
       pickUpItem(currentCell, pos.x, pos.y);
@@ -710,7 +753,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         const adjCell = currentGrid[ny][nx];
         if (adjCell.type.startsWith('item-') && theme?.canPickupFromAdjacent?.(adjCell.type)) {
           if (currentGS.inventory.length >= maxInventory) {
-            showMessage(`Inventory full! (${maxInventory} items max) Press Q to drop items.`);
+            showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
             return;
           }
           pickUpItem(adjCell, nx, ny);
@@ -720,7 +763,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
 
     soundManager.play('blocked');
-    showMessage('No item here to pick up. Stand on an item and press F.');
+    showNotification('notifications.noItemHere', 'info');
   }, [showMessage, pickUpItem, theme, maxInventory]);
 
   // Toggle wearable items (T key) - separate from main interactions
@@ -742,10 +785,10 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
       if (!hasWearables && !isWearing) {
         soundManager.play('blocked');
-        showMessage('No wearable items in inventory.');
+        showNotification('notifications.noWearables', 'info');
       } else {
         soundManager.play('blocked');
-        showMessage('Cannot wear/remove right now.');
+        showNotification('notifications.cantWearNow', 'warning');
       }
       return;
     }
@@ -795,7 +838,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       if (c.type.startsWith('item-')) {
         if (possibleActions.length === 0) {
           soundManager.play('blocked');
-          showMessage('Press F to pick up items.');
+          showNotification('notifications.pressF', 'info');
           return;
         }
         // Continue to show self-interactions if any
@@ -823,7 +866,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     if (possibleActions.length === 0) {
       soundManager.play('blocked');
-      showMessage('Nothing to interact with here.');
+      showNotification('notifications.nothingHere', 'info');
       return;
     }
 
@@ -900,8 +943,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Handle life loss from hazards
       if (moveResult.loseLife) {
         const remaining = loseLife();
-        if (remaining > 0 && moveResult.message) {
-          showMessage(`${moveResult.message} Lives: ${remaining}`);
+        if (remaining > 0) {
+          const moveMsg = moveResult.messageKey
+            ? getMessage(themeId, moveResult.messageKey, moveResult.messageParams || {})
+            : moveResult.message;
+          if (moveMsg) {
+            showNotification('notifications.damage', 'danger', { message: moveMsg, remaining });
+          }
         }
         return;
       }
@@ -925,8 +973,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Handle blocked movement with message
       if (!moveResult.allowed) {
         soundManager.play('blocked');
-        if (moveResult.message) {
-          showMessage(moveResult.message);
+        const blockedMsg = moveResult.messageKey
+          ? getMessage(themeId, moveResult.messageKey, moveResult.messageParams || {})
+          : moveResult.message;
+        if (blockedMsg) {
+          showMessage(blockedMsg, 1500, 'info');
         }
         return;
       }
@@ -943,7 +994,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         lastHazardDamageRef.current = Date.now();
         const remaining = loseLife();
         if (remaining > 0) {
-          showMessage(`${hazard.message} Lives: ${remaining}`);
+          const hazardMsg = hazard.messageKey ? getMessage(themeId, hazard.messageKey) : hazard.message;
+          showNotification('notifications.damage', 'danger', { message: hazardMsg, remaining });
         }
       }
       return;
@@ -962,11 +1014,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         lastHazardDamageRef.current = Date.now();
         const remaining = loseLife();
         if (remaining > 0) {
-          showMessage(`${hazard.message} Lives: ${remaining}`);
+          const hazardMsg = hazard.messageKey ? getMessage(themeId, hazard.messageKey) : hazard.message;
+          showNotification('notifications.damage', 'danger', { message: hazardMsg, remaining });
         }
       }
     }
-  }, [theme, showMessage, loseLife, respawn, cancelInteraction]);
+  }, [theme, showMessage, loseLife, respawn, cancelInteraction, getMessage, themeId]);
 
   // Store callback refs so keyboard handler doesn't need to depend on them
   const callbacksRef = useRef({});
@@ -1100,7 +1153,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
         if (interactionStateRef.current) {
           cancelInteraction();
-          showMessage('Interaction cancelled.');
+          showNotification('notifications.cancelled', 'info');
         }
       }
 
@@ -1111,7 +1164,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
         if (interactionStateRef.current) {
           cancelInteraction();
-          showMessage('Interaction cancelled.');
+          showNotification('notifications.cancelled', 'info');
         }
       }
     };
@@ -1362,7 +1415,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           lastHazardDamageRef.current = now;
           const remaining = loseLife();
           if (remaining > 0) {
-            showMessage(`${hazard.message} Lives: ${remaining}`);
+            const hazardMsg = hazard.messageKey ? getMessage(themeId, hazard.messageKey) : hazard.message;
+            showNotification('notifications.damage', 'danger', { message: hazardMsg, remaining });
           }
         }
       }
@@ -1409,7 +1463,10 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     if (exitResult && !exitResult.allowed) {
       if (!exitMessageShownRef.current) {
         exitMessageShownRef.current = true;
-        showMessage(exitResult.message || 'Cannot exit yet!');
+        const exitMsg = exitResult.messageKey
+          ? getMessage(themeId, exitResult.messageKey, exitResult.messageParams || {})
+          : (exitResult.message || t('notifications.completeMissions'));
+        showMessage(exitMsg, 1500, 'warning');
       }
       return;
     }
@@ -1420,7 +1477,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setGameState(prev => ({ ...prev, reachedExit: true }));
       setGameOver('win');
       soundManager.play('win');
-      showMessage('YOU ESCAPED!', 999999);
+      showNotification('notifications.escaped', 'success', {}, 999999);
 
       // Submit score to leaderboard (only for named users, not in test mode)
       if (!isTestMode && level.id && displayName) {
@@ -1431,7 +1488,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
     } else if (!exitMessageShownRef.current) {
       exitMessageShownRef.current = true;
-      showMessage('Complete all missions first!');
+      showNotification('notifications.completeMissions', 'warning');
     }
   }, [playerPos, gameOver, level, showMessage, grid, gameState, exitTiles, theme]);
 
@@ -1478,8 +1535,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             border: '1px solid rgba(255, 68, 68, 0.3)',
             boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
           }}>
-            <div style={{ fontSize: 10, color: '#ff9999', fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
-              Lives
+            <div style={{ fontSize: 10, color: '#ff9999', fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
+              {t('hud.lives')}
             </div>
             <div style={{ fontSize: 18 }}>
               {'❤️'.repeat(lives)}{'🖤'.repeat(Math.max(0, (level.lives || 3) - lives))}
@@ -1499,8 +1556,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               border: '2px solid rgba(100, 180, 255, 0.5)',
               boxShadow: '0 4px 15px rgba(100, 180, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
             }}>
-              <div style={{ fontSize: 9, color: '#a8d8ff', fontWeight: 'bold', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
-                ⏱ Time
+              <div style={{ fontSize: 9, color: '#a8d8ff', fontWeight: 'bold', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
+                ⏱ {t('hud.time')}
               </div>
               <div style={{ fontSize: 20, color: '#ffffff', fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1 }}>
                 {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
@@ -1515,8 +1572,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               border: '2px solid rgba(200, 120, 255, 0.5)',
               boxShadow: '0 4px 15px rgba(200, 120, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
             }}>
-              <div style={{ fontSize: 9, color: '#e8b8ff', fontWeight: 'bold', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
-                🚶 Moves
+              <div style={{ fontSize: 9, color: '#e8b8ff', fontWeight: 'bold', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
+                🚶 {t('hud.moves')}
               </div>
               <div style={{ fontSize: 20, color: '#ffffff', fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1 }}>
                 {moveCount}
@@ -1531,8 +1588,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               gap: 6,
               alignItems: 'center',
             }}>
-              <div style={{ fontSize: 11, color: '#ccbb99', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Inv:
+              <div style={{ fontSize: 11, color: '#ccbb99', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, direction: isRTL ? 'rtl' : 'ltr' }}>
+                {t('hud.inventoryShort')}:
               </div>
               {gameState.inventory.filter(item => !theme?.isWearable?.(item.itemType)).slice(0, 5).map((item, i) => {
                 // Get border color for items with lockColor
@@ -1570,8 +1627,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               gap: 6,
               alignItems: 'center',
             }}>
-              <div style={{ fontSize: 11, color: '#a8c8ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Wear:
+              <div style={{ fontSize: 11, color: '#a8c8ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, direction: isRTL ? 'rtl' : 'ltr' }}>
+                {t('hud.wearShort')}:
               </div>
               {gameState.inventory.filter(item => theme?.isWearable?.(item.itemType)).map((item, i) => (
                 <div key={i} style={{
@@ -1682,34 +1739,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           )}
         </div>
 
-        {/* Center: Message (Fixed space) */}
-        <div style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          height: '48px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minWidth: '300px',
-        }}>
-          {message && (
-            <div style={{
-              background: 'linear-gradient(145deg, rgba(58, 122, 58, 0.95) 0%, rgba(42, 90, 42, 0.95) 100%)',
-              padding: '10px 24px',
-              borderRadius: 10,
-              color: '#ffffff',
-              fontSize: 14,
-              fontWeight: '700',
-              boxShadow: '0 4px 16px rgba(68, 170, 68, 0.4), 0 0 0 2px rgba(68, 170, 68, 0.3)',
-              backdropFilter: 'blur(10px)',
-              textAlign: 'center',
-            }}>
-              {message}
-            </div>
-          )}
-        </div>
-
         {/* Right: Missions */}
         <div style={{
           background: 'rgba(30, 45, 60, 0.6)',
@@ -1719,8 +1748,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           border: '1px solid rgba(100, 150, 200, 0.3)',
           boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
         }}>
-          <div style={{ fontSize: 10, color: '#a8d8f8', fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
-            Missions {level.fixedOrder ? '(Ordered)' : ''}
+          <div style={{ fontSize: 10, color: '#a8d8f8', fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
+            {level.fixedOrder ? t('hud.missionsOrdered') : t('hud.missions')}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {effectiveMissions.map((m, i) => {
@@ -1737,8 +1766,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   gap: 6,
                 }}>
                   <span style={{ fontSize: 12 }}>{complete ? '✓' : isCurrent ? '▶' : '○'}</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {m.description || `${m.type}: ${m.targetId || ''}`}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: isRTL ? 'rtl' : 'ltr' }}>
+                    {getMissionDescription(m)}
                   </span>
                 </div>
               );
@@ -1747,15 +1776,24 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         </div>
       </div>
 
-      {/* Main Game Area - Flexible, centered */}
+      {/* Main Content Area with Notification Sidebar */}
       <div style={{
         flex: 1,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        position: 'relative',
+        overflow: 'hidden',
       }}>
+        {/* Left Sidebar: Notification Panel */}
+        <NotificationPanel />
+
+        {/* Game Area - Flexible, centered */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          position: 'relative',
+        }}>
         <div style={{ position: 'relative' }}>
           <Grid
             grid={grid}
@@ -1798,7 +1836,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                 letterSpacing: 1,
                 textAlign: 'center',
               }}>
-                Hold key to interact
+                {t('controls.holdToInteract')}
               </div>
               {inlineMenu.actions.map((action, idx) => (
                 <div
@@ -1844,6 +1882,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             </div>
           )}
         </div>
+        </div>
       </div>
 
       {/* Bottom Controls Bar */}
@@ -1869,12 +1908,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           flexWrap: 'wrap',
           justifyContent: 'center',
         }}>
-          <span><strong>WASD/Arrows:</strong> Move</span>
-          <span><strong>E:</strong> Interact</span>
-          <span><strong>F:</strong> Pick up</span>
-          <span><strong>T:</strong> Wear/Remove</span>
-          <span><strong>Q:</strong> Drop Item</span>
-          <span><strong>R:</strong> Restart</span>
+          <span>{t('controls.move')}</span>
+          <span>{t('controls.interact')}</span>
+          <span>{t('controls.pickup')}</span>
+          <span>{t('controls.wear')}</span>
+          <span>{t('controls.drop')}</span>
+          <span>{t('controls.restart')}</span>
         </div>
         <button
           onClick={toggleSound}
@@ -1894,9 +1933,32 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           }}
           onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(50, 70, 50, 0.8)'}
           onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(40, 55, 40, 0.6)'}
-          title={soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+          title={soundEnabled ? t('settings.mute') : t('settings.unmute')}
         >
           <span>{soundEnabled ? '🔊' : '🔇'}</span>
+        </button>
+        <button
+          onClick={() => setLanguage(language === 'en' ? 'he' : 'en')}
+          style={{
+            background: 'rgba(40, 55, 40, 0.6)',
+            border: '1px solid rgba(68, 170, 68, 0.3)',
+            borderRadius: 8,
+            padding: '6px 10px',
+            color: '#a8e8a8',
+            fontSize: 12,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            transition: 'all 0.2s',
+            flexShrink: 0,
+            fontWeight: '600',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(50, 70, 50, 0.8)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(40, 55, 40, 0.6)'}
+          title={t('settings.language')}
+        >
+          <span>{language === 'en' ? '🇺🇸 EN' : '🇮🇱 עב'}</span>
         </button>
       </div>
 
@@ -1927,8 +1989,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               fontSize: 20,
               fontWeight: '800',
               textAlign: 'center',
+              direction: isRTL ? 'rtl' : 'ltr',
             }}>
-              Drop Item
+              {t('dropMenu.title')}
             </h2>
             <div style={{
               color: '#88cc88',
@@ -1936,12 +1999,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               textAlign: 'center',
               marginBottom: 16,
               fontWeight: '500',
+              direction: isRTL ? 'rtl' : 'ltr',
             }}>
-              Click or press number key
+              {t('dropMenu.instruction')}
             </div>
             {gameState.inventory.length === 0 ? (
-              <div style={{ color: '#a8e8a8', fontSize: 14, padding: 20, textAlign: 'center' }}>
-                Inventory is empty
+              <div style={{ color: '#a8e8a8', fontSize: 14, padding: 20, textAlign: 'center', direction: isRTL ? 'rtl' : 'ltr' }}>
+                {t('dropMenu.empty')}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1950,7 +2014,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   const isWearable = theme?.isWearable?.(item.itemType);
                   if (isWearable) return null; // Skip wearables in main list
 
-                  const itemLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+                  const themeLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+                  const itemLabel = getItemLabel(themeId, item.itemType, themeLabel);
 
                   return (
                     <button
@@ -2019,14 +2084,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                         alignItems: 'center',
                         gap: 6,
                       }}>
-                        <span>Wearables</span>
+                        <span>{t('dropMenu.wearables')}</span>
                         <span style={{
                           fontSize: 9,
                           color: '#88aadd',
                           fontWeight: 'normal',
                           textTransform: 'none',
                         }}>
-                          (Press T to wear)
+                          {t('dropMenu.wearHint')}
                         </span>
                       </div>
                     </div>
@@ -2034,7 +2099,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                       const isWearable = theme?.isWearable?.(item.itemType);
                       if (!isWearable) return null;
 
-                      const itemLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+                      const themeLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+                      const itemLabel = getItemLabel(themeId, item.itemType, themeLabel);
 
                       return (
                         <button
@@ -2105,7 +2171,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               onMouseEnter={(e) => e.target.style.background = 'rgba(40, 55, 40, 0.8)'}
               onMouseLeave={(e) => e.target.style.background = 'rgba(30, 40, 30, 0.6)'}
             >
-              Cancel (Q or ESC)
+              {t('dropMenu.close')} (Q/ESC)
             </button>
           </div>
         </div>
@@ -2218,7 +2284,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               textTransform: 'uppercase',
               letterSpacing: 3,
             }}>
-              📊 Final Statistics
+              📊 {t('stats.finalStatistics')}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-around', gap: 40 }}>
@@ -2231,8 +2297,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   fontWeight: '600',
                   textTransform: 'uppercase',
                   letterSpacing: 2,
+                  direction: isRTL ? 'rtl' : 'ltr',
                 }}>
-                  ⏱ Time
+                  ⏱ {t('hud.time')}
                 </div>
                 <div style={{
                   fontSize: 48,
@@ -2248,8 +2315,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   fontSize: 12,
                   color: '#6699cc',
                   marginTop: 4,
+                  direction: isRTL ? 'rtl' : 'ltr',
                 }}>
-                  minutes:seconds
+                  {t('stats.minutesSeconds')}
                 </div>
               </div>
 
@@ -2262,8 +2330,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   fontWeight: '600',
                   textTransform: 'uppercase',
                   letterSpacing: 2,
+                  direction: isRTL ? 'rtl' : 'ltr',
                 }}>
-                  🚶 Moves
+                  🚶 {t('hud.moves')}
                 </div>
                 <div style={{
                   fontSize: 48,
@@ -2279,8 +2348,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   fontSize: 12,
                   color: '#9966cc',
                   marginTop: 4,
+                  direction: isRTL ? 'rtl' : 'ltr',
                 }}>
-                  total steps
+                  {t('stats.totalSteps')}
                 </div>
               </div>
             </div>
@@ -2300,7 +2370,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   fontWeight: '700',
                   letterSpacing: 1,
                 }}>
-                  🏆 Score: {Math.max(0, 10000 - (elapsedTime * 10) - (moveCount * 5))} pts
+                  🏆 {t('stats.score')}: {Math.max(0, 10000 - (elapsedTime * 10) - (moveCount * 5))} {t('stats.points')}
                 </div>
               </div>
             )}

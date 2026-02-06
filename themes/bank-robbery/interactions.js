@@ -24,7 +24,7 @@ export const INTERACTIONS = {
       );
 
       if (keyIdx === -1) {
-        return { success: false, message: `Need a ${doorColor} key!` };
+        return { success: false, messageKey: 'needKey', messageParams: { color: doorColor } };
       }
 
       // Open the door
@@ -35,7 +35,8 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: `Unlocked ${doorColor} door with key!`,
+        messageKey: 'doorUnlocked',
+        messageParams: { color: doorColor },
         modifyGrid: true,
         modifyInventory: true
       };
@@ -60,7 +61,7 @@ export const INTERACTIONS = {
       );
 
       if (cardIdx === -1) {
-        return { success: false, message: `Need a ${doorColor} keycard!` };
+        return { success: false, messageKey: 'needKeycard', messageParams: { color: doorColor } };
       }
 
       // Open the door
@@ -71,7 +72,8 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: `Unlocked ${doorColor} door with keycard!`,
+        messageKey: 'cardDoorUnlocked',
+        messageParams: { color: doorColor },
         modifyGrid: true,
         modifyInventory: true
       };
@@ -104,7 +106,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: '🎭 Disguised as guard! Cameras ignore you.',
+        messageKey: 'uniformEquipped',
         modifyInventory: true,
         modifyState: true
       };
@@ -130,7 +132,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Removed guard uniform.',
+        messageKey: 'uniformRemoved',
         modifyInventory: true,
         modifyState: true
       };
@@ -158,7 +160,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Placed mirror.',
+        messageKey: 'mirrorPlaced',
         modifyGrid: true,
         modifyInventory: true
       };
@@ -184,7 +186,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Drilled through the vault door!',
+        messageKey: 'vaultDrilled',
         modifyGrid: true
       };
     }
@@ -212,7 +214,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Bomb placed. Get to safe distance and detonate!',
+        messageKey: 'bombPlaced',
         modifyGrid: true,
         modifyInventory: true
       };
@@ -314,7 +316,7 @@ export const INTERACTIONS = {
         // Player is too close - this will be fatal
         return {
           success: true,
-          message: 'TOO CLOSE! The explosion killed you!',
+          messageKey: 'explosionTooClose',
           fatal: true, // Signal to game engine to kill player
           modifyState: { lives: 0 }
         };
@@ -323,7 +325,7 @@ export const INTERACTIONS = {
       // Check if any bomb is in range
       const inRange = bombs.filter(b => b.distance <= maxRange);
       if (inRange.length === 0) {
-        return { success: false, error: `Out of range! Get within ${maxRange} tiles of a bomb.` };
+        return { success: false, messageKey: 'bombOutOfRange', messageParams: { range: maxRange } };
       }
 
       // Explode all bombs in range
@@ -350,12 +352,10 @@ export const INTERACTIONS = {
         }
       }
 
-      const bombWord = inRange.length === 1 ? 'bomb' : 'bombs';
-      const vaultMsg = vaultsOpened > 0 ? ` ${vaultsOpened} vault${vaultsOpened > 1 ? 's' : ''} opened!` : '';
-
       return {
         success: true,
-        message: `BOOM! ${inRange.length} ${bombWord} detonated!${vaultMsg}`,
+        messageKey: vaultsOpened > 0 ? 'bombDetonatedWithVault' : 'bombDetonated',
+        messageParams: { bombs: inRange.length, vaults: vaultsOpened },
         sound: 'explosion',
         modifyGrid: true
       };
@@ -415,13 +415,15 @@ export const INTERACTIONS = {
         return `$${val}`;
       };
 
-      const message = amountToTake >= amount
-        ? `💰 Grabbed ${formatMoney(amountToTake)}! (Bag: ${formatMoney(bag.contents)}/${formatMoney(bag.capacity)})`
-        : `💰 Grabbed ${formatMoney(amountToTake)} (bag full)! ${formatMoney(amount - amountToTake)} left.`;
-
       return {
         success: true,
-        message,
+        messageKey: amountToTake >= amount ? 'moneyGrabbed' : 'moneyGrabbedPartial',
+        messageParams: {
+          amount: formatMoney(amountToTake),
+          bagContents: formatMoney(bag.contents),
+          bagCapacity: formatMoney(bag.capacity),
+          remaining: formatMoney(amount - amountToTake)
+        },
         modifyGrid: true,
         modifyContainers: true
       };
@@ -637,7 +639,7 @@ export const INTERACTIONS = {
       console.log('[POISON] Returning success with modifyGrid=true');
       return {
         success: true,
-        message: '💤 Guard knocked out with poison!',
+        messageKey: 'guardPoisoned',
         modifyGrid: true,
         modifyInventory: true
       };

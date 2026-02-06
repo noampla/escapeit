@@ -342,7 +342,7 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       return {
         allowed: false,
         loseLife: true,
-        message: 'A bear attacks! Hold E near the bear with a knife to defeat it.'
+        messageKey: 'bearWarning'
       };
 
     case 'snow':
@@ -351,7 +351,7 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       }
       return {
         allowed: false,
-        message: 'Too cold! You need a Sweater to enter snow.'
+        messageKey: 'tooCold'
       };
 
     case 'water':
@@ -366,14 +366,14 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       }
       return {
         allowed: false,
-        message: "Can't swim! Place a raft on the water."
+        messageKey: 'cantSwim'
       };
 
     case 'fire':
       return {
         allowed: false,
         loseLife: true,
-        message: 'Burned by fire!'
+        messageKey: 'burned'
       };
 
     case 'door-key': {
@@ -384,12 +384,14 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       if (hasKey) {
         return {
           allowed: false,
-          message: `Face the door and hold E to unlock with ${doorColor} key`
+          messageKey: 'doorUnlockHint',
+          messageParams: { color: doorColor }
         };
       }
       return {
         allowed: false,
-        message: `Locked! Need a ${doorColor} key`
+        messageKey: 'doorLocked',
+        messageParams: { color: doorColor }
       };
     }
 
@@ -401,12 +403,14 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       if (hasCard) {
         return {
           allowed: false,
-          message: `Face the door and hold E to unlock with ${doorColor} keycard`
+          messageKey: 'cardDoorUnlockHint',
+          messageParams: { color: doorColor }
         };
       }
       return {
         allowed: false,
-        message: `Locked! Need a ${doorColor} keycard`
+        messageKey: 'cardDoorLocked',
+        messageParams: { color: doorColor }
       };
     }
 
@@ -423,7 +427,7 @@ export function checkExitRequirements(gameState, exitConfig) {
   if (needsKey && !hasItemType(gameState?.inventory, 'key')) {
     return {
       allowed: false,
-      message: 'You need a Key to escape!'
+      messageKey: 'needKeyToEscape'
     };
   }
 

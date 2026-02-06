@@ -1,6 +1,7 @@
 // UserStatusBar - shows user status and allows name claiming / transfer codes
 import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext.jsx';
+import { useLanguage } from '../contexts/LanguageContext.jsx';
 
 const styles = {
   container: {
@@ -131,6 +132,7 @@ const styles = {
 
 export default function UserStatusBar() {
   const { user, loading, error, isAnonymous, displayName, claimName, getTransferCode, linkWithCode, clearError } = useUser();
+  const { t, isRTL } = useLanguage();
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -153,7 +155,7 @@ export default function UserStatusBar() {
 
     const success = await claimName(nameInput.trim());
     if (success) {
-      setSuccessMsg('Name claimed!');
+      setSuccessMsg(t('userStatus.nameClaimed'));
       setNameInput('');
     }
     setSubmitting(false);
@@ -181,7 +183,7 @@ export default function UserStatusBar() {
 
     const success = await linkWithCode(codeInput.trim());
     if (success) {
-      setSuccessMsg('Account linked!');
+      setSuccessMsg(t('userStatus.accountLinked'));
       setCodeInput('');
       setOpen(false);
     }
@@ -190,8 +192,14 @@ export default function UserStatusBar() {
 
   const displayError = error || localError;
 
+  const containerStyle = {
+    ...styles.container,
+    right: isRTL ? 'auto' : 8,
+    left: isRTL ? 8 : 'auto'
+  };
+
   return (
-    <div style={styles.container}>
+    <div style={containerStyle}>
       <div
         style={{ ...styles.badge, ...(hover ? styles.badgeHover : {}) }}
         onClick={() => setOpen(!open)}
@@ -202,23 +210,23 @@ export default function UserStatusBar() {
           {isAnonymous ? '?' : displayName?.charAt(0).toUpperCase()}
         </div>
         <span style={{ ...styles.name, ...(isAnonymous ? styles.anonymous : {}) }}>
-          {isAnonymous ? 'Anonymous' : displayName}
+          {isAnonymous ? t('userStatus.anonymous') : displayName}
         </span>
       </div>
 
       {open && (
-        <div style={styles.dropdown} onClick={e => e.stopPropagation()}>
+        <div style={{ ...styles.dropdown, direction: isRTL ? 'rtl' : 'ltr', right: isRTL ? 'auto' : 0, left: isRTL ? 0 : 'auto' }} onClick={e => e.stopPropagation()}>
           {isAnonymous ? (
             <>
               <div style={styles.section}>
-                <div style={styles.sectionTitle}>Claim a Name</div>
+                <div style={styles.sectionTitle}>{t('userStatus.claimName')}</div>
                 <input
                   type="text"
-                  placeholder="Enter username (2-20 chars)"
+                  placeholder={t('userStatus.enterUsername')}
                   value={nameInput}
                   onChange={e => setNameInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleClaimName()}
-                  style={styles.input}
+                  style={{ ...styles.input, direction: isRTL ? 'rtl' : 'ltr' }}
                   maxLength={20}
                 />
                 <button
@@ -226,20 +234,20 @@ export default function UserStatusBar() {
                   onClick={handleClaimName}
                   disabled={submitting || !nameInput.trim()}
                 >
-                  {submitting ? 'Saving...' : 'Claim Name'}
+                  {submitting ? t('userStatus.saving') : t('userStatus.claimButton')}
                 </button>
                 <div style={styles.hint}>
-                  Get a name to appear on leaderboards
+                  {t('userStatus.leaderboardHint')}
                 </div>
               </div>
 
               <div style={styles.divider} />
 
               <div style={styles.section}>
-                <div style={styles.sectionTitle}>Have a Transfer Code?</div>
+                <div style={styles.sectionTitle}>{t('userStatus.haveTransferCode')}</div>
                 <input
                   type="text"
-                  placeholder="Enter 6-character code"
+                  placeholder={t('userStatus.enterCode')}
                   value={codeInput}
                   onChange={e => setCodeInput(e.target.value.toUpperCase())}
                   onKeyDown={e => e.key === 'Enter' && handleUseCode()}
@@ -251,28 +259,28 @@ export default function UserStatusBar() {
                   onClick={handleUseCode}
                   disabled={submitting || codeInput.length !== 6}
                 >
-                  Link Account
+                  {t('userStatus.linkAccount')}
                 </button>
               </div>
             </>
           ) : (
             <>
               <div style={styles.section}>
-                <div style={styles.sectionTitle}>Your Name</div>
+                <div style={styles.sectionTitle}>{t('userStatus.yourName')}</div>
                 <div style={{ fontSize: 14, color: '#fff' }}>{displayName}</div>
               </div>
 
               <div style={styles.divider} />
 
               <div style={styles.section}>
-                <div style={styles.sectionTitle}>Transfer Code</div>
+                <div style={styles.sectionTitle}>{t('userStatus.transferCode')}</div>
                 {transferCode || user?.transferCode ? (
                   <>
                     <div style={styles.codeDisplay}>
                       {transferCode || user?.transferCode}
                     </div>
                     <div style={styles.hint}>
-                      Use this code on another device to link your account
+                      {t('userStatus.codeHint')}
                     </div>
                   </>
                 ) : (
@@ -282,10 +290,10 @@ export default function UserStatusBar() {
                       onClick={handleGetCode}
                       disabled={submitting}
                     >
-                      {submitting ? 'Generating...' : 'Get Transfer Code'}
+                      {submitting ? t('userStatus.generating') : t('userStatus.getTransferCode')}
                     </button>
                     <div style={styles.hint}>
-                      Generate a code to use your account on other browsers
+                      {t('userStatus.generateHint')}
                     </div>
                   </>
                 )}

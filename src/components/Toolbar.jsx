@@ -1,10 +1,20 @@
 import { useEffect, useRef, useContext, useMemo } from 'react';
 import { ThemeContext } from '../App';
+import { useLanguage } from '../contexts/LanguageContext';
+
+const getCategoryLabel = (t, catId) => {
+  const labels = {
+    basic: t('toolbar.terrain'),
+    interactive: t('toolbar.objects'),
+    hazard: t('toolbar.hazards'),
+  };
+  return labels[catId] || catId;
+};
 
 const categories = [
-  { id: 'basic', label: 'Terrain' },
-  { id: 'interactive', label: 'Objects' },
-  { id: 'hazard', label: 'Hazards' },
+  { id: 'basic' },
+  { id: 'interactive' },
+  { id: 'hazard' },
 ];
 
 // Minimal fallbacks for engine-level tiles only
@@ -74,7 +84,9 @@ function ToolbarIcon({ type, theme, TILE_TYPES, lockColor }) {
 
 export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange, lockColor, onLockColorChange }) {
   const theme = useContext(ThemeContext);
+  const { t, getTileLabel } = useLanguage();
   const TILE_TYPES = theme?.getTileTypes() || {};
+  const themeId = theme?.themeId || 'forest';
   const toolbarRef = useRef(null);
 
   // Get colors and tile lists from theme with fallbacks
@@ -108,7 +120,7 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
         letterSpacing: 1,
         textTransform: 'uppercase',
       }}>
-        {theme?.emoji || '🎯'} Objects
+        {theme?.emoji || '🎯'} {t('toolbar.objects')}
       </h3>
       {categories.map(cat => {
         const items = Object.entries(TILE_TYPES).filter(([, def]) => def.category === cat.id);
@@ -123,7 +135,7 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
               fontWeight: '700',
               letterSpacing: 1,
             }}>
-              {cat.label}
+              {getCategoryLabel(t, cat.id)}
             </div>
             {items.map(([type, def]) => {
               const isLockTile = LOCK_TILES.includes(type);
@@ -174,7 +186,7 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
                     }}
                   >
                     <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} lockColor={lockColor} />
-                    <span style={{ flex: 1 }}>{def.label}</span>
+                    <span style={{ flex: 1 }}>{getTileLabel(themeId, type, def.label)}</span>
                     {showLockColorIndicator && (
                       <span style={{
                         width: 12,
@@ -288,9 +300,9 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
         lineHeight: 1.8,
         fontFamily: 'monospace',
       }}>
-        <div style={{ color: theme?.primaryColor || '#aaddff', fontWeight: 'bold', marginBottom: 6, fontSize: 13 }}>Controls</div>
-        Left click: place<br />
-        Right click: remove
+        <div style={{ color: theme?.primaryColor || '#aaddff', fontWeight: 'bold', marginBottom: 6, fontSize: 13 }}>{t('toolbar.controls')}</div>
+        {t('toolbar.leftClick')}<br />
+        {t('toolbar.rightClick')}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 // Theme Loader - Dynamically loads theme modules
 import soundManager from './soundManager.js';
+import { getThemeMessage, getThemeItemLabel, registerThemeTranslations } from '../i18n';
 
 export class ThemeLoader {
   constructor(themeId) {
@@ -10,6 +11,32 @@ export class ThemeLoader {
     this.interactions = null;
     this.hazards = null;
     this.sounds = null;
+    this.language = 'en'; // Default language for message translation
+  }
+
+  // Set the current language for message translation
+  setLanguage(lang) {
+    this.language = lang;
+  }
+
+  // Load theme-specific translation files
+  async loadThemeTranslations() {
+    const languages = ['en', 'he'];
+
+    for (const lang of languages) {
+      try {
+        const i18nModule = await import(`../../themes/${this.themeId}/i18n/${lang}.json`);
+        const data = i18nModule.default || i18nModule;
+        registerThemeTranslations(this.themeId, lang, data);
+      } catch {
+        // No i18n file for this language - that's OK, fallback will be used
+      }
+    }
+  }
+
+  // Translate a theme message key to the current language
+  translateMessage(messageKey, params = {}, fallback = '') {
+    return getThemeMessage(this.language, this.themeId, messageKey, params, fallback);
   }
 
   async load() {
@@ -42,6 +69,9 @@ export class ThemeLoader {
         this.sounds = null;
         soundManager.clearThemeSounds();
       }
+
+      // Load theme-specific translations (optional)
+      await this.loadThemeTranslations();
 
       return this;
     } catch (error) {
@@ -94,7 +124,31 @@ export class ThemeLoader {
   }
 
   // Get item label with state (for inventory display)
+  // Uses theme i18n translations when available
   getItemLabel(itemType, state) {
+    // First try to get the localized label from theme i18n
+    const localizedLabel = getThemeItemLabel(this.language, this.themeId, itemType, null);
+
+    // If we have a localized base label, handle state-dependent variants
+    if (localizedLabel) {
+      // Handle bucket filled/empty state
+      if (itemType === 'bucket' && state?.filled !== undefined) {
+        const filledKey = state.filled ? 'bucketFilled' : 'bucketEmpty';
+        const stateLabel = getThemeItemLabel(this.language, this.themeId, filledKey, null);
+        if (stateLabel) return stateLabel;
+      }
+
+      // Handle colored items (key, card)
+      if ((itemType === 'key' || itemType === 'card') && state?.lockColor) {
+        const colors = this.getLockColors();
+        const colorLabel = colors[state.lockColor]?.label || state.lockColor;
+        return `${colorLabel} ${localizedLabel}`;
+      }
+
+      return localizedLabel;
+    }
+
+    // Fallback to theme's getItemLabel (returns English)
     if (this.items?.getItemLabel) {
       return this.items.getItemLabel(itemType, state);
     }
@@ -273,6 +327,18 @@ export class ThemeLoader {
       panelBackground: 'rgba(30, 45, 30, 0.95)',
       messageBackground: 'rgba(58, 122, 58, 0.95)'
     };
+  }
+
+  // Get notification colors for styled notifications
+  getNotificationColors() {
+    const defaultColors = {
+      success: { bg: 'rgba(68, 136, 68, 0.95)', text: '#e8ffe8', border: '#88cc88' },
+      info: { bg: 'rgba(58, 106, 138, 0.95)', text: '#e8f4ff', border: '#88aacc' },
+      warning: { bg: 'rgba(138, 106, 58, 0.95)', text: '#fff8e8', border: '#ccaa66' },
+      error: { bg: 'rgba(138, 58, 58, 0.95)', text: '#ffe8e8', border: '#cc6666' },
+      danger: { bg: 'rgba(106, 42, 42, 0.95)', text: '#ffd8d8', border: '#aa4444' }
+    };
+    return this.theme?.ui?.notificationColors || defaultColors;
   }
 
   // Get lock colors (for doors/keys/cards)

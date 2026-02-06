@@ -1,5 +1,6 @@
 import { useContext, useMemo } from 'react';
 import { ThemeContext } from '../App';
+import { useLanguage } from '../contexts/LanguageContext';
 import { BASE_MISSION_TYPES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 
 const HelpText = ({ type, field, show, CONFIG_HELP }) => {
@@ -24,6 +25,8 @@ export default function PropertiesPanel({
   inventoryCapacity, onInventoryCapacityChange
 }) {
   const theme = useContext(ThemeContext);
+  const { t, isRTL, getTileLabel } = useLanguage();
+  const themeId = theme?.themeId || 'forest';
   const TILE_TYPES = theme?.getTileTypes() || {};
   const CONFIG_HELP = theme?.getConfigHelp() || {};
   const CONFIG_SCHEMA = theme?.getConfigSchema?.() || {};
@@ -80,7 +83,7 @@ export default function PropertiesPanel({
   const renderPropertiesContent = () => {
     if (!selectedCell) {
       return (
-        <p style={{ color: '#666', fontSize: 12, margin: 0 }}>Click a tile to configure it.</p>
+        <p style={{ color: '#666', fontSize: 12, margin: 0, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.clickToConfig')}</p>
       );
     }
 
@@ -91,8 +94,8 @@ export default function PropertiesPanel({
     if (!def || !def.configurable) {
       return (
         <>
-          <p style={{ color: '#888', fontSize: 12, margin: '0 0 4px' }}>{def?.label || cell.type} at ({x}, {y})</p>
-          <p style={{ color: '#666', fontSize: 11, margin: 0 }}>Not configurable.</p>
+          <p style={{ color: '#888', fontSize: 12, margin: '0 0 4px', direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.tileAt', { label: getTileLabel(themeId, cell.type, def?.label || cell.type), x, y })}</p>
+          <p style={{ color: '#666', fontSize: 11, margin: 0, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.notConfigurable')}</p>
         </>
       );
     }
@@ -181,7 +184,7 @@ export default function PropertiesPanel({
 
     return (
       <>
-        <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>{def.label} at ({x}, {y})</p>
+        <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>{t('properties.tileAt', { label: getTileLabel(themeId, cell.type, def.label), x, y })}</p>
         {schemaFields.map(([fieldKey, fieldDef], idx) => renderField(fieldKey, fieldDef, idx === 0))}
       </>
     );
@@ -198,16 +201,16 @@ export default function PropertiesPanel({
     }}>
       {/* Properties Section */}
       <div style={sectionStyle}>
-        <h3 style={headerStyle}>Tile Properties</h3>
+        <h3 style={{ ...headerStyle, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.tileProperties')}</h3>
         {renderPropertiesContent()}
       </div>
 
       {/* Level Settings Section */}
       <div style={sectionStyle}>
-        <h3 style={headerStyle}>Level Settings</h3>
+        <h3 style={{ ...headerStyle, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.levelSettings')}</h3>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <label style={{ color: '#aaa', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            Lives:
+          <label style={{ color: '#aaa', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, direction: isRTL ? 'rtl' : 'ltr' }}>
+            {t('properties.lives')}
             <input
               type="number" min="1" max="10"
               value={lives}
@@ -215,8 +218,8 @@ export default function PropertiesPanel({
               style={{ ...inputStyle, width: 50, padding: '4px 6px' }}
             />
           </label>
-          <label style={{ color: '#aaa', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            Inventory:
+          <label style={{ color: '#aaa', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, direction: isRTL ? 'rtl' : 'ltr' }}>
+            {t('properties.inventory')}
             <input
               type="number" min="1" max="20"
               value={inventoryCapacity || DEFAULT_INVENTORY_CAPACITY}
@@ -225,16 +228,16 @@ export default function PropertiesPanel({
             />
           </label>
         </div>
-        <label style={{ color: '#aaa', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
+        <label style={{ color: '#aaa', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, direction: isRTL ? 'rtl' : 'ltr' }}>
           <input type="checkbox" checked={fixedOrder} onChange={e => onFixedOrderChange?.(e.target.checked)} />
-          Fixed Mission Order
+          {t('properties.fixedOrder')}
         </label>
       </div>
 
       {/* Missions Section */}
       <div style={{ ...sectionStyle, borderBottom: 'none', flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <h3 style={{ ...headerStyle, margin: 0 }}>Missions</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, direction: isRTL ? 'rtl' : 'ltr' }}>
+          <h3 style={{ ...headerStyle, margin: 0 }}>{t('properties.missions')}</h3>
           <button
             onClick={addMission}
             style={{
@@ -248,7 +251,7 @@ export default function PropertiesPanel({
               cursor: 'pointer'
             }}
           >
-            + Add
+            {t('properties.addMission')}
           </button>
         </div>
 
@@ -262,10 +265,10 @@ export default function PropertiesPanel({
               borderRadius: 6,
               border: '1px solid #444',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: '#888', fontSize: 11 }}>Default:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, direction: isRTL ? 'rtl' : 'ltr' }}>
+                <span style={{ color: '#888', fontSize: 11 }}>{t('properties.defaultMission').split(':')[0]}:</span>
                 <span style={{ color: '#aaa', fontSize: 12, flex: 1 }}>
-                  {theme?.getDefaultMission?.()?.description || 'Reach the exit'}
+                  {theme?.getDefaultMission?.()?.description || t('properties.defaultMission')}
                 </span>
               </div>
             </div>
@@ -291,7 +294,7 @@ export default function PropertiesPanel({
                     onChange={e => updateMission(i, 'type', e.target.value)}
                     style={{ ...inputStyle, flex: 1, padding: '4px 6px' }}
                   >
-                    {missionTypes.map(mt => <option key={mt.id} value={mt.id}>{mt.label}</option>)}
+                    {missionTypes.map(mt => <option key={mt.id} value={mt.id}>{t(`missionTypeLabels.${mt.id}`)}</option>)}
                   </select>
                   <button
                     onClick={() => removeMission(i)}
@@ -340,15 +343,15 @@ export default function PropertiesPanel({
                         value={m.targetId || ''}
                         onChange={e => updateMission(i, 'targetId', e.target.value)}
                       >
-                        <option value="">-- Select target --</option>
-                        {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        <option value="">{t('properties.selectTarget')}</option>
+                        {targetOptions.map(opt => <option key={opt} value={opt}>{getTileLabel(themeId, opt, opt)}</option>)}
                       </select>
                     ) : (
                       <input
                         style={{ ...inputStyle, padding: '4px 6px' }}
                         value={m.targetId || ''}
                         onChange={e => updateMission(i, 'targetId', e.target.value)}
-                        placeholder="Target"
+                        placeholder={t('properties.targetPlaceholder')}
                       />
                     )}
                   </div>
@@ -376,7 +379,7 @@ export default function PropertiesPanel({
                   style={{ ...inputStyle, padding: '4px 6px' }}
                   value={m.description || ''}
                   onChange={e => updateMission(i, 'description', e.target.value)}
-                  placeholder="Description (shown to player)"
+                  placeholder={t('properties.descriptionPlaceholder')}
                 />
               </div>
             );

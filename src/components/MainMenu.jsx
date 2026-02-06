@@ -1,6 +1,8 @@
 import { AVAILABLE_THEMES } from '../utils/themeRegistry';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function MainMenu({ onCreateNew, onPlayLevels }) {
+  const { t, isRTL, language, setLanguage, getLocalizedThemeName } = useLanguage();
   return (
     <div style={{
       width: '100vw',
@@ -14,6 +16,32 @@ export default function MainMenu({ onCreateNew, onPlayLevels }) {
       position: 'relative',
       overflow: 'hidden'
     }}>
+      {/* Language toggle - top right */}
+      <button
+        onClick={() => setLanguage(language === 'en' ? 'he' : 'en')}
+        style={{
+          position: 'absolute',
+          top: 20,
+          right: 20,
+          zIndex: 10,
+          padding: '10px 16px',
+          fontSize: '14px',
+          fontWeight: '600',
+          border: 'none',
+          borderRadius: '8px',
+          background: 'rgba(255, 255, 255, 0.1)',
+          color: '#ffffff',
+          cursor: 'pointer',
+          backdropFilter: 'blur(10px)',
+          transition: 'all 0.2s',
+        }}
+        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+        title={t('settings.language')}
+      >
+        {language === 'en' ? '🇺🇸 English' : '🇮🇱 עברית'}
+      </button>
+
       {/* Animated background */}
       <div style={{
         position: 'absolute',
@@ -43,15 +71,16 @@ export default function MainMenu({ onCreateNew, onPlayLevels }) {
           textShadow: '0 4px 20px rgba(255, 255, 255, 0.3)',
           letterSpacing: '4px'
         }}>
-          ESCAPE IT
+          {t('mainMenu.title')}
         </h1>
         <p style={{
           fontSize: '18px',
           color: '#999',
           marginTop: '10px',
-          letterSpacing: '2px'
+          letterSpacing: '2px',
+          direction: isRTL ? 'rtl' : 'ltr'
         }}>
-          Create & Play Custom Escape Rooms
+          {t('mainMenu.subtitle')}
         </p>
       </div>
 
@@ -92,7 +121,7 @@ export default function MainMenu({ onCreateNew, onPlayLevels }) {
           }}
         >
           <span style={{ fontSize: '24px' }}>🎨</span>
-          Create New Escape Room
+          {t('mainMenu.createNew')}
         </button>
 
         <button
@@ -123,7 +152,7 @@ export default function MainMenu({ onCreateNew, onPlayLevels }) {
           }}
         >
           <span style={{ fontSize: '24px' }}>🎮</span>
-          Play Escape Rooms
+          {t('mainMenu.playRooms')}
         </button>
       </div>
 
@@ -139,9 +168,10 @@ export default function MainMenu({ onCreateNew, onPlayLevels }) {
           color: '#666',
           marginBottom: '12px',
           textTransform: 'uppercase',
-          letterSpacing: '1px'
+          letterSpacing: '1px',
+          direction: isRTL ? 'rtl' : 'ltr'
         }}>
-          Available Themes
+          {t('themeSelect.availableThemes')}
         </p>
         <div style={{
           display: 'flex',
@@ -161,7 +191,7 @@ export default function MainMenu({ onCreateNew, onPlayLevels }) {
                 backdropFilter: 'blur(10px)'
               }}
             >
-              {theme.emoji} {theme.name}
+              {theme.emoji} {getLocalizedThemeName(theme.id, theme.name)}
             </span>
           ))}
         </div>

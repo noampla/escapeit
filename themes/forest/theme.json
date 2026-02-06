@@ -19,7 +19,14 @@
     "hudBackground": "linear-gradient(180deg, rgba(15, 25, 15, 0.95) 0%, rgba(10, 20, 10, 0.95) 100%)",
     "messageBackground": "linear-gradient(145deg, rgba(58, 122, 58, 0.95) 0%, rgba(42, 90, 42, 0.95) 100%)",
     "buttonBackground": "linear-gradient(145deg, #2a5a2a 0%, #1a4a1a 100%)",
-    "buttonHoverShadow": "0 8px 28px rgba(68, 170, 68, 0.4)"
+    "buttonHoverShadow": "0 8px 28px rgba(68, 170, 68, 0.4)",
+    "notificationColors": {
+      "success": { "bg": "rgba(68, 136, 68, 0.95)", "text": "#e8ffe8", "border": "#88cc88" },
+      "info": { "bg": "rgba(58, 106, 138, 0.95)", "text": "#e8f4ff", "border": "#88aacc" },
+      "warning": { "bg": "rgba(138, 106, 58, 0.95)", "text": "#fff8e8", "border": "#ccaa66" },
+      "error": { "bg": "rgba(138, 58, 58, 0.95)", "text": "#ffe8e8", "border": "#cc6666" },
+      "danger": { "bg": "rgba(106, 42, 42, 0.95)", "text": "#ffd8d8", "border": "#aa4444" }
+    }
   },
   "missions": {
     "types": ["collect", "rescue", "extinguish", "reach", "escape"],

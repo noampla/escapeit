@@ -5,19 +5,19 @@ export const HAZARD_TYPES = {
     name: 'Fire',
     emoji: '🔥',
     damage: 1,
-    message: '🔥 You stepped in fire!',
+    messageKey: 'fireStep',  // Translation key for localization
     renderColor: 'rgba(255, 68, 0, 0.3)'
   },
   bear: {
     name: 'Bear',
     emoji: '🐻',
     damage: 1,
-    message: '🐻 Bear attacked!',
+    messageKey: 'bearAttack',  // Translation key for localization
     renderColor: 'rgba(139, 69, 19, 0.3)',
     canDefeat: {
       with: 'knife',
       gives: 'sweater',
-      message: 'Bear defeated! Got sweater.'
+      messageKey: 'bearDefeated'  // Translation key for localization
     }
   }
 };
@@ -33,7 +33,7 @@ export function checkHazardAt(grid, x, y, gameState) {
     return {
       type: 'fire',
       damage: HAZARD_TYPES.fire.damage,
-      message: HAZARD_TYPES.fire.message
+      messageKey: HAZARD_TYPES.fire.messageKey
     };
   }
 
@@ -47,7 +47,7 @@ export function checkHazardAt(grid, x, y, gameState) {
         type: 'bear',
         damage: 0,
         defeated: true,
-        message: HAZARD_TYPES.bear.canDefeat.message,
+        messageKey: HAZARD_TYPES.bear.canDefeat.messageKey,
         removeTile: true,  // Remove bear from grid
         addItem: HAZARD_TYPES.bear.canDefeat.gives,  // Add sweater
         removeItem: 'knife'  // Remove knife
@@ -57,7 +57,7 @@ export function checkHazardAt(grid, x, y, gameState) {
       return {
         type: 'bear',
         damage: HAZARD_TYPES.bear.damage,
-        message: HAZARD_TYPES.bear.message,
+        messageKey: HAZARD_TYPES.bear.messageKey,
         blockMove: true  // Don't move onto bear
       };
     }

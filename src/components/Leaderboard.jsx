@@ -5,6 +5,7 @@ import {
   getTopScoresBySteps,
   formatTime
 } from '../utils/leaderboardService.js';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const styles = {
   container: {
@@ -108,6 +109,7 @@ const styles = {
 const MEDALS = ['', '1', '2', '3'];
 
 export default function Leaderboard({ mapId, compact = false }) {
+  const { t, isRTL } = useLanguage();
   const [tab, setTab] = useState('time'); // 'time' or 'steps'
   const [timeScores, setTimeScores] = useState([]);
   const [stepsScores, setStepsScores] = useState([]);
@@ -141,35 +143,35 @@ export default function Leaderboard({ mapId, compact = false }) {
 
   if (loading) {
     return (
-      <div style={styles.container}>
-        <div style={styles.loading}>Loading leaderboard...</div>
+      <div style={{ ...styles.container, direction: isRTL ? 'rtl' : 'ltr' }}>
+        <div style={styles.loading}>{t('leaderboard.loading')}</div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
+    <div style={{ ...styles.container, direction: isRTL ? 'rtl' : 'ltr' }}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Leaderboard</h3>
+        <h3 style={styles.title}>{t('leaderboard.title')}</h3>
         <div style={styles.tabs}>
           <button
             style={{ ...styles.tab, ...(tab === 'time' ? styles.tabActive : {}) }}
             onClick={() => setTab('time')}
           >
-            Fastest
+            {t('leaderboard.fastest')}
           </button>
           <button
             style={{ ...styles.tab, ...(tab === 'steps' ? styles.tabActive : {}) }}
             onClick={() => setTab('steps')}
           >
-            Least Steps
+            {t('leaderboard.leastSteps')}
           </button>
         </div>
       </div>
 
       {scores.length === 0 ? (
         <div style={styles.empty}>
-          No scores yet. Be the first!
+          {t('leaderboard.noScores')}
         </div>
       ) : (
         <>
@@ -204,7 +206,7 @@ export default function Leaderboard({ mapId, compact = false }) {
               style={styles.expandBtn}
               onClick={() => setExpanded(!expanded)}
             >
-              {expanded ? 'Show less' : `Show all (${scores.length})`}
+              {expanded ? t('leaderboard.showLess') : t('leaderboard.showAll', { count: scores.length })}
             </button>
           )}
         </>

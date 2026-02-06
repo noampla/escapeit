@@ -1,6 +1,8 @@
 import { AVAILABLE_THEMES } from '../utils/themeRegistry';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function ThemeSelect({ onSelectTheme, onBack }) {
+  const { t, isRTL, getLocalizedThemeName, getLocalizedThemeDescription } = useLanguage();
   return (
     <div style={{
       width: '100vw',
@@ -24,15 +26,17 @@ export default function ThemeSelect({ onSelectTheme, onBack }) {
           fontWeight: 'bold',
           margin: 0,
           marginBottom: '10px',
-          color: '#ffffff'
+          color: '#ffffff',
+          direction: isRTL ? 'rtl' : 'ltr'
         }}>
-          Choose a Theme
+          {t('themeSelect.title')}
         </h2>
         <p style={{
           fontSize: '16px',
-          color: '#999'
+          color: '#999',
+          direction: isRTL ? 'rtl' : 'ltr'
         }}>
-          Select a theme for your escape room
+          {t('themeSelect.subtitle')}
         </p>
       </div>
 
@@ -84,9 +88,10 @@ export default function ThemeSelect({ onSelectTheme, onBack }) {
               fontWeight: '600',
               margin: '0 0 8px 0',
               textAlign: 'center',
-              color: '#ffffff'
+              color: '#ffffff',
+              direction: isRTL ? 'rtl' : 'ltr'
             }}>
-              {theme.name}
+              {getLocalizedThemeName(theme.id, theme.name)}
             </h3>
 
             <p style={{
@@ -94,9 +99,10 @@ export default function ThemeSelect({ onSelectTheme, onBack }) {
               color: '#aaa',
               textAlign: 'center',
               marginBottom: '16px',
-              minHeight: '40px'
+              minHeight: '40px',
+              direction: isRTL ? 'rtl' : 'ltr'
             }}>
-              {theme.description}
+              {getLocalizedThemeDescription(theme.id, theme.description)}
             </p>
 
             {/* Meta info */}
@@ -133,7 +139,7 @@ export default function ThemeSelect({ onSelectTheme, onBack }) {
                 e.currentTarget.style.background = 'linear-gradient(135deg, #4488cc 0%, #3366aa 100%)';
               }}
             >
-              Create with this theme
+              {t('themeSelect.createWith')}
             </button>
           </div>
         ))}
@@ -161,7 +167,7 @@ export default function ThemeSelect({ onSelectTheme, onBack }) {
           e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
         }}
       >
-        ← Back to Menu
+        {isRTL ? `${t('themeSelect.backToMenu')} →` : `← ${t('themeSelect.backToMenu')}`}
       </button>
     </div>
   );

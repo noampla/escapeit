@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { loadLevels, deleteLevel } from '../utils/storage';
 import { getThemeById } from '../utils/themeRegistry';
 import { useUser } from '../contexts/UserContext.jsx';
+import { useLanguage } from '../contexts/LanguageContext';
 import { getTopScoresByTime, getTopScoresBySteps, formatTime } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
 
 // Mini leaderboard preview showing top 3 for time and steps
 function LeaderboardPreview({ mapId }) {
+  const { t } = useLanguage();
   const [timeScores, setTimeScores] = useState([]);
   const [stepsScores, setStepsScores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,11 +27,11 @@ function LeaderboardPreview({ mapId }) {
   }, [mapId]);
 
   if (loading) {
-    return <div style={{ color: '#666', fontSize: 11 }}>Loading...</div>;
+    return <div style={{ color: '#666', fontSize: 11 }}>{t('common.loading')}</div>;
   }
 
   if (timeScores.length === 0 && stepsScores.length === 0) {
-    return <div style={{ color: '#666', fontSize: 11, fontStyle: 'italic' }}>No scores yet</div>;
+    return <div style={{ color: '#666', fontSize: 11, fontStyle: 'italic' }}>{t('leaderboard.noScores')}</div>;
   }
 
   const medals = ['🥇', '🥈', '🥉'];
@@ -38,7 +40,7 @@ function LeaderboardPreview({ mapId }) {
     <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#aaa' }}>
       {/* Fastest times */}
       <div>
-        <div style={{ color: '#888', marginBottom: 4, fontWeight: '600' }}>⏱ Fastest</div>
+        <div style={{ color: '#888', marginBottom: 4, fontWeight: '600' }}>⏱ {t('leaderboard.fastestLabel')}</div>
         {timeScores.slice(0, 3).map((s, i) => (
           <div key={s.id} style={{ display: 'flex', gap: 4 }}>
             <span>{medals[i]}</span>
@@ -49,7 +51,7 @@ function LeaderboardPreview({ mapId }) {
       </div>
       {/* Least steps */}
       <div>
-        <div style={{ color: '#888', marginBottom: 4, fontWeight: '600' }}>👣 Fewest</div>
+        <div style={{ color: '#888', marginBottom: 4, fontWeight: '600' }}>👣 {t('leaderboard.fewestLabel')}</div>
         {stepsScores.slice(0, 3).map((s, i) => (
           <div key={s.id} style={{ display: 'flex', gap: 4 }}>
             <span>{medals[i]}</span>
@@ -113,6 +115,7 @@ function LeaderboardModal({ mapId, levelName, onClose }) {
 }
 
 export default function LevelSelect({ onSelect, onEdit, onBack }) {
+  const { t, isRTL, getLocalizedThemeName } = useLanguage();
   const [levels, setLevels] = useState([]);
   const { userId } = useUser();
   const [modalLevel, setModalLevel] = useState(null);
@@ -126,7 +129,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
   }, []);
 
   const handleDelete = (id, name) => {
-    if (confirm(`Delete level "${name}"?`)) {
+    if (confirm(t('levelSelect.deleteConfirm', { name }))) {
       deleteLevel(id).then(() => loadLevels().then(setLevels));
     }
   };
@@ -180,7 +183,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
           e.target.style.transform = 'translateY(0)';
         }}
       >
-        ← Back to Menu
+        {isRTL ? `${t('levelSelect.backToMenu')} →` : `← ${t('levelSelect.backToMenu')}`}
       </button>
 
       <h2 style={{
@@ -193,8 +196,9 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
         textTransform: 'uppercase',
         zIndex: 10,
         position: 'relative',
+        direction: isRTL ? 'rtl' : 'ltr',
       }}>
-        Play Escape Rooms
+        {t('levelSelect.title')}
       </h2>
 
       {levels.length === 0 ? (
@@ -211,8 +215,9 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
           fontWeight: '600',
           zIndex: 10,
           position: 'relative',
+          direction: isRTL ? 'rtl' : 'ltr',
         }}>
-          No saved levels yet. Create one first!
+          {t('levelSelect.noLevels')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, zIndex: 10, position: 'relative' }}>
@@ -258,7 +263,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                         marginBottom: '8px',
                         border: `1px solid ${theme.primaryColor}44`
                       }}>
-                        {theme.emoji} {theme.name}
+                        {theme.emoji} {getLocalizedThemeName(theme.id, theme.name)}
                       </div>
                     )}
 
@@ -276,9 +281,10 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                       fontSize: 13,
                       fontFamily: 'monospace',
                       fontWeight: '500',
+                      direction: isRTL ? 'rtl' : 'ltr',
                     }}>
-                      {level.missions?.length || 0} missions • {level.lives || 3} lives
-                      {level.creatorName && ` • by ${level.creatorName}`}
+                      {t('levelSelect.levelStats', { missions: level.missions?.length || 0, lives: level.lives || 3 })}
+                      {level.creatorName && ` • ${t('levelSelect.byCreator', { name: level.creatorName })}`}
                     </div>
                   </div>
 
@@ -293,7 +299,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                         e.target.style.background = 'linear-gradient(145deg, #2a4a3a 0%, #1a3a2a 100%)';
                       }}
                     >
-                      ▶ Play
+                      ▶ {t('levelSelect.play')}
                     </button>
 
                     <button
@@ -305,7 +311,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                       onMouseLeave={(e) => {
                         e.target.style.background = 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)';
                       }}
-                      title="View full leaderboard"
+                      title={t('levelSelect.viewLeaderboard')}
                     >
                       🏆
                     </button>
@@ -321,7 +327,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                           e.target.style.background = 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)';
                         }}
                       >
-                        ✏ Edit
+                        ✏ {t('levelSelect.edit')}
                       </button>
                     )}
 

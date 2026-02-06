@@ -6,19 +6,19 @@ export const HAZARD_TYPES = {
   camera: {
     name: 'Security Camera',
     damage: 1,
-    message: 'Spotted by security camera!',
+    messageKey: 'cameraSpotted',
     renderColor: 'rgba(255, 50, 50, 0.25)'
   },
   laser: {
     name: 'Laser Tripwire',
     damage: 1,
-    message: 'Cut by laser tripwire!',
+    messageKey: 'laserCut',
     renderColor: 'rgba(255, 20, 20, 0.6)'
   },
   guard: {
     name: 'Guard',
     damage: 1,
-    message: 'Spotted by guard!',
+    messageKey: 'guardSpotted',
     renderColor: 'rgba(50, 100, 255, 0.25)',
     range: 4 // Guards have a default vision range
   }
@@ -139,7 +139,7 @@ export function checkHazardAt(grid, x, y, gameState) {
           return {
             type: 'camera',
             damage: HAZARD_TYPES.camera.damage,
-            message: HAZARD_TYPES.camera.message,
+            messageKey: HAZARD_TYPES.camera.messageKey,
             continuous: true,
             interval: 5000
           };
@@ -158,7 +158,7 @@ export function checkHazardAt(grid, x, y, gameState) {
           return {
             type: 'guard',
             damage: HAZARD_TYPES.guard.damage,
-            message: HAZARD_TYPES.guard.message,
+            messageKey: HAZARD_TYPES.guard.messageKey,
             continuous: true,
             interval: 5000
           };
@@ -173,7 +173,7 @@ export function checkHazardAt(grid, x, y, gameState) {
           return {
             type: 'laser',
             damage: HAZARD_TYPES.laser.damage,
-            message: HAZARD_TYPES.laser.message,
+            messageKey: HAZARD_TYPES.laser.messageKey,
             continuous: true,
             interval: 3000
           };

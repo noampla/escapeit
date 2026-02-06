@@ -22,7 +22,7 @@ export const INTERACTIONS = {
       grid[y][x] = { type: 'item-wood', config: {} };
       return {
         success: true,
-        message: '🪓 Tree chopped! Wood left on ground.',
+        messageKey: 'treeChopped',
         modifyGrid: true
       };
     }
@@ -43,7 +43,7 @@ export const INTERACTIONS = {
       );
 
       if (bucketIdx === -1) {
-        return { success: false, message: 'No empty bucket found!' };
+        return { success: false, messageKey: 'noEmptyBucket' };
       }
 
       // Fill the bucket
@@ -54,7 +54,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Filled bucket with water!',
+        messageKey: 'bucketFilled',
         modifyInventory: true
       };
     }
@@ -72,7 +72,7 @@ export const INTERACTIONS = {
       const woodIdx = findItemIndex(gameState.inventory, 'wood');
 
       if (ropeIdx === -1 || woodIdx === -1) {
-        return { success: false, message: 'Need rope and wood!' };
+        return { success: false, messageKey: 'needRopeAndWood' };
       }
 
       // Remove rope and wood, add raft to inventory
@@ -82,7 +82,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Built a raft! You can now place it on water with E.',
+        messageKey: 'raftBuilt',
         modifyInventory: true
       };
     }
@@ -99,7 +99,7 @@ export const INTERACTIONS = {
       // Find raft in inventory
       const raftIdx = findItemIndex(gameState.inventory, 'raft');
       if (raftIdx === -1) {
-        return { success: false, message: 'No raft in inventory!' };
+        return { success: false, messageKey: 'noRaftInInventory' };
       }
 
       // Place raft on water tile
@@ -110,7 +110,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: '🛶 Raft placed on water!',
+        messageKey: 'raftPlaced',
         modifyGrid: true,
         modifyInventory: true
       };
@@ -132,7 +132,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: '🛶 Picked up raft!',
+        messageKey: 'raftPickedUp',
         modifyGrid: true,
         modifyInventory: true
       };
@@ -152,7 +152,7 @@ export const INTERACTIONS = {
       );
 
       if (filledBucketIdx === -1) {
-        return { success: false, message: 'Need a filled bucket!' };
+        return { success: false, messageKey: 'needFilledBucket' };
       }
 
       // Remove fire, replace with ground
@@ -166,7 +166,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Fire extinguished!',
+        messageKey: 'fireExtinguished',
         modifyGrid: true,
         modifyInventory: true
       };
@@ -191,7 +191,8 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: `Rescued: ${friendName}!`,
+        messageKey: 'rescued',
+        messageParams: { name: friendName },
         modifyGrid: true,
         modifyState: {
           rescuedFriends: gameState.rescuedFriends
@@ -208,7 +209,7 @@ export const INTERACTIONS = {
       const knifeIdx = findItemIndex(gameState.inventory, 'knife');
 
       if (knifeIdx === -1) {
-        return { success: false, message: 'Need a knife!' };
+        return { success: false, messageKey: 'needKnife' };
       }
 
       // Remove bear from grid
@@ -224,7 +225,7 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: 'Defeated the bear! Got a sweater.',
+        messageKey: 'defeatedBear',
         modifyGrid: true,
         modifyInventory: true
       };
@@ -250,7 +251,7 @@ export const INTERACTIONS = {
       );
 
       if (keyIdx === -1) {
-        return { success: false, message: `Need a ${doorColor} key!` };
+        return { success: false, messageKey: 'needKey', messageParams: { color: doorColor } };
       }
 
       // Open the door
@@ -261,7 +262,8 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: `Unlocked ${doorColor} door with key!`,
+        messageKey: 'doorUnlocked',
+        messageParams: { color: doorColor },
         modifyGrid: true,
         modifyInventory: true
       };
@@ -287,7 +289,7 @@ export const INTERACTIONS = {
       );
 
       if (cardIdx === -1) {
-        return { success: false, message: `Need a ${doorColor} keycard!` };
+        return { success: false, messageKey: 'needKeycard', messageParams: { color: doorColor } };
       }
 
       // Open the door
@@ -298,7 +300,8 @@ export const INTERACTIONS = {
 
       return {
         success: true,
-        message: `Unlocked ${doorColor} door with keycard!`,
+        messageKey: 'cardDoorUnlocked',
+        messageParams: { color: doorColor },
         modifyGrid: true,
         modifyInventory: true
       };
@@ -465,12 +468,12 @@ export function customPickup(gameState, grid, playerPos, direction, maxInventory
   // Check if standing on the raft (can't pick up raft you're standing on)
   const currentTile = grid[playerPos.y][playerPos.x];
   if (currentTile.type === 'raft') {
-    return { handled: true, message: "Can't pick up raft while standing on it!" };
+    return { handled: true, messageKey: 'cantPickupRaftOnIt' };
   }
 
   // Check inventory capacity
   if (gameState.inventory.length >= maxInventory) {
-    return { handled: true, message: `Inventory full! (${maxInventory} items max) Press Q to drop items.` };
+    return { handled: true, messageKey: 'inventoryFull', messageParams: { max: maxInventory } };
   }
 
   // Pick up raft - convert raft tile to water
@@ -484,6 +487,6 @@ export function customPickup(gameState, grid, playerPos, direction, maxInventory
     handled: true,
     newGrid,
     newInventory,
-    message: '🛶 Picked up raft!'
+    messageKey: 'raftPickedUp'
   };
 }

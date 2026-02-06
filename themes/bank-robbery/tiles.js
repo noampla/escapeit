@@ -1170,12 +1170,14 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       if (hasKey) {
         return {
           allowed: false,
-          message: `Face the door and hold E to unlock with ${doorColor} key`
+          messageKey: 'doorUnlockHint',
+          messageParams: { color: doorColor }
         };
       }
       return {
         allowed: false,
-        message: `Locked! Need a ${doorColor} key`
+        messageKey: 'doorLocked',
+        messageParams: { color: doorColor }
       };
     }
 
@@ -1185,12 +1187,14 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       if (hasCard) {
         return {
           allowed: false,
-          message: `Face the door and hold E to unlock with ${doorColor} keycard`
+          messageKey: 'cardDoorUnlockHint',
+          messageParams: { color: doorColor }
         };
       }
       return {
         allowed: false,
-        message: `Locked! Need a ${doorColor} keycard`
+        messageKey: 'cardDoorLocked',
+        messageParams: { color: doorColor }
       };
     }
 
@@ -1199,12 +1203,12 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       if (hasDrill) {
         return {
           allowed: false,
-          message: 'Face the vault and hold E to drill through'
+          messageKey: 'vaultDrillHint'
         };
       }
       return {
         allowed: false,
-        message: 'Heavy vault door. Need a drill to open.'
+        messageKey: 'vaultNeedDrill'
       };
     }
 

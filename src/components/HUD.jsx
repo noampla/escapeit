@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef } from 'react';
 import { ThemeContext } from '../App';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Component to render inventory item icon using theme's rendering
 function InventoryItemIcon({ itemType, itemState = {} }) {
@@ -32,6 +33,22 @@ function InventoryItemIcon({ itemType, itemState = {} }) {
 
 export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, message, inventory = [], grid, worn = {} }) {
   const theme = useContext(ThemeContext);
+  const { t, isRTL, getItemLabel, getTileLabel } = useLanguage();
+  const themeId = theme?.themeId || 'forest';
+
+  // Helper to get localized mission description
+  const getMissionDescription = (mission) => {
+    if (mission.description) return mission.description;
+
+    // Get localized target name if available
+    const targetLabel = mission.targetId
+      ? getTileLabel(themeId, mission.targetId, mission.targetId)
+      : '';
+
+    // Use localized mission type template
+    const typeKey = `missionTypes.${mission.type}`;
+    return t(typeKey, { target: targetLabel });
+  };
 
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 14, pointerEvents: 'none' }}>
@@ -48,8 +65,8 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
         `,
         backdropFilter: 'blur(10px)',
       }}>
-        <div style={{ color: '#ff9999', fontSize: 10, fontWeight: 'bold', marginBottom: 4, letterSpacing: 1, textTransform: 'uppercase' }}>
-          Lives
+        <div style={{ color: '#ff9999', fontSize: 10, fontWeight: 'bold', marginBottom: 4, letterSpacing: 1, textTransform: 'uppercase', direction: isRTL ? 'rtl' : 'ltr' }}>
+          {t('hud.lives')}
         </div>
         <span style={{ color: '#ff6666', fontSize: 20 }}>
           {'❤️'.repeat(lives)}{'🖤'.repeat(Math.max(0, maxLives - lives))}
@@ -108,8 +125,9 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
           fontWeight: '700',
           textTransform: 'uppercase',
           letterSpacing: 1.5,
+          direction: isRTL ? 'rtl' : 'ltr',
         }}>
-          Missions{fixedOrder ? ' (Ordered)' : ''}
+          {fixedOrder ? t('hud.missionsOrdered') : t('hud.missions')}
         </div>
         {missions.map((m, i) => {
           const complete = isMissionDone(m, gameState, grid, theme);
@@ -124,9 +142,10 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
               display: 'flex',
               alignItems: 'center',
               gap: 8,
+              direction: isRTL ? 'rtl' : 'ltr',
             }}>
               <span style={{ fontSize: 14 }}>{complete ? '✓' : isCurrent ? '▶' : '○'}</span>
-              {m.description || `${m.type}: ${m.targetId || ''}`}
+              {getMissionDescription(m)}
             </div>
           );
         })}
@@ -153,12 +172,14 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
             fontWeight: '700',
             textTransform: 'uppercase',
             letterSpacing: 1.5,
+            direction: isRTL ? 'rtl' : 'ltr',
           }}>
-            Inventory
+            {t('hud.inventory')}
           </div>
           {inventory.map((item, i) => {
-            // Use theme's getItemLabel for proper labeling (handles state like filled/empty, colors)
-            const label = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+            // Use localized label from i18n, with theme's getItemLabel as fallback
+            const themeLabel = theme?.getItemLabel?.(item.itemType, item) || item.itemType;
+            const label = getItemLabel(themeId, item.itemType, themeLabel);
             return (
               <div key={i} style={{
                 color: '#ffffff',
@@ -184,8 +205,9 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
             fontFamily: 'monospace',
             paddingTop: 8,
             borderTop: '1px solid rgba(200, 150, 100, 0.2)',
+            direction: isRTL ? 'rtl' : 'ltr',
           }}>
-            Press Q to drop
+            {t('hud.dropHint')}
           </div>
         </div>
       )}
@@ -211,11 +233,13 @@ export default function HUD({ lives, maxLives, missions, gameState, fixedOrder, 
             fontWeight: '700',
             textTransform: 'uppercase',
             letterSpacing: 1.5,
+            direction: isRTL ? 'rtl' : 'ltr',
           }}>
-            Wearing
+            {t('hud.wearing')}
           </div>
           {Object.entries(worn).filter(([, itemType]) => itemType).map(([slot, itemType]) => {
-            const label = theme?.getItemLabel?.(itemType, {}) || itemType;
+            const themeLabel = theme?.getItemLabel?.(itemType, {}) || itemType;
+            const label = getItemLabel(themeId, itemType, themeLabel);
             return (
               <div key={slot} style={{
                 color: '#ffffff',

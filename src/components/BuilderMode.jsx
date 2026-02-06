@@ -8,6 +8,7 @@ import { saveLevel, generateId, loadLevels } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { useUser } from '../contexts/UserContext.jsx';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Default fallback
 const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
@@ -51,6 +52,7 @@ function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
 
 export default function BuilderMode({ onBack, editLevel, themeId }) {
   const theme = useContext(ThemeContext);
+  const { t, isRTL, language, setLanguage, getTileLabel, getLocalizedThemeName } = useLanguage();
   const { userId, displayName } = useUser();
   const lockTiles = useMemo(() => theme?.getLockTiles?.() || DEFAULT_LOCK_TILES, [theme]);
   const [grid, setGrid] = useState(() => {
@@ -220,7 +222,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
 
   const handleSave = () => {
     if (!levelName.trim()) {
-      alert('Please enter a level name.');
+      alert(t('builder.enterLevelName'));
       return;
     }
 
@@ -249,12 +251,12 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       })
       .catch(err => {
         console.error('Failed to save level:', err);
-        alert('Failed to save level. Check console for details.');
+        alert(t('builder.saveFailed'));
       });
   };
 
   const handleClear = () => {
-    if (confirm('Clear the entire grid?')) {
+    if (confirm(t('builder.confirmClear'))) {
       pushUndo(grid);
       setGrid(createEmptyGrid());
       setSaved(false);
@@ -312,7 +314,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
 
   const handleLoadLevel = (level) => {
     if (!saved && (grid.some(row => row.some(cell => cell.type !== 'empty')) || missions.length > 0)) {
-      if (!confirm('Load this level? Current unsaved changes will be lost.')) {
+      if (!confirm(t('builder.loadConfirm'))) {
         return;
       }
     }
@@ -368,9 +370,9 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     };
     return (
       <div>
-        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 100 }}>
+        <div style={{ position: 'absolute', top: 10, left: isRTL ? 'auto' : 10, right: isRTL ? 10 : 'auto', zIndex: 100 }}>
           <button onClick={() => setTestMode(false)} style={{ ...barBtn, background: 'linear-gradient(145deg, #4a4a3a 0%, #3a3a2a 100%)', padding: '10px 20px' }}>
-            ← Exit Test
+            {isRTL ? `${t('builder.exitTest')} →` : `← ${t('builder.exitTest')}`}
           </button>
         </div>
         <SolverMode level={testLevel} onBack={() => setTestMode(false)} />
@@ -410,11 +412,11 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         backdropFilter: 'blur(10px)',
         zIndex: 10,
       }}>
-        <button onClick={onBack} style={barBtn}>← Menu</button>
+        <button onClick={onBack} style={barBtn}>{isRTL ? `${t('builder.menu')} →` : `← ${t('builder.menu')}`}</button>
         <input
           value={levelName}
           onChange={e => setLevelName(e.target.value)}
-          placeholder="Level name..."
+          placeholder={t('builder.levelName')}
           style={{
             padding: '10px 16px',
             background: 'linear-gradient(135deg, rgba(30, 30, 30, 0.9) 0%, rgba(20, 20, 20, 0.9) 100%)',
@@ -429,31 +431,38 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           }}
         />
         <button onClick={handleSave} style={{ ...barBtn, background: saved ? '#2a4a2a' : '#2a3a4a' }}>
-          {saved ? '✓ Saved' : 'Save'}
+          {saved ? `✓ ${t('builder.saved')}` : t('builder.save')}
         </button>
         <button onClick={() => { setLoadMenuOpen(true); loadLevels().then(setLoadMenuLevels); }} style={{ ...barBtn, background: '#2a3a4a' }}>
-          Load
+          {t('builder.load')}
         </button>
 
         <div style={{ display: 'flex', border: '1px solid #666', borderRadius: 4, overflow: 'hidden', marginLeft: 4 }}>
           <button onClick={() => setSubMode('build')} style={{ ...activeBarBtn(subMode === 'build'), borderRadius: 0, border: 'none', borderRight: '1px solid #666' }}>
-            Build
+            {t('builder.build')}
           </button>
           <button onClick={() => setSubMode('edit')} style={{ ...activeBarBtn(subMode === 'edit'), borderRadius: 0, border: 'none' }}>
-            Edit
+            {t('builder.edit')}
           </button>
         </div>
 
-        <button onClick={handleUndo} style={barBtn} disabled={undoStack.length === 0}>Undo</button>
-        <button onClick={handleRedo} style={barBtn} disabled={redoStack.length === 0}>Redo</button>
+        <button onClick={handleUndo} style={barBtn} disabled={undoStack.length === 0}>{t('builder.undo')}</button>
+        <button onClick={handleRedo} style={barBtn} disabled={redoStack.length === 0}>{t('builder.redo')}</button>
         <button onClick={() => setShowHazardZones(!showHazardZones)} style={{ ...barBtn, background: showHazardZones ? 'linear-gradient(145deg, #4a4a3a 0%, #3a3a2a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }}>
-          {showHazardZones ? 'Zones ON' : 'Zones OFF'}
+          {showHazardZones ? t('builder.zonesOn') : t('builder.zonesOff')}
         </button>
         <button onClick={() => setShowTooltips(!showTooltips)} style={{ ...barBtn, background: showTooltips ? 'linear-gradient(145deg, #3a4a4a 0%, #2a3a3a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }}>
-          {showTooltips ? 'Tips ON' : 'Tips OFF'}
+          {showTooltips ? t('builder.tipsOn') : t('builder.tipsOff')}
         </button>
-        <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ Test</button>
-        <button onClick={handleClear} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}>Clear</button>
+        <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ {t('builder.test')}</button>
+        <button onClick={handleClear} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}>{t('builder.clear')}</button>
+        <button
+          onClick={() => setLanguage(language === 'en' ? 'he' : 'en')}
+          style={{ ...barBtn, background: 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)', fontWeight: '600' }}
+          title={t('settings.language')}
+        >
+          {language === 'en' ? '🇺🇸 EN' : '🇮🇱 עב'}
+        </button>
         <span style={{
           color: theme?.primaryColor || '#aaaaaa',
           fontSize: 13,
@@ -465,7 +474,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           fontWeight: '500',
           fontFamily: 'monospace',
         }}>
-          {theme?.emoji || '🎯'} {theme?.name || 'Theme'} • {subMode === 'build' ? '🎨 Build' : '✏️ Edit'} • {selectedTool} • Scroll/Arrows to pan
+          {theme?.emoji || '🎯'} {getLocalizedThemeName(themeId, theme?.name || 'Theme')} • {subMode === 'build' ? `🎨 ${t('builder.statusBuild')}` : `✏️ ${t('builder.statusEdit')}`} • {getTileLabel(themeId, selectedTool, selectedTool)} • {t('builder.panHint')}
         </span>
       </div>
 
@@ -562,15 +571,16 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
                 0 4px 12px rgba(0, 0, 0, 0.8)
               `,
               letterSpacing: 1,
+              direction: isRTL ? 'rtl' : 'ltr',
             }}>
-              {theme?.emoji || '📂'} Load {theme?.name || 'Level'}
+              {theme?.emoji || '📂'} {t('builder.loadTitle', { theme: getLocalizedThemeName(themeId, theme?.name || 'Level') })}
             </h2>
             {(() => {
               const levels = loadMenuLevels;
               if (levels.length === 0) {
                 return (
-                  <div style={{ color: '#888', fontSize: 14, padding: 20, textAlign: 'center' }}>
-                    No saved levels found
+                  <div style={{ color: '#888', fontSize: 14, padding: 20, textAlign: 'center', direction: isRTL ? 'rtl' : 'ltr' }}>
+                    {t('builder.noLevels')}
                   </div>
                 );
               }
@@ -601,9 +611,9 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
                       }}
                     >
                       <div>
-                        <div style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', marginBottom: 4 }}>{level.name || 'Unnamed Level'}</div>
-                        <div style={{ color: '#aaaaaa', fontSize: 12, fontFamily: 'monospace' }}>
-                          {level.missions?.length || 0} missions • {level.lives || 3} lives • {new Date(level.updatedAt || level.createdAt).toLocaleDateString()}
+                        <div style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', marginBottom: 4 }}>{level.name || t('builder.unnamedLevel')}</div>
+                        <div style={{ color: '#aaaaaa', fontSize: 12, fontFamily: 'monospace', direction: isRTL ? 'rtl' : 'ltr' }}>
+                          {t('builder.levelInfo', { missions: level.missions?.length || 0, lives: level.lives || 3, date: new Date(level.updatedAt || level.createdAt).toLocaleDateString() })}
                         </div>
                       </div>
                       <button
@@ -616,7 +626,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
                         onMouseEnter={(e) => e.target.style.background = 'linear-gradient(145deg, #4a5a5a 0%, #3a4a4a 100%)'}
                         onMouseLeave={(e) => e.target.style.background = 'linear-gradient(145deg, #3a4a4a 0%, #2a3a3a 100%)'}
                       >
-                        Load
+                        {t('builder.load')}
                       </button>
                     </div>
                   ))}
@@ -627,7 +637,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
               onClick={() => setLoadMenuOpen(false)}
               style={{ ...barBtn, marginTop: 16, width: '100%', padding: '10px' }}
             >
-              Cancel
+              {t('builder.cancel')}
             </button>
           </div>
         </div>
