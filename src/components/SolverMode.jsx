@@ -4,7 +4,7 @@ import { findTile, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
 import { getAllHazardZones } from '../engine/hazards';
 import { checkAllMissions, checkMissionComplete } from '../engine/missions';
-import { DIRECTIONS, GRID_COLS, GRID_ROWS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { DIRECTIONS, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { InteractionEngine } from '../engine/interactionEngine';
 import { useUser } from '../contexts/UserContext.jsx';
@@ -54,8 +54,8 @@ function InventoryIcon({ theme, itemType, size = 24, itemState = {} }) {
 
 function convertLegacyItems(grid) {
   const newGrid = cloneGrid(grid);
-  for (let y = 0; y < GRID_ROWS; y++) {
-    for (let x = 0; x < GRID_COLS; x++) {
+  for (let y = 0; y < newGrid.length; y++) {
+    for (let x = 0; x < newGrid[0].length; x++) {
       const cell = newGrid[y][x];
       if (cell.type === 'item' && cell.config?.itemType) {
         newGrid[y][x] = { type: `item-${cell.config.itemType}`, config: {} };
@@ -65,47 +65,46 @@ function convertLegacyItems(grid) {
   return newGrid;
 }
 
-function calculateViewportBounds(grid) {
-  let minX = GRID_COLS, minY = GRID_ROWS, maxX = -1, maxY = -1;
+// Calculate viewport centered on player position
+function calculatePlayerViewport(playerPos, grid, tilesX = 20, tilesY = 15) {
+  const gridCols = grid[0].length;
+  const gridRows = grid.length;
+  const halfX = Math.floor(tilesX / 2);
+  const halfY = Math.floor(tilesY / 2);
 
-  for (let y = 0; y < GRID_ROWS; y++) {
-    for (let x = 0; x < GRID_COLS; x++) {
-      const cell = grid[y][x];
-      if (cell.type !== 'empty') {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
+  let minX = playerPos.x - halfX;
+  let maxX = playerPos.x + halfX;
+  let minY = playerPos.y - halfY;
+  let maxY = playerPos.y + halfY;
 
-  if (maxX === -1) {
-    return { minX: 0, minY: 0, maxX: GRID_COLS - 1, maxY: GRID_ROWS - 1 };
-  }
+  // Clamp to grid bounds
+  if (minX < 0) { maxX -= minX; minX = 0; }
+  if (minY < 0) { maxY -= minY; minY = 0; }
+  if (maxX >= gridCols) { minX -= (maxX - gridCols + 1); maxX = gridCols - 1; }
+  if (maxY >= gridRows) { minY -= (maxY - gridRows + 1); maxY = gridRows - 1; }
 
-  const padding = 2;
-  minX = Math.max(0, minX - padding);
-  minY = Math.max(0, minY - padding);
-  maxX = Math.min(GRID_COLS - 1, maxX + padding);
-  maxY = Math.min(GRID_ROWS - 1, maxY + padding);
+  // Final clamp
+  minX = Math.max(0, minX);
+  minY = Math.max(0, minY);
 
   return { minX, minY, maxX, maxY };
 }
 
-function getAdjacentPositions(x, y) {
+function getAdjacentPositions(x, y, grid) {
   const adjacent = [];
+  const gridRows = grid.length;
+  const gridCols = grid[0].length;
   if (y > 0) adjacent.push({ x, y: y - 1, key: `${x},${y - 1}` });
-  if (y < GRID_ROWS - 1) adjacent.push({ x, y: y + 1, key: `${x},${y + 1}` });
+  if (y < gridRows - 1) adjacent.push({ x, y: y + 1, key: `${x},${y + 1}` });
   if (x > 0) adjacent.push({ x: x - 1, y, key: `${x - 1},${y}` });
-  if (x < GRID_COLS - 1) adjacent.push({ x: x + 1, y, key: `${x + 1},${y}` });
+  if (x < gridCols - 1) adjacent.push({ x: x + 1, y, key: `${x + 1},${y}` });
   return adjacent;
 }
 
-function initializeRevealedTiles(startX, startY) {
+function initializeRevealedTiles(startX, startY, grid) {
   const revealed = new Set();
   revealed.add(`${startX},${startY}`);
-  const adjacent = getAdjacentPositions(startX, startY);
+  const adjacent = getAdjacentPositions(startX, startY, grid);
   adjacent.forEach(pos => revealed.add(pos.key));
   return revealed;
 }
@@ -156,7 +155,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     worn: {}, // Wearable items (e.g., uniform)
     containers: {}, // Container items (e.g., bag)
   });
-  const [revealedTiles, setRevealedTiles] = useState(() => initializeRevealedTiles(startPos.x, startPos.y));
+  const [revealedTiles, setRevealedTiles] = useState(() => initializeRevealedTiles(startPos.x, startPos.y, level.grid));
   const [tick, setTick] = useState(0);
   const [message, setMessage] = useState(null);
   const [gameOver, setGameOver] = useState(null);
@@ -243,7 +242,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       worn: {},
       containers: {},
     });
-    setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y));
+    setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y, level.grid));
     setTick(0);
     setGameOver(null);
     setMessage(null);
@@ -329,7 +328,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       { x: px, y: py + 1 }, // down
       { x: px - 1, y: py }, // left
       { x: px + 1, y: py }, // right
-    ].filter(n => n.x >= 0 && n.x < GRID_COLS && n.y >= 0 && n.y < GRID_ROWS);
+    ].filter(n => n.x >= 0 && n.x < newGrid[0].length && n.y >= 0 && n.y < newGrid.length);
 
     // Count floor colors from neighbors (uses theme's ignore tiles)
     const colorCounts = {};
@@ -444,7 +443,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     const adjacent = Object.entries(DIRECTIONS).map(([dir, dd]) => ({
       x: pos.x + dd.dx, y: pos.y + dd.dy, dir,
-    })).filter(p => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS);
+    })).filter(p => p.x >= 0 && p.x < currentGrid[0].length && p.y >= 0 && p.y < currentGrid.length);
 
     const targets = [];
 
@@ -707,7 +706,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     for (const dir of adjacentDirs) {
       const nx = pos.x + dir.dx;
       const ny = pos.y + dir.dy;
-      if (nx >= 0 && nx < GRID_COLS && ny >= 0 && ny < GRID_ROWS) {
+      if (nx >= 0 && nx < currentGrid[0].length && ny >= 0 && ny < currentGrid.length) {
         const adjCell = currentGrid[ny][nx];
         if (adjCell.type.startsWith('item-') && theme?.canPickupFromAdjacent?.(adjCell.type)) {
           if (currentGS.inventory.length >= maxInventory) {
@@ -870,12 +869,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const prev = playerPosRef.current;
     const nx = prev.x + d.dx, ny = prev.y + d.dy;
 
-    if (nx < 0 || nx >= GRID_COLS || ny < 0 || ny >= GRID_ROWS) {
+    const currentGrid = gridRef.current;
+
+    if (nx < 0 || nx >= currentGrid[0].length || ny < 0 || ny >= currentGrid.length) {
       soundManager.play('blocked');
       return;
     }
-
-    const currentGrid = gridRef.current;
     const targetCell = currentGrid[ny][nx];
     const currentCell = currentGrid[prev.y][prev.x];
     const currentGS = gameStateRef.current;
@@ -885,7 +884,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setRevealedTiles(prev => {
         const newRevealed = new Set(prev);
         newRevealed.add(`${nx},${ny}`);
-        const adjacent = getAdjacentPositions(nx, ny);
+        const adjacent = getAdjacentPositions(nx, ny, currentGrid);
         adjacent.forEach(pos => newRevealed.add(pos.key));
         return newRevealed;
       });
@@ -1168,7 +1167,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         x: pos.x + dd.dx,
         y: pos.y + dd.dy,
         dir,
-      })).filter(p => p.x >= 0 && p.x < GRID_COLS && p.y >= 0 && p.y < GRID_ROWS);
+      })).filter(p => p.x >= 0 && p.x < currentGrid[0].length && p.y >= 0 && p.y < currentGrid.length);
 
       // Find the tile we're facing
       const facingTile = adjacent.find(t => t.dir === playerDir);
@@ -1436,8 +1435,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
   }, [playerPos, gameOver, level, showMessage, grid, gameState, exitTiles, theme]);
 
-  // Removed viewport bounds for open-world feel
-  const viewportBounds = null;
+  // Calculate viewport centered on player for infinite grid support
+  const viewportBounds = useMemo(() =>
+    calculatePlayerViewport(playerPos, grid),
+    [playerPos, grid]
+  );
 
   return (
     <div style={{

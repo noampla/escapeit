@@ -1272,9 +1272,21 @@ export function moveEntities(grid, gameState) {
       // Move guard to next position
       const guardTile = { ...tile, config: { ...tile.config } };
 
-      // Swap tiles - guard moves forward, leaves floor behind
+      // Store the floor config of the destination tile before overwriting
+      const destTile = newGrid[nextY][nextX];
+      if (destTile.type === 'floor' || destTile.type === 'start' || destTile.type === 'exit') {
+        guardTile.config.underlyingFloor = { type: destTile.type, config: { ...destTile.config } };
+      } else {
+        // Default to plain floor if moving onto something else (like item tile that was picked up)
+        guardTile.config.underlyingFloor = { type: 'floor', config: {} };
+      }
+
+      // Restore the floor at old position (use stored underlying floor or default)
+      const oldFloor = tile.config?.underlyingFloor || { type: 'floor', config: {} };
+      newGrid[y][x] = { type: oldFloor.type, config: { ...oldFloor.config } };
+
+      // Move guard to new position
       newGrid[nextY][nextX] = guardTile;
-      newGrid[y][x] = { type: 'floor', config: {} };
 
       anyMoved = true;
     } else {

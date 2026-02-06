@@ -1,8 +1,7 @@
-import { GRID_COLS, GRID_ROWS } from '../utils/constants';
 import { isWalkable } from './tiles';
 
 export function canMoveTo(grid, x, y) {
-  if (x < 0 || x >= GRID_COLS || y < 0 || y >= GRID_ROWS) return false;
+  if (x < 0 || y < 0 || y >= grid.length || x >= grid[0].length) return false;
   return isWalkable(grid[y][x]);
 }
 

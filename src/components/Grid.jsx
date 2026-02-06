@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, GRID_COLS, GRID_ROWS } from '../utils/constants';
+import { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } from '../utils/constants';
 import { getAllHazardZones } from '../engine/hazards';
 
 // Default emoji fallbacks (used if theme doesn't provide getTileEmoji)
@@ -45,8 +45,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
     // Determine the range of tiles to render
     const startX = viewportBounds ? viewportBounds.minX : 0;
     const startY = viewportBounds ? viewportBounds.minY : 0;
-    const endX = viewportBounds ? viewportBounds.maxX : GRID_COLS - 1;
-    const endY = viewportBounds ? viewportBounds.maxY : GRID_ROWS - 1;
+    const endX = viewportBounds ? viewportBounds.maxX : grid[0].length - 1;
+    const endY = viewportBounds ? viewportBounds.maxY : grid.length - 1;
 
     for (let y = startY; y <= endY; y++) {
       for (let x = startX; x <= endX; x++) {
@@ -232,7 +232,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
     const localY = Math.floor((e.clientY - rect.top) / TILE_SIZE);
     const x = localX + offsetX;
     const y = localY + offsetY;
-    if (x >= 0 && x < GRID_COLS && y >= 0 && y < GRID_ROWS) return { x, y };
+    if (x >= 0 && x < grid[0].length && y >= 0 && y < grid.length) return { x, y };
     return null;
   };
 

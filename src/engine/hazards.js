@@ -1,5 +1,3 @@
-import { GRID_COLS, GRID_ROWS } from '../utils/constants';
-
 // Check if player position is on a fire tile
 export function checkHazards(grid, playerX, playerY) {
   const cell = grid[playerY]?.[playerX];
@@ -10,8 +8,8 @@ export function checkHazards(grid, playerX, playerY) {
 // Get all fire tile positions for builder preview
 export function getAllHazardZones(grid) {
   const zones = [];
-  for (let y = 0; y < GRID_ROWS; y++) {
-    for (let x = 0; x < GRID_COLS; x++) {
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[0].length; x++) {
       const cell = grid[y][x];
       if (cell.type === 'fire') {
         zones.push({ x, y, hazardType: 'fire' });
@@ -29,12 +27,14 @@ export function floodFillWater(grid, startX, startY) {
   const visited = new Set();
   const queue = [{ x: startX, y: startY }];
   const cells = [];
+  const gridRows = grid.length;
+  const gridCols = grid[0].length;
   while (queue.length > 0) {
     const { x, y } = queue.shift();
     const key = `${x},${y}`;
     if (visited.has(key)) continue;
     visited.add(key);
-    if (x < 0 || x >= GRID_COLS || y < 0 || y >= GRID_ROWS) continue;
+    if (x < 0 || x >= gridCols || y < 0 || y >= gridRows) continue;
     if (grid[y][x].type !== 'water') continue;
     cells.push({ x, y });
     queue.push({ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 });

@@ -5,7 +5,7 @@ import PropertiesPanel from './PropertiesPanel';
 import SolverMode from './SolverMode';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid } from '../engine/tiles';
 import { saveLevel, generateId, loadLevels } from '../utils/storage';
-import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, GRID_COLS, GRID_ROWS } from '../utils/constants';
+import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { useUser } from '../contexts/UserContext.jsx';
 
@@ -15,11 +15,13 @@ const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
 // Check if a tile can be placed at position (for tiles with placement restrictions like camera)
 function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
   const tileDef = TILE_TYPES[tileType];
+  const gridRows = grid.length;
+  const gridCols = grid[0].length;
 
   // If tile has attachToWall requirement, validate placement
   if (tileDef?.attachToWall) {
     // Check if on map boundary
-    const isOnBoundary = x === 0 || x === GRID_COLS - 1 || y === 0 || y === GRID_ROWS - 1;
+    const isOnBoundary = x === 0 || x === gridCols - 1 || y === 0 || y === gridRows - 1;
     if (isOnBoundary) return { valid: true };
 
     // Check if adjacent to a wall
@@ -31,7 +33,7 @@ function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
     ];
 
     const hasAdjacentWall = neighbors.some(n => {
-      if (n.x < 0 || n.x >= GRID_COLS || n.y < 0 || n.y >= GRID_ROWS) return true; // Boundary counts as wall
+      if (n.x < 0 || n.x >= gridCols || n.y < 0 || n.y >= gridRows) return true; // Boundary counts as wall
       const neighborCell = grid[n.y][n.x];
       return neighborCell.type === 'wall' || neighborCell.type === 'empty';
     });
@@ -79,6 +81,36 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [placementError, setPlacementError] = useState(null);
   const lastDragPos = useRef(null);
   const placementErrorTimer = useRef(null);
+
+  // Viewport state for infinite grid - center starts at middle of old 20x15 area
+  const [viewportCenter, setViewportCenter] = useState({ x: 10, y: 7 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef(null);
+  const containerRef = useRef(null);
+
+  // Calculate viewport bounds based on center and container size
+  const viewportBounds = useMemo(() => {
+    // Default to showing ~20x15 tiles if no container measured yet
+    const tilesX = 20;
+    const tilesY = 15;
+    const halfX = Math.floor(tilesX / 2);
+    const halfY = Math.floor(tilesY / 2);
+
+    const minX = Math.max(0, viewportCenter.x - halfX);
+    const minY = Math.max(0, viewportCenter.y - halfY);
+    const maxX = Math.min(grid[0].length - 1, viewportCenter.x + halfX);
+    const maxY = Math.min(grid.length - 1, viewportCenter.y + halfY);
+
+    return { minX, minY, maxX, maxY };
+  }, [viewportCenter, grid]);
+
+  // Pan viewport with arrow keys (when not typing) or middle mouse drag
+  const handlePan = useCallback((dx, dy) => {
+    setViewportCenter(prev => ({
+      x: Math.max(10, Math.min(grid[0].length - 10, prev.x + dx)),
+      y: Math.max(7, Math.min(grid.length - 7, prev.y + dy))
+    }));
+  }, [grid]);
 
   const pushUndo = useCallback((currentGrid) => {
     setUndoStack(prev => [...prev.slice(-30), cloneGrid(currentGrid)]);
@@ -234,7 +266,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     setTestMode(true);
   };
 
-  // R key to start testing
+  // Keyboard shortcuts: R to test, Arrow keys to pan viewport
   useEffect(() => {
     const onKeyDown = (e) => {
       // Don't trigger if typing in an input
@@ -245,11 +277,38 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         e.preventDefault();
         handleTest();
       }
+
+      // Arrow keys to pan viewport
+      const panAmount = e.shiftKey ? 5 : 1;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); handlePan(-panAmount, 0); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); handlePan(panAmount, 0); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); handlePan(0, -panAmount); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); handlePan(0, panAmount); }
+    };
+
+    // Scroll wheel to pan: scroll = up/down, shift+scroll = left/right
+    // Only when scrolling over the canvas (grid area)
+    const onWheel = (e) => {
+      // Only handle if scrolling over the canvas element
+      if (e.target?.tagName?.toLowerCase() !== 'canvas') return;
+
+      e.preventDefault();
+      const delta = Math.sign(e.deltaY) * 3; // 3 tiles per scroll tick
+
+      if (e.shiftKey) {
+        handlePan(delta, 0); // Shift+scroll = left/right
+      } else {
+        handlePan(0, delta); // Scroll = up/down
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('wheel', onWheel);
+    };
+  }, [handlePan]);
 
   const handleLoadLevel = (level) => {
     if (!saved && (grid.some(row => row.some(cell => cell.type !== 'empty')) || missions.length > 0)) {
@@ -406,7 +465,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           fontWeight: '500',
           fontFamily: 'monospace',
         }}>
-          {theme?.emoji || '🎯'} {theme?.name || 'Theme'} • {subMode === 'build' ? '🎨 Build' : '✏️ Edit'} • {selectedTool}
+          {theme?.emoji || '🎯'} {theme?.name || 'Theme'} • {subMode === 'build' ? '🎨 Build' : '✏️ Edit'} • {selectedTool} • Scroll/Arrows to pan
         </span>
       </div>
 
@@ -422,6 +481,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             showHazardZones={showHazardZones}
             showTooltips={showTooltips}
             theme={theme}
+            viewportBounds={viewportBounds}
           />
           {/* Placement error message */}
           {placementError && (

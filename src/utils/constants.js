@@ -1,6 +1,6 @@
 // Universal constants - theme-independent
-export const GRID_COLS = 20;
-export const GRID_ROWS = 15;
+export const GRID_COLS = 100;
+export const GRID_ROWS = 100;
 export const TILE_SIZE = 40;
 export const CANVAS_WIDTH = GRID_COLS * TILE_SIZE;
 export const CANVAS_HEIGHT = GRID_ROWS * TILE_SIZE;

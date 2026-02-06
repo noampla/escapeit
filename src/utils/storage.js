@@ -1,20 +1,22 @@
 import { collection, doc, setDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
-import { GRID_COLS } from './constants';
 
 const COLLECTION = 'maps';
 
 // Firestore doesn't allow nested arrays. Flatten grid (2D) to 1D on save, restore on load.
 function flattenLevel(level) {
   const { grid, ...rest } = level;
-  return { ...rest, grid: grid.flat() };
+  // Store grid dimensions for proper restoration
+  return { ...rest, grid: grid.flat(), gridCols: grid[0].length, gridRows: grid.length };
 }
 
 function restoreLevel(data) {
-  const { grid, ...rest } = data;
+  const { grid, gridCols, gridRows, ...rest } = data;
+  // Use stored dimensions, fallback to legacy 20x15 for old saved levels
+  const cols = gridCols || 20;
   const restored = [];
-  for (let row = 0; row < grid.length / GRID_COLS; row++) {
-    restored.push(grid.slice(row * GRID_COLS, (row + 1) * GRID_COLS));
+  for (let row = 0; row < grid.length / cols; row++) {
+    restored.push(grid.slice(row * cols, (row + 1) * cols));
   }
   return { ...rest, grid: restored };
 }

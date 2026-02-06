@@ -29,14 +29,15 @@ export function placeTile(grid, x, y, type, TILE_TYPES = {}) {
   }
   const newGrid = cloneGrid(grid);
   if (def.unique) {
-    for (let gy = 0; gy < GRID_ROWS; gy++) {
-      for (let gx = 0; gx < GRID_COLS; gx++) {
+    for (let gy = 0; gy < newGrid.length; gy++) {
+      for (let gx = 0; gx < newGrid[0].length; gx++) {
         if (newGrid[gy][gx].type === type) {
           newGrid[gy][gx] = { type: 'ground', config: {} };
         }
       }
     }
   }
+  const oldCell = grid[y][x];
   newGrid[y][x] = {
     type,
     config: def.defaultConfig ? { ...def.defaultConfig } : {},
@@ -44,6 +45,10 @@ export function placeTile(grid, x, y, type, TILE_TYPES = {}) {
   // Store itemType for item tiles
   if (def.isItemTile) {
     newGrid[y][x].config.itemType = def.itemType;
+  }
+  // Store underlying floor for moving entities (guards) so they preserve floor colors
+  if (def.isMovingEntity && (oldCell.type === 'floor' || oldCell.type === 'start' || oldCell.type === 'exit' || oldCell.type === 'ground')) {
+    newGrid[y][x].config.underlyingFloor = { type: oldCell.type, config: { ...oldCell.config } };
   }
   return newGrid;
 }
@@ -68,8 +73,8 @@ export function isWalkable(cell) {
 }
 
 export function findTile(grid, type) {
-  for (let y = 0; y < GRID_ROWS; y++) {
-    for (let x = 0; x < GRID_COLS; x++) {
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[0].length; x++) {
       if (grid[y][x].type === type) return { x, y };
     }
   }
@@ -78,8 +83,8 @@ export function findTile(grid, type) {
 
 export function findAllTiles(grid, type) {
   const results = [];
-  for (let y = 0; y < GRID_ROWS; y++) {
-    for (let x = 0; x < GRID_COLS; x++) {
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[0].length; x++) {
       if (grid[y][x].type === type) results.push({ x, y, config: grid[y][x].config });
     }
   }
