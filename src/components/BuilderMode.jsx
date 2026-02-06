@@ -82,8 +82,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const lastDragPos = useRef(null);
   const placementErrorTimer = useRef(null);
 
-  // Viewport state for infinite grid - center starts at middle of old 20x15 area
-  const [viewportCenter, setViewportCenter] = useState({ x: 10, y: 7 });
+  // Viewport state for infinite grid - center starts at middle of grid
+  const [viewportCenter, setViewportCenter] = useState({ x: 50, y: 50 });
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef(null);
   const containerRef = useRef(null);
@@ -108,7 +108,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const handlePan = useCallback((dx, dy) => {
     setViewportCenter(prev => ({
       x: Math.max(10, Math.min(grid[0].length - 10, prev.x + dx)),
-      y: Math.max(7, Math.min(grid.length - 7, prev.y + dy))
+      y: Math.max(8, Math.min(grid.length - 8, prev.y + dy))
     }));
   }, [grid]);
 
