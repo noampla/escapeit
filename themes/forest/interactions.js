@@ -18,8 +18,9 @@ export const INTERACTIONS = {
     duration: 1500,
     requirements: { inventory: ['axe'], tile: 'tree' },
     execute: (gameState, grid, x, y) => {
-      // Replace tree with wood item
-      grid[y][x] = { type: 'item-wood', config: {} };
+      // Replace tree (floor) with ground, place wood item (object)
+      grid[y][x].floor = { type: 'ground', config: {} };
+      grid[y][x].object = { type: 'item-wood', config: {} };
       return {
         success: true,
         messageKey: 'treeChopped',
@@ -102,8 +103,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'noRaftInInventory' };
       }
 
-      // Place raft on water tile
-      grid[y][x] = { type: 'raft', config: {} };
+      // Place raft on water tile (object layer)
+      grid[y][x].object = { type: 'raft', config: {} };
 
       // Remove raft from inventory
       gameState.inventory = gameState.inventory.filter((_, i) => i !== raftIdx);
@@ -124,8 +125,8 @@ export const INTERACTIONS = {
       tile: 'raft'
     },
     execute: (gameState, grid, x, y) => {
-      // Replace raft tile with water
-      grid[y][x] = { type: 'water', config: {} };
+      // Remove raft from object layer (water floor remains)
+      grid[y][x].object = null;
 
       // Add raft to inventory
       gameState.inventory.push({ itemType: 'raft', filled: false });
@@ -155,8 +156,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needFilledBucket' };
       }
 
-      // Remove fire, replace with ground
-      grid[y][x] = { type: 'ground', config: {} };
+      // Remove fire from object layer
+      grid[y][x].object = null;
 
       // Empty the bucket
       gameState.inventory[filledBucketIdx] = {
@@ -179,10 +180,10 @@ export const INTERACTIONS = {
     requirements: { tile: 'friend' },
     execute: (gameState, grid, x, y) => {
       const friend = grid[y][x];
-      const friendName = friend.config?.name || 'Friend';
+      const friendName = friend.object?.config?.name || 'Friend';
 
-      // Remove friend from grid
-      grid[y][x] = { type: 'ground', config: {} };
+      // Remove friend from object layer
+      grid[y][x].object = null;
 
       // Update game state
       gameState.rescuedFriends = (gameState.rescuedFriends || 0) + 1;
@@ -212,8 +213,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needKnife' };
       }
 
-      // Remove bear from grid
-      grid[y][x] = { type: 'ground', config: {} };
+      // Remove bear from object layer
+      grid[y][x].object = null;
 
       // Remove knife and add sweater
       gameState.inventory = gameState.inventory.filter((_, i) => i !== knifeIdx);
@@ -238,14 +239,14 @@ export const INTERACTIONS = {
     requirements: { tile: 'door-key' },
     // Custom check for matching key color
     checkCustom: (gameState, tile) => {
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       return gameState.inventory?.some(
         item => item.itemType === 'key' && item.lockColor === doorColor
       );
     },
     execute: (gameState, grid, x, y) => {
       const tile = grid[y][x];
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       const keyIdx = gameState.inventory.findIndex(
         item => item.itemType === 'key' && item.lockColor === doorColor
       );
@@ -254,8 +255,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needKey', messageParams: { color: doorColor } };
       }
 
-      // Open the door
-      grid[y][x] = { type: 'door-key-open', config: {} };
+      // Open the door (object layer)
+      grid[y][x].object = { type: 'door-key-open', config: {} };
 
       // Remove the key
       gameState.inventory = gameState.inventory.filter((_, i) => i !== keyIdx);
@@ -276,14 +277,14 @@ export const INTERACTIONS = {
     requirements: { tile: 'door-card' },
     // Custom check for matching card color
     checkCustom: (gameState, tile) => {
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       return gameState.inventory?.some(
         item => item.itemType === 'card' && item.lockColor === doorColor
       );
     },
     execute: (gameState, grid, x, y) => {
       const tile = grid[y][x];
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       const cardIdx = gameState.inventory.findIndex(
         item => item.itemType === 'card' && item.lockColor === doorColor
       );
@@ -292,8 +293,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needKeycard', messageParams: { color: doorColor } };
       }
 
-      // Open the door
-      grid[y][x] = { type: 'door-card-open', config: {} };
+      // Open the door (object layer)
+      grid[y][x].object = { type: 'door-card-open', config: {} };
 
       // Remove the card
       gameState.inventory = gameState.inventory.filter((_, i) => i !== cardIdx);
@@ -334,13 +335,15 @@ export function getAvailableInteractions(gameState, grid, x, y) {
 function checkRequirements(requirements, gameState, tile, interaction = null) {
   if (!requirements) return true;
 
-  // Check tile type
-  if (requirements.tile && tile.type !== requirements.tile) {
+  // Check tile type (check both object and floor layers)
+  const tileType = tile.object?.type || tile.floor?.type;
+
+  if (requirements.tile && tileType !== requirements.tile) {
     return false;
   }
 
   // Check if tile is one of multiple types
-  if (requirements.tileAny && !requirements.tileAny.includes(tile.type)) {
+  if (requirements.tileAny && !requirements.tileAny.includes(tileType)) {
     return false;
   }
 

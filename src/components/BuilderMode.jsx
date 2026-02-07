@@ -3,7 +3,7 @@ import Grid from './Grid';
 import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
 import SolverMode from './SolverMode';
-import { createEmptyGrid, placeTile, removeTile, cloneGrid } from '../engine/tiles';
+import { createEmptyGrid, placeTile, removeTile, cloneGrid, validateObjectPlacement } from '../engine/tiles';
 import { saveLevel, generateId, loadLevels } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
 import { ThemeContext } from '../App';
@@ -36,7 +36,9 @@ function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
     const hasAdjacentWall = neighbors.some(n => {
       if (n.x < 0 || n.x >= gridCols || n.y < 0 || n.y >= gridRows) return true; // Boundary counts as wall
       const neighborCell = grid[n.y][n.x];
-      return neighborCell.type === 'wall' || neighborCell.type === 'empty';
+      // Check both floor and object layers for walls/empty
+      return neighborCell.floor?.type === 'wall' || neighborCell.floor?.type === 'empty' ||
+             neighborCell.object?.type === 'wall' || neighborCell.object?.type === 'empty';
     });
 
     if (hasAdjacentWall) return { valid: true };
@@ -176,8 +178,20 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     }
 
     const TILE_TYPES = theme?.getTileTypes() || {};
+    const tileDef = TILE_TYPES[selectedTool];
+    const layer = tileDef?.layer || 'floor';
 
-    // Validate placement for tiles with restrictions
+    // Validate object placement on floor
+    if (layer === 'object') {
+      const cell = grid[y][x];
+      const validation = validateObjectPlacement(cell, selectedTool, TILE_TYPES);
+      if (!validation.valid) {
+        showPlacementError(validation.message);
+        return;
+      }
+    }
+
+    // Validate placement for tiles with restrictions (like camera attachToWall)
     const placementCheck = canPlaceTile(grid, x, y, selectedTool, TILE_TYPES);
     if (!placementCheck.valid) {
       showPlacementError(placementCheck.message);
@@ -189,12 +203,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     // Apply floor color if placing floor tile
     if (selectedTool === 'floor') {
       newGrid = cloneGrid(newGrid);
-      newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
+      newGrid[y][x].floor.config = { ...newGrid[y][x].floor.config, floorColor: selectedFloorColor };
     }
     // Apply lock color if placing door/key/card tile
     if (lockTiles.includes(selectedTool)) {
       newGrid = cloneGrid(newGrid);
-      newGrid[y][x].config = { ...newGrid[y][x].config, lockColor: selectedLockColor };
+      // Lock color goes on object layer for doors/items
+      if (layer === 'object' && newGrid[y][x].object) {
+        newGrid[y][x].object.config = { ...newGrid[y][x].object.config, lockColor: selectedLockColor };
+      }
     }
     setGrid(newGrid);
     setSelectedCell({ x, y });
@@ -208,6 +225,18 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     if (lastDragPos.current === key) return;
     lastDragPos.current = key;
     const TILE_TYPES = theme?.getTileTypes() || {};
+    const tileDef = TILE_TYPES[selectedTool];
+    const layer = tileDef?.layer || 'floor';
+
+    // Validate object placement on floor
+    if (layer === 'object') {
+      const cell = grid[y][x];
+      const validation = validateObjectPlacement(cell, selectedTool, TILE_TYPES);
+      if (!validation.valid) {
+        // Don't show error on drag to avoid spam, just skip placement
+        return;
+      }
+    }
 
     // Validate placement for tiles with restrictions
     const placementCheck = canPlaceTile(grid, x, y, selectedTool, TILE_TYPES);
@@ -341,7 +370,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   }, [handlePan]);
 
   const handleLoadLevel = (level) => {
-    if (!saved && (grid.some(row => row.some(cell => cell.type !== 'empty')) || missions.length > 0)) {
+    if (!saved && (grid.some(row => row.some(cell => cell.floor?.type !== 'empty' || cell.object)) || missions.length > 0)) {
       if (!confirm(t('builder.loadConfirm'))) {
         return;
       }

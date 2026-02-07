@@ -10,14 +10,14 @@ export const INTERACTIONS = {
       tile: 'door-card'
     },
     checkCustom: (gameState, tile) => {
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       return gameState.inventory?.some(item =>
         item.itemType === 'card' && item.lockColor === doorColor
       );
     },
     execute: (gameState, grid, x, y) => {
       const tile = grid[y][x];
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       const colorLabel = LOCK_COLORS[doorColor]?.label || doorColor;
 
       // Find and consume the matching keycard
@@ -36,8 +36,8 @@ export const INTERACTIONS = {
       // Remove card from inventory
       gameState.inventory = gameState.inventory.filter((_, i) => i !== cardIndex);
 
-      // Open the door
-      grid[y][x] = { type: 'door-card-open', config: {} };
+      // Open the door (object layer)
+      grid[y][x].object = { type: 'door-card-open', config: {} };
 
       return {
         success: true,
@@ -54,13 +54,15 @@ export const INTERACTIONS = {
 function checkRequirements(requirements, gameState, tile, interaction) {
   if (!requirements) return true;
 
-  // Check tile requirement
-  if (requirements.tile && tile.type !== requirements.tile) {
+  // Check tile requirement (check both object and floor layers)
+  const tileType = tile.object?.type || tile.floor?.type;
+
+  if (requirements.tile && tileType !== requirements.tile) {
     return false;
   }
 
   // Check tileAny requirement
-  if (requirements.tileAny && !requirements.tileAny.includes(tile.type)) {
+  if (requirements.tileAny && !requirements.tileAny.includes(tileType)) {
     return false;
   }
 

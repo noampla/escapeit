@@ -4,6 +4,7 @@ export const TILE_TYPES = {
     label: 'Empty',
     color: '#0a0a0a',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Empty void. Not walkable.',
     walkable: false
   },
@@ -11,6 +12,7 @@ export const TILE_TYPES = {
     label: 'Ground',
     color: '#3d5a28',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Walkable forest ground.',
     walkable: true
   },
@@ -18,6 +20,7 @@ export const TILE_TYPES = {
     label: 'Tree',
     color: '#2d4a1a',
     category: 'basic',
+    layer: 'floor',
     configurable: false,
     defaultConfig: {},
     tooltip: 'Blocks movement. Cut with axe (hold E) to get wood.',
@@ -27,6 +30,7 @@ export const TILE_TYPES = {
     label: 'Water',
     color: '#2266aa',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Blocks movement. Build a raft (hold E with Rope + Wood), then face water and press Q to place it.',
     walkable: false
   },
@@ -34,6 +38,7 @@ export const TILE_TYPES = {
     label: 'Snow',
     color: '#ddeeff',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Blocks movement unless player has a Sweater.',
     walkable: false  // Special: walkable with sweater
   },
@@ -41,6 +46,7 @@ export const TILE_TYPES = {
     label: 'Raft',
     color: '#6699aa',
     category: null,
+    layer: 'object',
     tooltip: 'Walkable water. Face it and press F to pick up, Q to place on water.',
     walkable: true
   },
@@ -48,6 +54,7 @@ export const TILE_TYPES = {
     label: 'Campfire (Start)',
     color: '#cc6600',
     category: 'basic',
+    layer: 'floor',
     unique: true,
     tooltip: 'Player spawn point. Only one per level.',
     walkable: true
@@ -56,6 +63,7 @@ export const TILE_TYPES = {
     label: 'Car (Exit)',
     color: '#4488cc',
     category: 'basic',
+    layer: 'floor',
     unique: true,
     configurable: true,
     defaultConfig: { needsKey: true },
@@ -68,6 +76,7 @@ export const TILE_TYPES = {
     label: 'Key',
     color: '#ffdd00',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'key',
     tooltip: 'Collectible key. Press F to pick up.',
@@ -77,6 +86,7 @@ export const TILE_TYPES = {
     label: 'Axe',
     color: '#aa6633',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'axe',
     tooltip: 'Collectible axe. Press F to pick up. Use to cut trees.',
@@ -86,6 +96,7 @@ export const TILE_TYPES = {
     label: 'Bucket',
     color: '#5588bb',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'bucket',
     tooltip: 'Collectible bucket. Press F to pick up. Fill at water, use on fire.',
@@ -95,6 +106,7 @@ export const TILE_TYPES = {
     label: 'Rope',
     color: '#aa8855',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'rope',
     tooltip: 'Collectible rope. Press F to pick up. Combine with wood to build raft.',
@@ -104,6 +116,7 @@ export const TILE_TYPES = {
     label: 'Knife',
     color: '#cccccc',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'knife',
     tooltip: 'Collectible knife. Press F to pick up. Defeat bears.',
@@ -113,6 +126,7 @@ export const TILE_TYPES = {
     label: 'Sweater',
     color: '#cc4466',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'sweater',
     tooltip: 'Collectible sweater. Press F to pick up. Walk through snow.',
@@ -122,6 +136,7 @@ export const TILE_TYPES = {
     label: 'Wood',
     color: '#8b6914',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'wood',
     tooltip: 'Collectible wood. Press F to pick up. Combine with rope to build raft.',
@@ -131,6 +146,7 @@ export const TILE_TYPES = {
     label: 'Raft',
     color: '#8b6914',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'raft',
     tooltip: 'Collectible raft. Press F to pick up. Face water and press Q to place.',
@@ -141,6 +157,7 @@ export const TILE_TYPES = {
     label: 'Lost Friend',
     color: '#ff88cc',
     category: 'interactive',
+    layer: 'object',
     configurable: true,
     defaultConfig: { name: 'Friend' },
     tooltip: 'Lost friend. Hold E to rescue.',
@@ -150,6 +167,7 @@ export const TILE_TYPES = {
     label: 'Fire',
     color: '#ff4400',
     category: 'hazard',
+    layer: 'object',
     tooltip: 'Damaging hazard. Stepping on it costs a life. Extinguish with filled Bucket (hold E nearby).',
     walkable: true  // Walkable but causes damage
   },
@@ -157,6 +175,7 @@ export const TILE_TYPES = {
     label: 'Bear',
     color: '#8b4513',
     category: 'hazard',
+    layer: 'object',
     tooltip: 'Without Knife: lose a life, pushed back. With Knife: bear defeated, get Sweater.',
     walkable: false  // Special: walkable with knife
   },
@@ -261,6 +280,9 @@ function drawRaft(ctx, cx, cy, size) {
 
 // Custom rendering for tiles (optional - most use emoji/color)
 export function renderTile(ctx, tile, cx, cy, size) {
+  // Guard against undefined tile
+  if (!tile) return false;
+
   // Raft gets custom rendering
   if (tile.type === 'raft') {
     drawRaft(ctx, cx, cy, size);
@@ -359,9 +381,9 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       if (currentTileType === 'raft') {
         return {
           allowed: true,
-          // Set the source tile (where player was) to water, dest tile to raft
-          setSourceTile: { type: 'water', config: {} },
-          setDestTile: { type: 'raft', config: {} }
+          // Set the source tile (where player was) to water (floor), dest tile to raft (object on water)
+          setSourceTile: { floor: { type: 'water', config: {} }, object: null },
+          setDestTile: { floor: { type: 'water', config: {} }, object: { type: 'raft', config: {} } }
         };
       }
       return {
@@ -432,4 +454,37 @@ export function checkExitRequirements(gameState, exitConfig) {
   }
 
   return { allowed: true };
+}
+
+// === TWO-LAYER SYSTEM HELPERS ===
+
+/**
+ * Get the layer a tile type belongs to
+ * @param {string} tileType - The tile type
+ * @returns {'floor'|'object'} - The layer
+ */
+export function getTileLayer(tileType) {
+  const tile = TILE_TYPES[tileType];
+  return tile?.layer || 'floor'; // Default to floor for safety
+}
+
+/**
+ * Check if a tile type is a floor tile
+ */
+export function isFloorTile(tileType) {
+  return getTileLayer(tileType) === 'floor';
+}
+
+/**
+ * Check if a tile type is an object tile
+ */
+export function isObjectTile(tileType) {
+  return getTileLayer(tileType) === 'object';
+}
+
+/**
+ * Get default floor for this theme
+ */
+export function getDefaultFloor() {
+  return { type: 'ground', config: {} };
 }

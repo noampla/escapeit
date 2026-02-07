@@ -59,43 +59,61 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
 
         const cell = grid[y][x];
         const TILE_TYPES = theme?.getTileTypes() || {};
-        const def = TILE_TYPES[cell.type] || TILE_TYPES.empty || { color: '#333' };
         const px = (x - offsetX) * TILE_SIZE, py = (y - offsetY) * TILE_SIZE;
         const cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
 
-        ctx.fillStyle = def.color;
+        // === LAYER 1: FLOOR ===
+        const floorDef = TILE_TYPES[cell.floor?.type] || TILE_TYPES.empty || { color: '#333' };
+
+        // Draw floor background color
+        ctx.fillStyle = floorDef.color;
         ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
+        // Draw grid border
         ctx.strokeStyle = '#2a3a2a';
         ctx.lineWidth = 0.5;
         ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
 
-        // Draw item tiles
-        if (cell.type.startsWith('item-')) {
-          const itemType = cell.type.replace('item-', '');
-          // Try theme's custom rendering first (pass top-left corner, not center)
-          const rendered = theme?.renderItem?.(ctx, itemType, px, py, TILE_SIZE, cell.config);
-          if (!rendered) {
-            // Fallback to emoji (use center coordinates)
-            const emoji = theme?.getItemEmoji?.(itemType) || DEFAULT_TILE_EMOJIS[cell.type];
-            if (emoji) {
-              ctx.font = '22px serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(emoji, cx, cy);
-            }
+        // Draw floor custom rendering or emoji
+        const floorRendered = theme?.renderTile?.(ctx, cell.floor, cx, cy, TILE_SIZE);
+        if (!floorRendered) {
+          const floorEmoji = theme?.getTileEmoji?.(cell.floor?.type) || DEFAULT_TILE_EMOJIS[cell.floor?.type];
+          if (floorEmoji) {
+            ctx.font = '22px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(floorEmoji, cx, cy);
           }
-        } else {
-          // Try theme's custom tile rendering first
-          const rendered = theme?.renderTile?.(ctx, cell, cx, cy, TILE_SIZE);
-          if (!rendered) {
-            // Fallback to emoji
-            const emoji = theme?.getTileEmoji?.(cell.type) || DEFAULT_TILE_EMOJIS[cell.type];
-            if (emoji) {
-              ctx.font = '22px serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(emoji, cx, cy);
+        }
+
+        // === LAYER 2: OBJECT (if exists) ===
+        if (cell.object) {
+          // Items use special rendering
+          if (cell.object.type.startsWith('item-')) {
+            const itemType = cell.object.type.replace('item-', '');
+            // Try theme's custom rendering first (pass top-left corner, not center)
+            const rendered = theme?.renderItem?.(ctx, itemType, px, py, TILE_SIZE, cell.object.config);
+            if (!rendered) {
+              // Fallback to emoji (use center coordinates)
+              const emoji = theme?.getItemEmoji?.(itemType) || DEFAULT_TILE_EMOJIS[cell.object.type];
+              if (emoji) {
+                ctx.font = '22px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(emoji, cx, cy);
+              }
+            }
+          } else {
+            // Other objects (doors, hazards, etc)
+            const rendered = theme?.renderTile?.(ctx, cell.object, cx, cy, TILE_SIZE);
+            if (!rendered) {
+              const emoji = theme?.getTileEmoji?.(cell.object.type) || DEFAULT_TILE_EMOJIS[cell.object.type];
+              if (emoji) {
+                ctx.font = '22px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(emoji, cx, cy);
+              }
             }
           }
         }

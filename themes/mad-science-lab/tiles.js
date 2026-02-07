@@ -24,6 +24,7 @@ export const TILE_TYPES = {
     label: 'Empty',
     color: '#050508',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Empty void. Not walkable.',
     walkable: false
   },
@@ -31,6 +32,7 @@ export const TILE_TYPES = {
     label: 'Wall',
     color: '#1a1a1f',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Laboratory wall. Blocks movement.',
     walkable: false
   },
@@ -38,6 +40,7 @@ export const TILE_TYPES = {
     label: 'Floor',
     color: '#2a2a2f',
     category: 'basic',
+    layer: 'floor',
     configurable: true,
     defaultConfig: { floorColor: 'gray' },
     tooltip: 'Lab floor. Shift+click to change color.',
@@ -47,6 +50,7 @@ export const TILE_TYPES = {
     label: 'Entry Point (Start)',
     color: '#1a4a1a',
     category: 'basic',
+    layer: 'floor',
     unique: true,
     tooltip: 'Player spawn point. Only one per level.',
     walkable: true
@@ -55,6 +59,7 @@ export const TILE_TYPES = {
     label: 'Emergency Exit',
     color: '#4a1a1a',
     category: 'basic',
+    layer: 'floor',
     unique: true,
     tooltip: 'Emergency exit. Escape here to complete the level.',
     walkable: true
@@ -65,6 +70,7 @@ export const TILE_TYPES = {
     label: 'Security Door',
     color: '#2a2a3a',
     category: 'interactive',
+    layer: 'object',
     configurable: true,
     defaultConfig: { lockColor: 'red' },
     tooltip: 'Electronic security door. Requires matching colored keycard.',
@@ -73,6 +79,7 @@ export const TILE_TYPES = {
   'door-card-open': {
     label: 'Open Security Door',
     color: '#1a1a2a',
+    layer: 'object',
     walkable: true
   },
 
@@ -81,6 +88,7 @@ export const TILE_TYPES = {
     label: 'Keycard',
     color: '#3a3a4a',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'card',
     configurable: true,
@@ -140,6 +148,9 @@ export function isWalkable(tileType, gameState = {}) {
 
 // Custom rendering for tiles
 export function renderTile(ctx, tile, cx, cy, size) {
+  // Guard against undefined tile
+  if (!tile) return false;
+
   // Floor renders with configured color and grid pattern
   if (tile.type === 'floor') {
     const floorColor = tile.config?.floorColor || 'gray';
@@ -450,4 +461,37 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
 // Check if player meets exit requirements
 export function checkExitRequirements(gameState, exitConfig) {
   return { allowed: true };
+}
+
+// === TWO-LAYER SYSTEM HELPERS ===
+
+/**
+ * Get the layer a tile type belongs to
+ * @param {string} tileType - The tile type
+ * @returns {'floor'|'object'} - The layer
+ */
+export function getTileLayer(tileType) {
+  const tile = TILE_TYPES[tileType];
+  return tile?.layer || 'floor'; // Default to floor for safety
+}
+
+/**
+ * Check if a tile type is a floor tile
+ */
+export function isFloorTile(tileType) {
+  return getTileLayer(tileType) === 'floor';
+}
+
+/**
+ * Check if a tile type is an object tile
+ */
+export function isObjectTile(tileType) {
+  return getTileLayer(tileType) === 'object';
+}
+
+/**
+ * Get default floor for this theme
+ */
+export function getDefaultFloor() {
+  return { type: 'floor', config: { floorColor: 'gray' } };
 }

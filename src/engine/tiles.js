@@ -5,7 +5,10 @@ export function createEmptyGrid() {
   for (let y = 0; y < GRID_ROWS; y++) {
     const row = [];
     for (let x = 0; x < GRID_COLS; x++) {
-      row.push({ type: 'empty', config: {} });
+      row.push({
+        floor: { type: 'empty', config: {} },
+        object: null
+      });
     }
     grid.push(row);
   }
@@ -14,68 +17,170 @@ export function createEmptyGrid() {
 
 export function cloneGrid(grid) {
   return grid.map(row => row.map(cell => ({
-    type: cell.type,
-    config: { ...cell.config },
+    floor: {
+      type: cell.floor.type,
+      config: { ...cell.floor.config }
+    },
+    object: cell.object ? {
+      type: cell.object.type,
+      config: { ...cell.object.config }
+    } : null
   })));
 }
 
 export function placeTile(grid, x, y, type, TILE_TYPES = {}) {
   const def = TILE_TYPES[type];
   if (!def) {
-    // If no definition, just place the tile
+    // If no definition, default to floor layer
     const newGrid = cloneGrid(grid);
-    newGrid[y][x] = { type, config: {} };
+    newGrid[y][x].floor = { type, config: {} };
     return newGrid;
   }
+
+  const layer = def.layer || 'floor';
   const newGrid = cloneGrid(grid);
+
+  // Handle unique tiles - remove duplicates from same layer
   if (def.unique) {
     for (let gy = 0; gy < newGrid.length; gy++) {
       for (let gx = 0; gx < newGrid[0].length; gx++) {
-        if (newGrid[gy][gx].type === type) {
-          newGrid[gy][gx] = { type: 'ground', config: {} };
+        const cell = newGrid[gy][gx];
+        if (layer === 'floor' && cell.floor.type === type) {
+          cell.floor = { type: 'ground', config: {} };
+        } else if (layer === 'object' && cell.object?.type === type) {
+          cell.object = null;
         }
       }
     }
   }
+
   const oldCell = grid[y][x];
-  newGrid[y][x] = {
-    type,
-    config: def.defaultConfig ? { ...def.defaultConfig } : {},
-  };
-  // Store itemType for item tiles
-  if (def.isItemTile) {
-    newGrid[y][x].config.itemType = def.itemType;
+
+  if (layer === 'floor') {
+    // Placing floor tile
+    newGrid[y][x].floor = {
+      type,
+      config: def.defaultConfig ? { ...def.defaultConfig } : {}
+    };
+
+    // Clear object if new floor is not walkable
+    if (!def.walkable && newGrid[y][x].object) {
+      newGrid[y][x].object = null;
+    }
+  } else {
+    // Placing object tile
+    newGrid[y][x].object = {
+      type,
+      config: def.defaultConfig ? { ...def.defaultConfig } : {}
+    };
+
+    // Store itemType for item tiles
+    if (def.isItemTile) {
+      newGrid[y][x].object.config.itemType = def.itemType;
+    }
+
+    // Store underlying floor for moving entities (guards) so they preserve floor colors
+    if (def.isMovingEntity) {
+      newGrid[y][x].object.config.underlyingFloor = {
+        type: oldCell.floor.type,
+        config: { ...oldCell.floor.config }
+      };
+    }
   }
-  // Store underlying floor for moving entities (guards) so they preserve floor colors
-  if (def.isMovingEntity && (oldCell.type === 'floor' || oldCell.type === 'start' || oldCell.type === 'exit' || oldCell.type === 'ground')) {
-    newGrid[y][x].config.underlyingFloor = { type: oldCell.type, config: { ...oldCell.config } };
-  }
+
   return newGrid;
 }
 
 export function removeTile(grid, x, y) {
   const newGrid = cloneGrid(grid);
   const cell = newGrid[y][x];
-  if (cell.type === 'ground' || cell.type === 'empty') {
-    newGrid[y][x] = { type: 'empty', config: {} };
-  } else {
-    newGrid[y][x] = { type: 'ground', config: {} };
+
+  // If there's an object, remove it first
+  if (cell.object) {
+    // For moving entities, restore underlying floor
+    if (cell.object.config?.underlyingFloor) {
+      cell.floor = {
+        type: cell.object.config.underlyingFloor.type,
+        config: { ...cell.object.config.underlyingFloor.config }
+      };
+    }
+    cell.object = null;
   }
+  // If no object, remove floor (replace with empty or ground)
+  else if (cell.floor.type === 'ground' || cell.floor.type === 'floor') {
+    cell.floor = { type: 'empty', config: {} };
+  } else {
+    cell.floor = { type: 'ground', config: {} };
+  }
+
   return newGrid;
 }
 
-export function isWalkable(cell) {
-  // Blocking tiles (forest + bank-robbery themes)
-  const blocking = ['tree', 'empty', 'water', 'snow', 'bear', 'wall', 'door-key', 'door-card'];
-  // Item tiles are walkable
-  if (cell.type.startsWith('item-')) return true;
-  return !blocking.includes(cell.type);
+/**
+ * Check if a cell is walkable based on tile definitions from theme
+ * @param {Object} cell - Grid cell with floor and object layers
+ * @param {Object} TILE_TYPES - Tile definitions from theme
+ * @returns {boolean} - True if walkable
+ */
+export function isWalkable(cell, TILE_TYPES = {}) {
+  // Check object layer first (objects can block movement)
+  if (cell.object) {
+    const objectDef = TILE_TYPES[cell.object.type];
+    // If object has a walkable property defined, use it
+    if (objectDef && objectDef.walkable !== undefined) {
+      return objectDef.walkable;
+    }
+    // Default: objects are walkable unless specified otherwise
+    return true;
+  }
+
+  // Check floor layer
+  const floorDef = TILE_TYPES[cell.floor.type];
+  if (floorDef && floorDef.walkable !== undefined) {
+    return floorDef.walkable;
+  }
+
+  // Default: if no definition found, assume not walkable for safety
+  return false;
+}
+
+/**
+ * Validate that an object can be placed on a floor
+ * @param {Object} cell - Grid cell with floor and object layers
+ * @param {string} objectType - Object type to place
+ * @param {Object} TILE_TYPES - Tile definitions
+ * @returns {Object} { valid: boolean, message?: string }
+ */
+export function validateObjectPlacement(cell, objectType, TILE_TYPES) {
+  const objectDef = TILE_TYPES[objectType];
+  const floorDef = TILE_TYPES[cell.floor.type];
+
+  // Objects can only be placed on floors (not on empty/void)
+  if (cell.floor.type === 'empty') {
+    return {
+      valid: false,
+      message: 'Cannot place objects on empty tiles! Place a floor tile first.'
+    };
+  }
+
+  // Check if floor is walkable (most objects need walkable floors)
+  // Exception: cameras/lasers can attach to walls
+  if (!floorDef?.walkable && !objectDef?.attachToWall) {
+    return {
+      valid: false,
+      message: `Cannot place objects on ${floorDef?.label || 'this tile'}! Objects need walkable floor tiles.`
+    };
+  }
+
+  return { valid: true };
 }
 
 export function findTile(grid, type) {
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid[0].length; x++) {
-      if (grid[y][x].type === type) return { x, y };
+      const cell = grid[y][x];
+      if (cell.floor.type === type) return { x, y, layer: 'floor' };
+      if (cell.object?.type === type) return { x, y, layer: 'object' };
     }
   }
   return null;
@@ -85,7 +190,13 @@ export function findAllTiles(grid, type) {
   const results = [];
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid[0].length; x++) {
-      if (grid[y][x].type === type) results.push({ x, y, config: grid[y][x].config });
+      const cell = grid[y][x];
+      if (cell.floor.type === type) {
+        results.push({ x, y, layer: 'floor', config: cell.floor.config });
+      }
+      if (cell.object?.type === type) {
+        results.push({ x, y, layer: 'object', config: cell.object.config });
+      }
     }
   }
   return results;

@@ -60,8 +60,12 @@ function convertLegacyItems(grid) {
   for (let y = 0; y < newGrid.length; y++) {
     for (let x = 0; x < newGrid[0].length; x++) {
       const cell = newGrid[y][x];
-      if (cell.type === 'item' && cell.config?.itemType) {
-        newGrid[y][x] = { type: `item-${cell.config.itemType}`, config: {} };
+      // Convert old 'item' format to 'item-<type>' format in object layer
+      if (cell.object?.type === 'item' && cell.object.config?.itemType) {
+        newGrid[y][x].object = {
+          type: `item-${cell.object.config.itemType}`,
+          config: {}
+        };
       }
     }
   }
@@ -317,13 +321,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     const cell = currentGrid[pos.y][pos.x];
     // Allow dropping on ground-type tiles (uses theme's ground tiles)
-    if (!groundTiles.includes(cell.type)) {
+    if (!groundTiles.includes(cell.floor?.type)) {
       showNotification('notifications.cantDropHere', 'error');
       return;
     }
 
     const newGrid = cloneGrid(currentGrid);
-    newGrid[pos.y][pos.x] = { type: `item-${dropped.itemType}`, config: {} };
+    // Drop to object layer
+    newGrid[pos.y][pos.x].object = { type: `item-${dropped.itemType}`, config: { ...dropped } };
     setGrid(newGrid);
     setGameState(prev => ({
       ...prev,
@@ -342,13 +347,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     // Check if tile is pickable (some items like money must be collected via interaction)
     const TILE_TYPES = theme?.getTileTypes?.() || {};
-    const tileDef = TILE_TYPES[cell.type];
+    const tileDef = TILE_TYPES[cell.object?.type];
     if (tileDef?.pickable === false) {
       showNotification('notifications.cantPickUp', 'error');
       return false;
     }
 
-    const itemType = cell.type.replace('item-', '');
+    const itemType = cell.object.type.replace('item-', '');
 
     // Check if this is a container item - auto-equip instead of adding to inventory
     const isContainer = theme?.isContainer?.(itemType);
@@ -360,52 +365,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     const newGrid = cloneGrid(gridRef.current);
 
-    // Determine what tile to leave behind by checking surrounding tiles
-    const neighbors = [
-      { x: px, y: py - 1 }, // up
-      { x: px, y: py + 1 }, // down
-      { x: px - 1, y: py }, // left
-      { x: px + 1, y: py }, // right
-    ].filter(n => n.x >= 0 && n.x < newGrid[0].length && n.y >= 0 && n.y < newGrid.length);
-
-    // Count floor colors from neighbors (uses theme's ignore tiles)
-    const colorCounts = {};
-
-    for (const n of neighbors) {
-      const neighborCell = newGrid[n.y][n.x];
-      if (ignoreTiles.includes(neighborCell.type)) continue;
-
-      if (neighborCell.type === 'floor') {
-        const color = neighborCell.config?.floorColor || 'gray';
-        colorCounts[color] = (colorCounts[color] || 0) + 1;
-      } else if (groundTiles.includes(neighborCell.type)) {
-        // Non-floor walkable tiles count as 'ground'
-        colorCounts['_ground'] = (colorCounts['_ground'] || 0) + 1;
-      }
-    }
-
-    // Find most common floor color
-    let maxCount = 0;
-    let bestColor = null;
-    for (const [color, count] of Object.entries(colorCounts)) {
-      if (count > maxCount) {
-        maxCount = count;
-        bestColor = color;
-      }
-    }
-
-    // Set the tile based on what we found
-    if (bestColor === '_ground' || bestColor === null) {
-      // Use 'ground' for forest theme or if no floor neighbors found
-      newGrid[py][px] = { type: 'ground', config: {} };
-    } else {
-      // Use 'floor' with the most common color
-      newGrid[py][px] = { type: 'floor', config: { floorColor: bestColor } };
-    }
+    // With two-layer system, just clear the object layer - floor remains!
+    newGrid[py][px].object = null;
     setGrid(newGrid);
 
     // Preserve all config properties from tile to inventory item
-    const itemObj = { itemType, filled: false, ...cell.config };
+    const itemObj = { itemType, filled: false, ...cell.object.config };
     const itemLabel = theme?.getItemLabel?.(itemType, itemObj) || itemType;
 
     // Auto-equip containers (like bag)
@@ -486,13 +451,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const targets = [];
 
     const currentCell = currentGrid[pos.y][pos.x];
-    if (itemTilePattern.test(currentCell.type)) {
+    if (itemTilePattern.test(currentCell.object?.type)) {
       targets.push({ x: pos.x, y: pos.y, dir: 'self' });
     }
 
     for (const adj of adjacent) {
       const c = currentGrid[adj.y][adj.x];
-      if (interactableTiles.includes(c.type)) {
+      // Check both object and floor layers for interactable tiles
+      if (interactableTiles.includes(c.object?.type) || interactableTiles.includes(c.floor?.type)) {
         targets.push(adj);
       }
     }
@@ -732,7 +698,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
 
     // Check if standing on an item
-    if (currentCell.type.startsWith('item-')) {
+    if (currentCell.object?.type.startsWith('item-')) {
       if (currentGS.inventory.length >= maxInventory) {
         showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
         return;
@@ -753,7 +719,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       const ny = pos.y + dir.dy;
       if (nx >= 0 && nx < currentGrid[0].length && ny >= 0 && ny < currentGrid.length) {
         const adjCell = currentGrid[ny][nx];
-        if (adjCell.type.startsWith('item-') && theme?.canPickupFromAdjacent?.(adjCell.type)) {
+        if (adjCell.object?.type?.startsWith('item-') && theme?.canPickupFromAdjacent?.(adjCell.object.type)) {
           if (currentGS.inventory.length >= maxInventory) {
             showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
             return;
@@ -837,7 +803,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       const c = currentGrid[p.y][p.x];
 
       // Skip item pickups - those use F key now
-      if (c.type.startsWith('item-')) {
+      if (c.object?.type?.startsWith('item-')) {
         if (possibleActions.length === 0) {
           soundManager.play('blocked');
           showNotification('notifications.pressF', 'info');
@@ -936,10 +902,15 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     };
 
     // Use theme's movement rules
-    const moveResult = theme?.checkMovementInto?.(targetCell.type, {
+    // Check object layer first (for doors, hazards, etc.), then floor layer
+    const targetType = targetCell.object?.type || targetCell.floor?.type;
+    const currentType = currentCell.object?.type || currentCell.floor?.type;
+    const targetConfig = targetCell.object?.config || targetCell.floor?.config;
+
+    const moveResult = theme?.checkMovementInto?.(targetType, {
       ...currentGS,
-      currentTileType: currentCell.type
-    }, targetCell.config);
+      currentTileType: currentType
+    }, targetConfig);
 
     if (moveResult) {
       // Handle life loss from hazards
@@ -1232,7 +1203,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       const p = { x: facingTile.x, y: facingTile.y };
 
       // Skip item pickups
-      if (c.type.startsWith('item-')) return;
+      if (c.object?.type?.startsWith('item-')) return;
 
       // Get available interactions from theme
       const possibleActions = [];

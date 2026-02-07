@@ -25,11 +25,13 @@ export const HAZARD_TYPES = {
 // Check if there's a hazard at the given position
 // Returns hazard info or null
 export function checkHazardAt(grid, x, y, gameState) {
-  const tile = grid[y]?.[x];
-  if (!tile) return null;
+  const cell = grid[y]?.[x];
+  if (!cell) return null;
+
+  const tileType = cell.object?.type || cell.floor?.type;
 
   // Fire hazard
-  if (tile.type === 'fire') {
+  if (tileType === 'fire') {
     return {
       type: 'fire',
       damage: HAZARD_TYPES.fire.damage,
@@ -38,7 +40,7 @@ export function checkHazardAt(grid, x, y, gameState) {
   }
 
   // Bear hazard
-  if (tile.type === 'bear') {
+  if (tileType === 'bear') {
     const hasKnife = gameState.inventory?.some(item => item.itemType === 'knife');
 
     if (hasKnife) {
@@ -74,9 +76,10 @@ export function getAllHazardZones(grid) {
 
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const tile = grid[y][x];
+      const cell = grid[y][x];
+      const tileType = cell.object?.type || cell.floor?.type;
 
-      if (tile.type === 'fire') {
+      if (tileType === 'fire') {
         zones.push({
           x, y,
           hazardType: 'fire',
@@ -84,7 +87,7 @@ export function getAllHazardZones(grid) {
         });
       }
 
-      if (tile.type === 'bear') {
+      if (tileType === 'bear') {
         zones.push({
           x, y,
           hazardType: 'bear',

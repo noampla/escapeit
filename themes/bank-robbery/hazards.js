@@ -30,10 +30,11 @@ function getDirectionDelta(direction) {
 }
 
 // Check if a tile blocks camera vision
-function blocksVision(tileType) {
+function blocksVision(cell) {
   // Walls and closed doors block vision
   const blockingTiles = ['wall', 'empty', 'door-key', 'door-card'];
-  return blockingTiles.includes(tileType);
+  // Check both floor and object layers
+  return blockingTiles.includes(cell.floor?.type) || blockingTiles.includes(cell.object?.type);
 }
 
 // Trace a laser beam from (laserX, laserY) in direction until hitting a wall or map edge
@@ -47,8 +48,9 @@ export function getLaserBeamTiles(grid, laserX, laserY, direction) {
   let y = laserY + dir.dy;
 
   while (x >= 0 && x < cols && y >= 0 && y < rows) {
-    const tile = grid[y][x];
-    if (blocksVision(tile.type) || tile.type === 'item-mirror') break;
+    const cell = grid[y][x];
+    // Check if vision is blocked or mirror is present
+    if (blocksVision(cell) || cell.object?.type === 'item-mirror') break;
     tiles.push({ x, y });
     x += dir.dx;
     y += dir.dy;
@@ -94,10 +96,10 @@ export function getCameraVisionTiles(grid, cameraX, cameraY, direction, range) {
         continue;
       }
 
-      const tile = grid[y][x];
+      const cell = grid[y][x];
 
       // Check if vision is blocked at this tile
-      if (blocksVision(tile.type)) {
+      if (blocksVision(cell)) {
         // Mark this offset as blocked for future distances
         blockedOffsets.add(offset);
         continue;
@@ -128,11 +130,13 @@ export function checkHazardAt(grid, x, y, gameState) {
 
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
-      const tile = grid[cy][cx];
+      const cell = grid[cy][cx];
+      const tileType = cell.object?.type || cell.floor?.type;
 
-      if (tile.type === 'camera' && !cameraImmune) {
-        const direction = tile.config?.direction || 'down';
-        const range = tile.config?.range || 3;
+      if (tileType === 'camera' && !cameraImmune) {
+        const config = cell.object?.config || cell.floor?.config;
+        const direction = config?.direction || 'down';
+        const range = config?.range || 3;
         const visionTiles = getCameraVisionTiles(grid, cx, cy, direction, range);
 
         if (visionTiles.some(vt => vt.x === x && vt.y === y)) {
@@ -146,11 +150,12 @@ export function checkHazardAt(grid, x, y, gameState) {
         }
       }
 
-      if (tile.type === 'guard' && !cameraImmune) {
+      if (tileType === 'guard' && !cameraImmune) {
+        const config = cell.object?.config || cell.floor?.config;
         // Skip sleeping guards - they can't see
-        if (tile.config?.asleep) continue;
+        if (config?.asleep) continue;
 
-        const direction = tile.config?.direction || 'right';
+        const direction = config?.direction || 'right';
         const range = HAZARD_TYPES.guard.range;
         const visionTiles = getCameraVisionTiles(grid, cx, cy, direction, range);
 
@@ -165,8 +170,9 @@ export function checkHazardAt(grid, x, y, gameState) {
         }
       }
 
-      if (tile.type === 'laser') {
-        const direction = tile.config?.direction || 'down';
+      if (tileType === 'laser') {
+        const config = cell.object?.config || cell.floor?.config;
+        const direction = config?.direction || 'down';
         const beamTiles = getLaserBeamTiles(grid, cx, cy, direction);
 
         if (beamTiles.some(bt => bt.x === x && bt.y === y)) {
@@ -193,11 +199,13 @@ export function getAllHazardZones(grid) {
 
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const tile = grid[y][x];
+      const cell = grid[y][x];
+      const tileType = cell.object?.type || cell.floor?.type;
 
-      if (tile.type === 'camera') {
-        const direction = tile.config?.direction || 'down';
-        const range = tile.config?.range || 3;
+      if (tileType === 'camera') {
+        const config = cell.object?.config || cell.floor?.config;
+        const direction = config?.direction || 'down';
+        const range = config?.range || 3;
         const visionTiles = getCameraVisionTiles(grid, x, y, direction, range);
 
         for (const vt of visionTiles) {
@@ -213,11 +221,12 @@ export function getAllHazardZones(grid) {
         }
       }
 
-      if (tile.type === 'guard') {
+      if (tileType === 'guard') {
+        const config = cell.object?.config || cell.floor?.config;
         // Skip sleeping guards - they can't see
-        if (tile.config?.asleep) continue;
+        if (config?.asleep) continue;
 
-        const direction = tile.config?.direction || 'right';
+        const direction = config?.direction || 'right';
         const range = HAZARD_TYPES.guard.range;
         const visionTiles = getCameraVisionTiles(grid, x, y, direction, range);
 
@@ -234,8 +243,9 @@ export function getAllHazardZones(grid) {
         }
       }
 
-      if (tile.type === 'laser') {
-        const direction = tile.config?.direction || 'down';
+      if (tileType === 'laser') {
+        const config = cell.object?.config || cell.floor?.config;
+        const direction = config?.direction || 'down';
         const beamTiles = getLaserBeamTiles(grid, x, y, direction);
 
         for (const bt of beamTiles) {

@@ -14,6 +14,7 @@ export const TILE_TYPES = {
     label: 'Empty',
     color: '#0a0a0a',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Empty void. Not walkable.',
     walkable: false
   },
@@ -21,6 +22,7 @@ export const TILE_TYPES = {
     label: 'Wall',
     color: '#3a3a3a',
     category: 'basic',
+    layer: 'floor',
     tooltip: 'Solid wall. Blocks movement.',
     walkable: false
   },
@@ -28,6 +30,7 @@ export const TILE_TYPES = {
     label: 'Floor',
     color: '#4a4a4a',
     category: 'basic',
+    layer: 'floor',
     configurable: true,
     defaultConfig: { floorColor: 'gray' },
     tooltip: 'Walkable floor. Shift+click to change color.',
@@ -37,6 +40,7 @@ export const TILE_TYPES = {
     label: 'Entry Point (Start)',
     color: '#44aa44',
     category: 'basic',
+    layer: 'floor',
     unique: true,
     tooltip: 'Player spawn point. Only one per level.',
     walkable: true
@@ -45,6 +49,7 @@ export const TILE_TYPES = {
     label: 'Escape Van (Exit)',
     color: '#4488cc',
     category: 'basic',
+    layer: 'floor',
     unique: true,
     tooltip: 'Level exit. Escape here after completing all missions.',
     walkable: true
@@ -55,6 +60,7 @@ export const TILE_TYPES = {
     label: 'Key Door',
     color: '#8b4513',
     category: 'interactive',
+    layer: 'object',
     configurable: true,
     defaultConfig: { lockColor: 'red' },
     tooltip: 'Locked door. Requires matching colored key to open.',
@@ -64,6 +70,7 @@ export const TILE_TYPES = {
     label: 'Card Door',
     color: '#666688',
     category: 'interactive',
+    layer: 'object',
     configurable: true,
     defaultConfig: { lockColor: 'red' },
     tooltip: 'Electronic door. Requires matching colored keycard to open.',
@@ -74,11 +81,13 @@ export const TILE_TYPES = {
   'door-key-open': {
     label: 'Open Key Door',
     color: '#5a3a1a',
+    layer: 'object',
     walkable: true
   },
   'door-card-open': {
     label: 'Open Card Door',
     color: '#555566',
+    layer: 'object',
     walkable: true
   },
 
@@ -87,6 +96,7 @@ export const TILE_TYPES = {
     label: 'Key',
     color: '#ffdd00',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'key',
     configurable: true,
@@ -98,6 +108,7 @@ export const TILE_TYPES = {
     label: 'Keycard',
     color: '#aaaacc',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'card',
     configurable: true,
@@ -109,6 +120,7 @@ export const TILE_TYPES = {
     label: 'Guard Uniform',
     color: '#2244aa',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'uniform',
     wearable: true,
@@ -119,6 +131,7 @@ export const TILE_TYPES = {
     label: 'Mirror',
     color: '#ccddee',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'mirror',
     tooltip: 'Mirror. Pick up (F) and place (Q) to block laser beams.',
@@ -131,6 +144,7 @@ export const TILE_TYPES = {
     label: 'Security Camera',
     color: '#444466',
     category: 'hazard',
+    layer: 'object',
     configurable: true,
     defaultConfig: { direction: 'down', range: 3 },
     tooltip: 'Security camera. Place on walls or map edge. Detects player in vision cone.',
@@ -141,6 +155,7 @@ export const TILE_TYPES = {
     label: 'Laser Tripwire',
     color: '#330000',
     category: 'hazard',
+    layer: 'object',
     configurable: true,
     defaultConfig: { direction: 'down' },
     tooltip: 'Laser tripwire. Place on a wall or floor boundary. Fires a beam perpendicular to the wall until it hits another wall.',
@@ -153,12 +168,14 @@ export const TILE_TYPES = {
     label: 'Vault Door',
     color: '#2a2a2a',
     category: 'interactive',
+    layer: 'object',
     tooltip: 'Heavy vault door. Requires a drill to open. Hold E while facing with drill in inventory.',
     walkable: false
   },
   'vault-door-open': {
     label: 'Open Vault Door',
     color: '#1a1a1a',
+    layer: 'object',
     walkable: true
   },
 
@@ -167,6 +184,7 @@ export const TILE_TYPES = {
     label: 'Drill',
     color: '#ffaa00',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'drill',
     tooltip: 'Power drill. Pick up (F) and use to drill through vault doors.',
@@ -178,6 +196,7 @@ export const TILE_TYPES = {
     label: 'Bomb',
     color: '#cc2222',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'bomb',
     tooltip: 'Explosive bomb. Pick up (F) and place near vault doors. Use detonator to explode.',
@@ -189,6 +208,7 @@ export const TILE_TYPES = {
     label: 'Detonator',
     color: '#ffcc00',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'detonator',
     configurable: true,
@@ -202,6 +222,7 @@ export const TILE_TYPES = {
     label: 'Duffel Bag',
     color: '#4a3a2a',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'bag',
     configurable: true,
@@ -215,6 +236,7 @@ export const TILE_TYPES = {
     label: 'Cash',
     color: '#55aa55',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'money',
     configurable: true,
@@ -229,6 +251,7 @@ export const TILE_TYPES = {
     label: 'Poison Bottle',
     color: '#884499',
     category: 'interactive',
+    layer: 'object',
     isItemTile: true,
     itemType: 'poison',
     tooltip: 'Knocks out guards. Press F to pick up, then E on a guard to use.',
@@ -240,6 +263,7 @@ export const TILE_TYPES = {
     label: 'Guard',
     color: '#2244aa',
     category: 'hazard',
+    layer: 'object',
     configurable: true,
     defaultConfig: { direction: 'right' },
     tooltip: 'Walking guard. Patrols back and forth.',
@@ -430,6 +454,9 @@ export function isWalkable(tileType, gameState = {}) {
 
 // Custom rendering for tiles
 export function renderTile(ctx, tile, cx, cy, size) {
+  // Guard against undefined tile
+  if (!tile) return false;
+
   // Floor renders with configured color
   if (tile.type === 'floor') {
     const floorColor = tile.config?.floorColor || 'gray';
@@ -1233,8 +1260,17 @@ export function moveEntities(grid, gameState) {
   const GRID_ROWS = grid.length;
   const GRID_COLS = grid[0]?.length || 0;
 
-  // Clone grid to avoid mutation
-  const newGrid = grid.map(row => row.map(cell => ({ ...cell, config: { ...cell.config } })));
+  // Clone grid with two-layer structure
+  const newGrid = grid.map(row => row.map(cell => ({
+    floor: {
+      type: cell.floor.type,
+      config: { ...cell.floor.config }
+    },
+    object: cell.object ? {
+      type: cell.object.type,
+      config: { ...cell.object.config }
+    } : null
+  })));
 
   let anyMoved = false;
 
@@ -1242,22 +1278,22 @@ export function moveEntities(grid, gameState) {
   const guards = [];
   for (let y = 0; y < GRID_ROWS; y++) {
     for (let x = 0; x < GRID_COLS; x++) {
-      if (newGrid[y][x].type === 'guard') {
-        guards.push({ x, y, tile: newGrid[y][x] });
+      if (newGrid[y][x].object?.type === 'guard') {
+        guards.push({ x, y, guardObj: newGrid[y][x].object });
       }
     }
   }
 
   // Now move each guard
   for (const guard of guards) {
-    const { x, y, tile } = guard;
+    const { x, y, guardObj } = guard;
 
     // Skip asleep or poisoning guards - they don't move
-    if (tile.config?.asleep || tile.config?.poisoning) {
+    if (guardObj.config?.asleep || guardObj.config?.poisoning) {
       continue;
     }
 
-    const direction = tile.config?.direction || 'right';
+    const direction = guardObj.config?.direction || 'right';
     const dirData = GUARD_DIRECTIONS[direction];
 
     if (!dirData) continue;
@@ -1267,30 +1303,35 @@ export function moveEntities(grid, gameState) {
     const nextY = y + dy;
 
     // Check if next position is valid and walkable
-    const canMove =
-      nextX >= 0 && nextX < GRID_COLS &&
-      nextY >= 0 && nextY < GRID_ROWS &&
-      isWalkable(newGrid[nextY][nextX].type, gameState);
+    // Check the destination cell's floor type for walkability
+    const destCell = (nextX >= 0 && nextX < GRID_COLS && nextY >= 0 && nextY < GRID_ROWS)
+      ? newGrid[nextY][nextX]
+      : null;
+
+    const canMove = destCell &&
+      !destCell.object && // No object blocking
+      isWalkable(destCell.floor.type, gameState); // Floor is walkable
 
     if (canMove) {
-      // Move guard to next position
-      const guardTile = { ...tile, config: { ...tile.config } };
-
-      // Store the floor config of the destination tile before overwriting
-      const destTile = newGrid[nextY][nextX];
-      if (destTile.type === 'floor' || destTile.type === 'start' || destTile.type === 'exit') {
-        guardTile.config.underlyingFloor = { type: destTile.type, config: { ...destTile.config } };
-      } else {
-        // Default to plain floor if moving onto something else (like item tile that was picked up)
-        guardTile.config.underlyingFloor = { type: 'floor', config: {} };
-      }
-
-      // Restore the floor at old position (use stored underlying floor or default)
-      const oldFloor = tile.config?.underlyingFloor || { type: 'floor', config: {} };
-      newGrid[y][x] = { type: oldFloor.type, config: { ...oldFloor.config } };
-
       // Move guard to new position
-      newGrid[nextY][nextX] = guardTile;
+      const movedGuard = {
+        type: 'guard',
+        config: { ...guardObj.config }
+      };
+
+      // Store the floor config of the destination tile
+      movedGuard.config.underlyingFloor = {
+        type: destCell.floor.type,
+        config: { ...destCell.floor.config }
+      };
+
+      // Restore the floor at old position (use stored underlying floor)
+      const oldFloor = guardObj.config?.underlyingFloor || { type: 'floor', config: {} };
+      newGrid[y][x].floor = { type: oldFloor.type, config: { ...oldFloor.config } };
+      newGrid[y][x].object = null;
+
+      // Move guard to new position (object layer)
+      newGrid[nextY][nextX].object = movedGuard;
 
       anyMoved = true;
     } else {
@@ -1303,7 +1344,7 @@ export function moveEntities(grid, gameState) {
       };
 
       const newDir = reverseDirections[direction] || 'right';
-      newGrid[y][x].config.direction = newDir;
+      newGrid[y][x].object.config.direction = newDir;
       anyMoved = true;
     }
   }
@@ -1363,4 +1404,37 @@ export function renderPlayer(ctx, x, y, size, direction, gameState = {}) {
   }
 
   return true; // Return true to indicate custom rendering was done
+}
+
+// === TWO-LAYER SYSTEM HELPERS ===
+
+/**
+ * Get the layer a tile type belongs to
+ * @param {string} tileType - The tile type
+ * @returns {'floor'|'object'} - The layer
+ */
+export function getTileLayer(tileType) {
+  const tile = TILE_TYPES[tileType];
+  return tile?.layer || 'floor'; // Default to floor for safety
+}
+
+/**
+ * Check if a tile type is a floor tile
+ */
+export function isFloorTile(tileType) {
+  return getTileLayer(tileType) === 'floor';
+}
+
+/**
+ * Check if a tile type is an object tile
+ */
+export function isObjectTile(tileType) {
+  return getTileLayer(tileType) === 'object';
+}
+
+/**
+ * Get default floor for this theme
+ */
+export function getDefaultFloor() {
+  return { type: 'floor', config: { floorColor: 'gray' } };
 }

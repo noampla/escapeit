@@ -11,14 +11,14 @@ export const INTERACTIONS = {
     duration: 1000,
     requirements: { tile: 'door-key' },
     checkCustom: (gameState, tile) => {
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       return gameState.inventory?.some(
         item => item.itemType === 'key' && item.lockColor === doorColor
       );
     },
     execute: (gameState, grid, x, y) => {
       const tile = grid[y][x];
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       const keyIdx = gameState.inventory.findIndex(
         item => item.itemType === 'key' && item.lockColor === doorColor
       );
@@ -27,8 +27,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needKey', messageParams: { color: doorColor } };
       }
 
-      // Open the door
-      grid[y][x] = { type: 'door-key-open', config: {} };
+      // Open the door (update object layer only)
+      grid[y][x].object = { type: 'door-key-open', config: {} };
 
       // Remove the key
       gameState.inventory = gameState.inventory.filter((_, i) => i !== keyIdx);
@@ -48,14 +48,14 @@ export const INTERACTIONS = {
     duration: 1000,
     requirements: { tile: 'door-card' },
     checkCustom: (gameState, tile) => {
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       return gameState.inventory?.some(
         item => item.itemType === 'card' && item.lockColor === doorColor
       );
     },
     execute: (gameState, grid, x, y) => {
       const tile = grid[y][x];
-      const doorColor = tile.config?.lockColor || 'red';
+      const doorColor = tile.object?.config?.lockColor || 'red';
       const cardIdx = gameState.inventory.findIndex(
         item => item.itemType === 'card' && item.lockColor === doorColor
       );
@@ -64,8 +64,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needKeycard', messageParams: { color: doorColor } };
       }
 
-      // Open the door
-      grid[y][x] = { type: 'door-card-open', config: {} };
+      // Open the door (update object layer only)
+      grid[y][x].object = { type: 'door-card-open', config: {} };
 
       // Remove the card
       gameState.inventory = gameState.inventory.filter((_, i) => i !== cardIdx);
@@ -152,8 +152,8 @@ export const INTERACTIONS = {
         return { success: false, error: 'No mirror in inventory!' };
       }
 
-      // Place mirror on target tile (x,y is the facing tile)
-      grid[y][x] = { type: 'item-mirror', config: {} };
+      // Place mirror on target tile (x,y is the facing tile) - object layer
+      grid[y][x].object = { type: 'item-mirror', config: {} };
 
       // Remove from inventory
       gameState.inventory = gameState.inventory.filter((_, i) => i !== mirrorIdx);
@@ -181,8 +181,8 @@ export const INTERACTIONS = {
         return { success: false, error: 'Need a drill!' };
       }
 
-      // Open the vault door (drill stays in inventory - reusable)
-      grid[y][x] = { type: 'vault-door-open', config: {} };
+      // Open the vault door (drill stays in inventory - reusable) - object layer
+      grid[y][x].object = { type: 'vault-door-open', config: {} };
 
       return {
         success: true,
@@ -206,8 +206,8 @@ export const INTERACTIONS = {
         return { success: false, error: 'No bomb in inventory!' };
       }
 
-      // Place bomb on target tile
-      grid[y][x] = { type: 'item-bomb', config: {} };
+      // Place bomb on target tile - object layer
+      grid[y][x].object = { type: 'item-bomb', config: {} };
 
       // Remove bomb from inventory
       gameState.inventory = gameState.inventory.filter((_, i) => i !== bombIdx);
@@ -239,7 +239,7 @@ export const INTERACTIONS = {
 
       for (let gy = 0; gy < grid.length; gy++) {
         for (let gx = 0; gx < grid[gy].length; gx++) {
-          if (grid[gy][gx].type === 'item-bomb') {
+          if (grid[gy][gx].object?.type === 'item-bomb') {
             const distance = Math.abs(gx - x) + Math.abs(gy - y);
             // Check if bomb is in range AND visible
             const isVisible = !revealedTiles || revealedTiles.has(`${gx},${gy}`);
@@ -262,7 +262,7 @@ export const INTERACTIONS = {
 
       for (let gy = 0; gy < grid.length; gy++) {
         for (let gx = 0; gx < grid[gy].length; gx++) {
-          if (grid[gy][gx].type === 'item-bomb') {
+          if (grid[gy][gx].object?.type === 'item-bomb') {
             const distance = Math.abs(gx - playerX) + Math.abs(gy - playerY);
             // Only consider visible bombs
             const isVisible = !revealedTiles || revealedTiles.has(`${gx},${gy}`);
@@ -295,7 +295,7 @@ export const INTERACTIONS = {
       const bombs = [];
       for (let gy = 0; gy < grid.length; gy++) {
         for (let gx = 0; gx < grid[gy].length; gx++) {
-          if (grid[gy][gx].type === 'item-bomb') {
+          if (grid[gy][gx].object?.type === 'item-bomb') {
             // Only include visible bombs
             const isVisible = !revealedTiles || revealedTiles.has(`${gx},${gy}`);
             if (isVisible) {
@@ -331,8 +331,8 @@ export const INTERACTIONS = {
       // Explode all bombs in range
       let vaultsOpened = 0;
       for (const bomb of inRange) {
-        // Remove the bomb
-        grid[bomb.y][bomb.x] = { type: 'floor', config: { floorColor: 'gray' } };
+        // Remove the bomb from object layer
+        grid[bomb.y][bomb.x].object = null;
 
         // Check adjacent tiles for vault doors and open them
         const adjacent = [
@@ -344,8 +344,8 @@ export const INTERACTIONS = {
 
         for (const adj of adjacent) {
           if (adj.y >= 0 && adj.y < grid.length && adj.x >= 0 && adj.x < grid[0].length) {
-            if (grid[adj.y][adj.x].type === 'vault-door') {
-              grid[adj.y][adj.x] = { type: 'vault-door-open', config: {} };
+            if (grid[adj.y][adj.x].object?.type === 'vault-door') {
+              grid[adj.y][adj.x].object = { type: 'vault-door-open', config: {} };
               vaultsOpened++;
             }
           }
@@ -366,7 +366,7 @@ export const INTERACTIONS = {
     label: 'Grab Cash',
     // Duration is calculated dynamically based on amount (sqrt scale for huge amounts)
     getDuration: (gameState, tile) => {
-      const amount = tile.config?.amount || 50000;
+      const amount = tile.object?.config?.amount || 50000;
       // Sqrt scale: $1K=~550ms, $100K=~1000ms, $1M=~2000ms, $5M=~4000ms
       return Math.min(5000, 500 + Math.sqrt(amount) * 1.5);
     },
@@ -386,7 +386,7 @@ export const INTERACTIONS = {
       }
 
       const tile = grid[y][x];
-      const amount = tile.config?.amount || 50000;
+      const amount = tile.object?.config?.amount || 50000;
       const spaceLeft = bag.capacity - bag.contents;
 
       if (spaceLeft <= 0) {
@@ -401,11 +401,11 @@ export const INTERACTIONS = {
 
       // Remove money tile or reduce amount
       if (amountToTake >= amount) {
-        // Take it all - replace with floor
-        grid[y][x] = { type: 'floor', config: { floorColor: 'gray' } };
+        // Take it all - remove from object layer
+        grid[y][x].object = null;
       } else {
-        // Partial take - reduce amount
-        grid[y][x] = { type: 'item-money', config: { amount: amount - amountToTake } };
+        // Partial take - reduce amount in object layer
+        grid[y][x].object = { type: 'item-money', config: { amount: amount - amountToTake } };
       }
 
       // Format amounts with K/M suffix
@@ -454,10 +454,10 @@ export const INTERACTIONS = {
         if (gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[0].length) continue;
 
         const guardTile = grid[gy][gx];
-        if (guardTile.type !== 'guard') continue;
-        if (guardTile.config?.asleep) continue;
+        if (guardTile.object?.type !== 'guard') continue;
+        if (guardTile.object?.config?.asleep) continue;
 
-        const guardDirection = guardTile.config?.direction || 'right';
+        const guardDirection = guardTile.object?.config?.direction || 'right';
         const isBehind = (guardDirection === dir);
 
         if (isBehind) {
@@ -488,13 +488,13 @@ export const INTERACTIONS = {
         const guardTile = grid[gy][gx];
 
         // Check if it's a guard
-        if (guardTile.type !== 'guard') continue;
+        if (guardTile.object?.type !== 'guard') continue;
 
         // Skip sleeping guards
-        if (guardTile.config?.asleep) continue;
+        if (guardTile.object?.config?.asleep) continue;
 
         // Check if player is behind the guard
-        const guardDirection = guardTile.config?.direction || 'right';
+        const guardDirection = guardTile.object?.config?.direction || 'right';
 
         // Player is behind if the direction from player to guard is the SAME as guard's facing direction
         // Example: Guard faces RIGHT, player is to the LEFT → dir='right' (player→guard) = BEHIND
@@ -525,17 +525,17 @@ export const INTERACTIONS = {
         if (gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[0].length) continue;
 
         const guardTile = grid[gy][gx];
-        if (guardTile.type !== 'guard' || guardTile.config?.asleep) continue;
+        if (guardTile.object?.type !== 'guard' || guardTile.object?.config?.asleep) continue;
 
-        const guardDirection = guardTile.config?.direction || 'right';
+        const guardDirection = guardTile.object?.config?.direction || 'right';
         const isBehind = (guardDirection === dir);
 
         if (isBehind) {
           // Immediately freeze the guard by setting poisoning flag (not asleep yet!)
-          grid[gy][gx] = {
-            ...guardTile,
+          grid[gy][gx].object = {
+            ...guardTile.object,
             config: {
-              ...guardTile.config,
+              ...guardTile.object.config,
               poisoning: true
             }
           };
@@ -566,12 +566,12 @@ export const INTERACTIONS = {
         if (gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[0].length) continue;
 
         const guardTile = grid[gy][gx];
-        if (guardTile?.type === 'guard' && guardTile.config?.poisoning) {
+        if (guardTile?.object?.type === 'guard' && guardTile.object?.config?.poisoning) {
           // Resume guard movement by removing poisoning flag
-          grid[gy][gx] = {
-            ...guardTile,
+          grid[gy][gx].object = {
+            ...guardTile.object,
             config: {
-              ...guardTile.config,
+              ...guardTile.object.config,
               poisoning: false
             }
           };
@@ -604,7 +604,7 @@ export const INTERACTIONS = {
       for (let gy = 0; gy < GRID_ROWS; gy++) {
         for (let gx = 0; gx < GRID_COLS; gx++) {
           const tile = grid[gy][gx];
-          if (tile.type === 'guard' && tile.config?.poisoning) {
+          if (tile.object?.type === 'guard' && tile.object?.config?.poisoning) {
             guardPos = { x: gx, y: gy };
             console.log('[POISON] Found poisoning guard at', gx, gy);
             break;
@@ -619,19 +619,19 @@ export const INTERACTIONS = {
       }
 
       const guardTile = grid[guardPos.y][guardPos.x];
-      console.log('[POISON] Guard before sleep:', guardTile.config);
+      console.log('[POISON] Guard before sleep:', guardTile.object?.config);
 
-      // Put guard to sleep permanently (remove poisoning flag, add asleep)
-      grid[guardPos.y][guardPos.x] = {
-        ...guardTile,
+      // Put guard to sleep permanently (remove poisoning flag, add asleep) - object layer
+      grid[guardPos.y][guardPos.x].object = {
+        ...guardTile.object,
         config: {
-          ...guardTile.config,
+          ...guardTile.object.config,
           poisoning: false,
           asleep: true
         }
       };
 
-      console.log('[POISON] Guard after sleep:', grid[guardPos.y][guardPos.x].config);
+      console.log('[POISON] Guard after sleep:', grid[guardPos.y][guardPos.x].object?.config);
 
       // Remove poison from inventory
       gameState.inventory = gameState.inventory.filter((_, i) => i !== poisonIdx);
@@ -659,12 +659,15 @@ function checkRequirements(requirements, gameState, tile, interaction = null, gr
 
   // Check tile type (unless anyTile is set)
   if (!requirements.anyTile) {
-    if (requirements.tile && tile.type !== requirements.tile) {
+    // Check both object and floor layers for tile type
+    const tileType = tile.object?.type || tile.floor?.type;
+
+    if (requirements.tile && tileType !== requirements.tile) {
       return false;
     }
 
     // Check if tile is one of multiple types
-    if (requirements.tileAny && !requirements.tileAny.includes(tile.type)) {
+    if (requirements.tileAny && !requirements.tileAny.includes(tileType)) {
       return false;
     }
   }

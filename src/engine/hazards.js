@@ -1,7 +1,10 @@
 // Check if player position is on a fire tile
 export function checkHazards(grid, playerX, playerY) {
   const cell = grid[playerY]?.[playerX];
-  if (cell && cell.type === 'fire') return 'fire';
+  if (cell) {
+    const tileType = cell.object?.type || cell.floor?.type;
+    if (tileType === 'fire') return 'fire';
+  }
   return null;
 }
 
@@ -11,10 +14,11 @@ export function getAllHazardZones(grid) {
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid[0].length; x++) {
       const cell = grid[y][x];
-      if (cell.type === 'fire') {
+      const tileType = cell.object?.type || cell.floor?.type;
+      if (tileType === 'fire') {
         zones.push({ x, y, hazardType: 'fire' });
       }
-      if (cell.type === 'bear') {
+      if (tileType === 'bear') {
         zones.push({ x, y, hazardType: 'bear' });
       }
     }
@@ -35,7 +39,8 @@ export function floodFillWater(grid, startX, startY) {
     if (visited.has(key)) continue;
     visited.add(key);
     if (x < 0 || x >= gridCols || y < 0 || y >= gridRows) continue;
-    if (grid[y][x].type !== 'water') continue;
+    const cellType = grid[y][x].floor?.type || grid[y][x].object?.type;
+    if (cellType !== 'water') continue;
     cells.push({ x, y });
     queue.push({ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 });
   }
