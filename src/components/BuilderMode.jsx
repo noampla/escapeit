@@ -4,7 +4,7 @@ import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
 import SolverMode from './SolverMode';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid, validateObjectPlacement } from '../engine/tiles';
-import { saveLevel, generateId, loadLevels } from '../utils/storage';
+import { saveLevel, generateId, loadLevelsByCreator } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { useUser } from '../contexts/UserContext.jsx';
@@ -250,12 +250,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       // Apply floor color if placing floor tile
       if (selectedTool === 'floor') {
         newGrid = cloneGrid(newGrid);
-        newGrid[y][x].config = { ...newGrid[y][x].config, floorColor: selectedFloorColor };
+        newGrid[y][x].floor.config = { ...newGrid[y][x].floor.config, floorColor: selectedFloorColor };
       }
       // Apply lock color if placing door/key/card tile
       if (lockTiles.includes(selectedTool)) {
         newGrid = cloneGrid(newGrid);
-        newGrid[y][x].config = { ...newGrid[y][x].config, lockColor: selectedLockColor };
+        // Lock color goes on object layer for doors/items
+        if (layer === 'object' && newGrid[y][x].object) {
+          newGrid[y][x].object.config = { ...newGrid[y][x].object.config, lockColor: selectedLockColor };
+        }
       }
       return newGrid;
     });
@@ -268,11 +271,30 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     setGrid(removeTile(grid, x, y));
     setSelectedCell(null);
     setSaved(false);
+    lastDragPos.current = `${x},${y}`;
+  };
+
+  const handleGridRightDrag = (x, y) => {
+    if (subMode === 'edit') return;
+    const key = `${x},${y}`;
+    if (lastDragPos.current === key) return;
+    lastDragPos.current = key;
+
+    setGrid(prev => removeTile(prev, x, y));
+    setSaved(false);
   };
 
   const handleConfigChange = (x, y, newConfig) => {
     const newGrid = cloneGrid(grid);
-    newGrid[y][x].config = newConfig;
+    const cell = newGrid[y][x];
+
+    // Update config on the appropriate layer (object takes priority over floor)
+    if (cell.object) {
+      cell.object.config = newConfig;
+    } else if (cell.floor) {
+      cell.floor.config = newConfig;
+    }
+
     setGrid(newGrid);
     setSaved(false);
   };
@@ -377,7 +399,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     }
     // Load all level data including ID
     setLevelId(level.id);
-    setGrid(level.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } }))));
+    // Use the grid as-is (already in correct format with floor/object layers from storage.js migration)
+    setGrid(level.grid);
     setMissions(level.missions || []);
     setLives(level.lives || DEFAULT_LIVES);
     setInventoryCapacity(level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY);
@@ -490,7 +513,14 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         <button onClick={handleSave} style={{ ...barBtn, background: saved ? '#2a4a2a' : '#2a3a4a' }}>
           {saved ? `✓ ${t('builder.saved')}` : t('builder.save')}
         </button>
-        <button onClick={() => { setLoadMenuOpen(true); loadLevels().then(setLoadMenuLevels); }} style={{ ...barBtn, background: '#2a3a4a' }}>
+        <button onClick={() => {
+          setLoadMenuOpen(true);
+          loadLevelsByCreator(userId).then(levels => {
+            // Filter levels to only show those matching current theme
+            const filteredLevels = levels.filter(level => level.themeId === themeId);
+            setLoadMenuLevels(filteredLevels);
+          });
+        }} style={{ ...barBtn, background: '#2a3a4a' }}>
           {t('builder.load')}
         </button>
 
@@ -593,6 +623,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             onClick={handleGridClick}
             onDrag={subMode === 'build' ? handleGridDrag : undefined}
             onRightClick={subMode === 'build' ? handleGridRightClick : undefined}
+            onRightDrag={subMode === 'build' ? handleGridRightDrag : undefined}
             showHazardZones={showHazardZones}
             showTooltips={showTooltips}
             theme={theme}

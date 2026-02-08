@@ -106,11 +106,9 @@ export function removeTile(grid, x, y) {
     }
     cell.object = null;
   }
-  // If no object, remove floor (replace with empty or ground)
-  else if (cell.floor.type === 'ground' || cell.floor.type === 'floor') {
+  // If no object, remove floor (replace with empty)
+  else {
     cell.floor = { type: 'empty', config: {} };
-  } else {
-    cell.floor = { type: 'ground', config: {} };
   }
 
   return newGrid;

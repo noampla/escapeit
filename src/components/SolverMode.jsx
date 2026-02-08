@@ -326,6 +326,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       return;
     }
 
+    // Don't allow dropping if there's already an object on this tile (door, item, etc.)
+    if (cell.object) {
+      showNotification('notifications.cantDropHere', 'error');
+      return;
+    }
+
     const newGrid = cloneGrid(currentGrid);
     // Drop to object layer
     newGrid[pos.y][pos.x].object = { type: `item-${dropped.itemType}`, config: { ...dropped } };
@@ -576,21 +582,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }));
 
     if (possibleActions.length > 1) {
-      setInteractionChoices({
-        choices: possibleActions.map(action => {
-          let label = action.label;
-          if (action.dir) {
-            label = `${label} (${action.dir})`;
-          }
-          return {
-            label,
-            action: () => {
-              setInteractionChoices(null);
-              startInteraction(action.type, action.targetPos, action.progressColor, action.duration, action.visualTarget);
-            },
-          };
-        }),
-      });
+      // Multiple actions - show inline menu (same as E key behavior)
+      const actionsWithKeys = possibleActions.map((action, idx) => ({
+        label: action.label,
+        key: (idx + 1).toString(),
+        action: () => startInteraction(action.type, action.targetPos, action.progressColor, action.duration, action.visualTarget),
+      }));
+      setInlineMenu({ actions: actionsWithKeys });
       return;
     }
 
@@ -777,40 +775,17 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Collect all possible actions using theme's interaction system
     const possibleActions = [];
 
-    // Always check interactions at player's current position first (for self-targeted actions like wear/remove)
-    // But exclude wearable interactions - those are handled by T key
-    const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y, true) || [];
-    const nonWearSelfInteractions = selfInteractions.filter(i =>
-      !i.id.includes('wear') && !i.id.includes('remove')
-    );
-    for (const interaction of nonWearSelfInteractions) {
-      // For self-interactions, execute at player position but optionally show progress at visualTarget (e.g., bomb)
-      const execPos = { x: playerPos.x, y: playerPos.y };
-      const visualPos = interaction.visualTarget || execPos;
-      possibleActions.push({
-        label: interaction.label,
-        action: () => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos),
-      });
-    }
-
     // Filter targets: only include the one we're facing, or all if standing on something
     const facingTarget = targets.find(t => t.dir === playerDir);
     const relevantTargets = facingTarget ? [facingTarget] : targets.filter(t => t.dir === 'self');
 
-    // Check interactions at facing tile
+    // Check interactions at facing tile FIRST (to match shortcut order)
     if (relevantTargets.length > 0) {
       const p = relevantTargets[0];
       const c = currentGrid[p.y][p.x];
 
       // Skip item pickups - those use F key now
-      if (c.object?.type?.startsWith('item-')) {
-        if (possibleActions.length === 0) {
-          soundManager.play('blocked');
-          showNotification('notifications.pressF', 'info');
-          return;
-        }
-        // Continue to show self-interactions if any
-      } else if (p.x !== playerPos.x || p.y !== playerPos.y) {
+      if (!c.object?.type?.startsWith('item-') && (p.x !== playerPos.x || p.y !== playerPos.y)) {
         // Get interactions at target tile from theme (only if different from player pos)
         // Exclude wear/remove - those use T key
         const allTargetInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, p.x, p.y) || [];
@@ -818,17 +793,44 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           !i.id.includes('wear') && !i.id.includes('remove')
         );
         for (const interaction of targetInteractions) {
-          // Avoid duplicates
-          if (!possibleActions.find(a => a.label === interaction.label)) {
-            // For facing tile interactions, execute at the facing tile, show progress there too
-            const execPos = p;
-            const visualPos = interaction.visualTarget || p;
-            possibleActions.push({
-              label: interaction.label,
-              action: () => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos),
-            });
-          }
+          // For facing tile interactions, execute at the facing tile, show progress there too
+          const execPos = p;
+          const visualPos = interaction.visualTarget || p;
+          possibleActions.push({
+            label: interaction.label,
+            action: () => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos),
+          });
         }
+      }
+    }
+
+    // Then check interactions at player's current position (for self-targeted actions)
+    // But exclude wearable interactions - those are handled by T key
+    const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y, true) || [];
+    const nonWearSelfInteractions = selfInteractions.filter(i =>
+      !i.id.includes('wear') && !i.id.includes('remove')
+    );
+    for (const interaction of nonWearSelfInteractions) {
+      // Avoid duplicates
+      if (!possibleActions.find(a => a.label === interaction.label)) {
+        // For self-interactions, execute at player position but optionally show progress at visualTarget (e.g., bomb)
+        const execPos = { x: playerPos.x, y: playerPos.y };
+        const visualPos = interaction.visualTarget || execPos;
+        possibleActions.push({
+          label: interaction.label,
+          action: () => startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, visualPos),
+        });
+      }
+    }
+
+    // Handle special case: if facing an item, show notification
+    if (relevantTargets.length > 0) {
+      const p = relevantTargets[0];
+      const c = currentGrid[p.y][p.x];
+      if (c.object?.type?.startsWith('item-') && possibleActions.length === 0) {
+        soundManager.play('blocked');
+        showNotification('notifications.pressF', 'info');
+        return;
       }
     }
 
@@ -844,22 +846,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       return;
     }
 
-    // Multiple actions - check if number key already held
+    // Multiple actions - show menu
     const actionsWithKeys = possibleActions.map((action, idx) => ({
       ...action,
       key: (idx + 1).toString(),
     }));
 
-    // If user is already holding a number key, execute that action immediately
-    const keys = keysDown.current;
-    for (let i = 0; i < actionsWithKeys.length; i++) {
-      if (keys.has(actionsWithKeys[i].key)) {
-        actionsWithKeys[i].action();
-        return;
-      }
-    }
-
-    // Otherwise show inline menu
     setInlineMenu({ actions: actionsWithKeys });
   }, [theme, showMessage, getInteractTargets, startInteraction, maxInventory]);
 
@@ -1114,8 +1106,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Handle inline menu action release
       if (inlineMenuRef.current && ['1', '2', '3', '4', '5'].includes(key)) {
         const actionIndex = parseInt(key) - 1;
-        if (actionIndex < inlineMenuRef.current.actions.length && interactionStateRef.current) {
-          // Action was held and completed, clear menu
+        if (actionIndex < inlineMenuRef.current.actions.length) {
+          // Clear menu when number key is released
           setInlineMenu(null);
         }
       }
@@ -1123,6 +1115,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       if (key === 'e' || key === 't') {
         // Mark E/T as released so new interactions can start
         interactionKeyReleasedRef.current = true;
+
+        // Don't clear inline menu when E is released - let it stay visible
+        // Menu will be cleared when number key is pressed or player moves
 
         if (interactionStateRef.current) {
           cancelInteraction();
@@ -1162,7 +1157,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       for (let i = 0; i < inlineMenu.actions.length && i < 5; i++) {
         const keyNum = (i + 1).toString();
         if (keys.has(keyNum)) {
-          // Hide menu immediately when starting interaction
+          // Clear menu and start interaction
           setInlineMenu(null);
           inlineMenu.actions[i].action();
           break;
@@ -1796,7 +1791,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             revealedTiles={revealedTiles}
             viewportBounds={viewportBounds}
             onHoldStart={handleMouseInteraction}
-            onHoldEnd={() => setMouseHoldState(null)}
+            onHoldEnd={() => {
+              if (interactionStateRef.current) {
+                cancelInteraction();
+              }
+              setMouseHoldState(null);
+            }}
             interactionTarget={(interactionState || mouseHoldState)?.visualTargetPos || (interactionState || mouseHoldState)?.targetPos}
             interactionProgress={(interactionState || mouseHoldState)?.progress || 0}
             interactionProgressColor={(interactionState || mouseHoldState)?.progressColor}
@@ -1808,8 +1808,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           {inlineMenu && !gameOver && (
             <div style={{
               position: 'absolute',
-              left: `${(playerPos.x + 1) * 40 + 10}px`,
-              top: `${playerPos.y * 40}px`,
+              left: `${(playerPos.x - viewportBounds.minX + 1) * 40 + 10}px`,
+              top: `${(playerPos.y - viewportBounds.minY) * 40}px`,
               background: 'linear-gradient(145deg, rgba(30, 45, 30, 0.98), rgba(20, 35, 20, 0.98))',
               borderRadius: 12,
               padding: '10px',

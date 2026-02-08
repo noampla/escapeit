@@ -31,8 +31,8 @@ function getDirectionDelta(direction) {
 
 // Check if a tile blocks camera vision
 function blocksVision(cell) {
-  // Walls and closed doors block vision
-  const blockingTiles = ['wall', 'empty', 'door-key', 'door-card'];
+  // Walls, closed doors, and vault doors block vision
+  const blockingTiles = ['wall', 'empty', 'door-key', 'door-card', 'vault-door'];
   // Check both floor and object layers
   return blockingTiles.includes(cell.floor?.type) || blockingTiles.includes(cell.object?.type);
 }
@@ -66,8 +66,8 @@ export function getCameraVisionTiles(grid, cameraX, cameraY, direction, range) {
   const rows = grid.length;
   const cols = grid[0]?.length || 0;
 
-  // Track which columns/rows are blocked (for cone shadow casting)
-  const blockedOffsets = new Set();
+  // Track which offset rays are blocked at which distance
+  const blockedRays = new Map(); // offset -> earliest blocking distance
 
   for (let dist = 1; dist <= range; dist++) {
     // Calculate the spread at this distance (cone expands as it goes)
@@ -77,8 +77,29 @@ export function getCameraVisionTiles(grid, cameraX, cameraY, direction, range) {
     const spread = dist - 1;
 
     for (let offset = -spread; offset <= spread; offset++) {
-      // Skip if this offset line is blocked
-      if (blockedOffsets.has(offset)) continue;
+      // Check if this offset was blocked earlier
+      if (blockedRays.has(offset) && blockedRays.get(offset) <= dist) {
+        continue;
+      }
+
+      // Check if an inner offset (closer to center) was blocked earlier
+      // which would cast a shadow on this outer offset
+      let shadowedByInner = false;
+      if (offset !== 0) {
+        const offsetSign = offset > 0 ? 1 : -1;
+        // Check all offsets between 0 and current offset
+        for (let checkOffset = offsetSign; Math.abs(checkOffset) < Math.abs(offset); checkOffset += offsetSign) {
+          if (blockedRays.has(checkOffset) && blockedRays.get(checkOffset) < dist) {
+            // This inner offset was blocked earlier, it casts a shadow
+            shadowedByInner = true;
+            break;
+          }
+        }
+      }
+
+      if (shadowedByInner) {
+        continue;
+      }
 
       let x, y;
       if (dir.dx !== 0) {
@@ -93,6 +114,7 @@ export function getCameraVisionTiles(grid, cameraX, cameraY, direction, range) {
 
       // Check bounds
       if (x < 0 || x >= cols || y < 0 || y >= rows) {
+        blockedRays.set(offset, dist);
         continue;
       }
 
@@ -100,8 +122,8 @@ export function getCameraVisionTiles(grid, cameraX, cameraY, direction, range) {
 
       // Check if vision is blocked at this tile
       if (blocksVision(cell)) {
-        // Mark this offset as blocked for future distances
-        blockedOffsets.add(offset);
+        // Mark this ray as blocked from this distance onward
+        blockedRays.set(offset, dist);
         continue;
       }
 
@@ -156,7 +178,7 @@ export function checkHazardAt(grid, x, y, gameState) {
         if (config?.asleep) continue;
 
         const direction = config?.direction || 'right';
-        const range = HAZARD_TYPES.guard.range;
+        const range = config?.visionRange || HAZARD_TYPES.guard.range; // Use configured range or default
         const visionTiles = getCameraVisionTiles(grid, cx, cy, direction, range);
 
         if (visionTiles.some(vt => vt.x === x && vt.y === y)) {
@@ -227,7 +249,7 @@ export function getAllHazardZones(grid) {
         if (config?.asleep) continue;
 
         const direction = config?.direction || 'right';
-        const range = HAZARD_TYPES.guard.range;
+        const range = config?.visionRange || HAZARD_TYPES.guard.range;
         const visionTiles = getCameraVisionTiles(grid, x, y, direction, range);
 
         for (const vt of visionTiles) {

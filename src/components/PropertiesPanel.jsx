@@ -89,22 +89,25 @@ export default function PropertiesPanel({
 
     const { x, y } = selectedCell;
     const cell = grid[y][x];
-    const def = TILE_TYPES[cell.type];
+
+    // Determine which layer to show (prioritize object over floor)
+    const tileType = cell.object ? cell.object.type : cell.floor?.type;
+    const config = cell.object ? cell.object.config : cell.floor?.config;
+    const def = TILE_TYPES[tileType];
 
     if (!def || !def.configurable) {
       return (
         <>
-          <p style={{ color: '#888', fontSize: 12, margin: '0 0 4px', direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.tileAt', { label: getTileLabel(themeId, cell.type, def?.label || cell.type), x, y })}</p>
+          <p style={{ color: '#888', fontSize: 12, margin: '0 0 4px', direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.tileAt', { label: getTileLabel(themeId, tileType, def?.label || tileType), x, y })}</p>
           <p style={{ color: '#666', fontSize: 11, margin: 0, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.notConfigurable')}</p>
         </>
       );
     }
 
-    const config = cell.config || {};
     const update = (key, value) => onConfigChange(x, y, { ...config, [key]: value });
 
     // Get schema for this tile type
-    const schema = CONFIG_SCHEMA[cell.type];
+    const schema = CONFIG_SCHEMA[tileType];
     const schemaFields = schema ? Object.entries(schema) : [];
 
     // Render a field based on its schema definition
@@ -124,7 +127,7 @@ export default function PropertiesPanel({
                 />
                 {fieldDef.label}
               </label>
-              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
             </div>
           );
 
@@ -138,7 +141,7 @@ export default function PropertiesPanel({
                 onChange={e => update(fieldKey, e.target.value)}
                 placeholder={fieldDef.placeholder || ''}
               />
-              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
             </div>
           );
 
@@ -154,7 +157,7 @@ export default function PropertiesPanel({
                 value={currentValue !== undefined ? currentValue : fieldDef.default}
                 onChange={e => update(fieldKey, Number(e.target.value))}
               />
-              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
             </div>
           );
 
@@ -172,7 +175,7 @@ export default function PropertiesPanel({
                   <option key={optId} value={optId}>{optDef.label}</option>
                 ))}
               </select>
-              <HelpText type={cell.type} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
             </div>
           );
         }
@@ -184,7 +187,7 @@ export default function PropertiesPanel({
 
     return (
       <>
-        <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>{t('properties.tileAt', { label: getTileLabel(themeId, cell.type, def.label), x, y })}</p>
+        <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>{t('properties.tileAt', { label: getTileLabel(themeId, tileType, def.label), x, y })}</p>
         {schemaFields.map(([fieldKey, fieldDef], idx) => renderField(fieldKey, fieldDef, idx === 0))}
       </>
     );

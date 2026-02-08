@@ -17,10 +17,11 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {} }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {} }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
+  const isRightDragging = useRef(false);
   const holdStartTime = useRef(null);
   const holdStartPos = useRef(null);
 
@@ -255,24 +256,36 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
   };
 
   const handleMouseDown = (e) => {
-    if (e.button === 2) return;
-    const pos = getTileAt(e);
-    if (pos) {
-      // Start hold timer for interactions
-      if (onHoldStart) {
-        holdStartTime.current = Date.now();
-        holdStartPos.current = pos;
-        onHoldStart(pos.x, pos.y);
+    if (e.button === 0) { // Left-click
+      const pos = getTileAt(e);
+      if (pos) {
+        // Start hold timer for interactions
+        if (onHoldStart) {
+          holdStartTime.current = Date.now();
+          holdStartPos.current = pos;
+          onHoldStart(pos.x, pos.y);
+        }
+        if (onClick) onClick(pos.x, pos.y, e);
       }
-      if (onClick) onClick(pos.x, pos.y, e);
+      isDragging.current = true;
+    } else if (e.button === 2) { // Right-click
+      e.preventDefault();
+      const pos = getTileAt(e);
+      if (pos) {
+        if (onRightClick) onRightClick(pos.x, pos.y);
+        isRightDragging.current = true;
+      }
     }
-    isDragging.current = true;
   };
 
   const handleMouseMove = (e) => {
     if (isDragging.current && onDrag) {
       const pos = getTileAt(e);
       if (pos) onDrag(pos.x, pos.y, e);
+    }
+    if (isRightDragging.current && onRightDrag) {
+      const pos = getTileAt(e);
+      if (pos) onRightDrag(pos.x, pos.y, e);
     }
     if (!showTooltips) { setTooltip(null); return; }
     const pos = getTileAt(e);
@@ -292,21 +305,24 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
     }
   };
 
-  const handleMouseUp = () => {
-    // End hold interaction
-    if (onHoldEnd && holdStartPos.current) {
-      onHoldEnd();
+  const handleMouseUp = (e) => {
+    // Check which button was released
+    if (e.button === 0) {
+      // Left mouse button released
+      if (onHoldEnd && holdStartPos.current) {
+        onHoldEnd();
+      }
+      holdStartTime.current = null;
+      holdStartPos.current = null;
+      isDragging.current = false;
+    } else if (e.button === 2) {
+      // Right mouse button released
+      isRightDragging.current = false;
     }
-    holdStartTime.current = null;
-    holdStartPos.current = null;
-    isDragging.current = false;
   };
 
-  const handleRightClick = (e) => {
-    e.preventDefault();
-    if (!onRightClick) return;
-    const pos = getTileAt(e);
-    if (pos) onRightClick(pos.x, pos.y);
+  const handleContextMenu = (e) => {
+    e.preventDefault(); // Prevent context menu from showing
   };
 
   const handleMouseLeave = () => {
@@ -318,6 +334,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
     holdStartPos.current = null;
     setTooltip(null);
     isDragging.current = false;
+    isRightDragging.current = false;
   };
 
   return (
@@ -329,7 +346,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onHoldStart,
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onContextMenu={handleRightClick}
+        onContextMenu={handleContextMenu}
         onMouseLeave={handleMouseLeave}
         style={{
           border: 'none',

@@ -265,8 +265,8 @@ export const TILE_TYPES = {
     category: 'hazard',
     layer: 'object',
     configurable: true,
-    defaultConfig: { direction: 'right' },
-    tooltip: 'Walking guard. Patrols back and forth.',
+    defaultConfig: { direction: 'right', visionRange: 4 },
+    tooltip: 'Walking guard. Patrols back and forth. Configurable vision range.',
     walkable: false,
     isMovingEntity: true // Mark as moving entity for engine
   }
@@ -332,7 +332,8 @@ export const CONFIG_HELP = {
     amount: 'Amount of cash in this stack.'
   },
   guard: {
-    direction: 'Initial direction the guard walks.'
+    direction: 'Initial direction the guard walks.',
+    visionRange: 'How many tiles the guard can see (default: 4).'
   }
 };
 
@@ -441,6 +442,13 @@ export const CONFIG_SCHEMA = {
       label: 'Direction',
       options: 'GUARD_DIRECTIONS',
       default: 'right'
+    },
+    visionRange: {
+      type: 'number',
+      label: 'Vision Range',
+      min: 1,
+      max: 5,
+      default: 4
     }
   }
 };
@@ -765,9 +773,9 @@ export function renderTile(ctx, tile, cx, cy, size) {
 
   // Open Vault Door
   if (tile.type === 'vault-door-open') {
-    // Dark interior visible
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+    // Show the floor color underneath instead of hardcoded black
+    // Floor color is already drawn, so we don't need to fill the background again
+    // Just draw the door frame and open door
 
     // Steel frame
     ctx.fillStyle = '#2a2a2a';
@@ -1239,6 +1247,17 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       };
     }
 
+    case 'guard': {
+      // Allow walking on sleeping guards, block on awake guards
+      if (tileConfig?.asleep) {
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        messageKey: 'guardBlocking'
+      };
+    }
+
     default:
       // Use default walkability
       return { allowed: isWalkable(tileType, gameState) };
@@ -1308,8 +1327,11 @@ export function moveEntities(grid, gameState) {
       ? newGrid[nextY][nextX]
       : null;
 
+    // Check if object is blocking (items don't block, only doors and other guards)
+    const isObjectBlocking = destCell?.object && !destCell.object.type.startsWith('item-');
+
     const canMove = destCell &&
-      !destCell.object && // No object blocking
+      !isObjectBlocking && // No blocking object (items don't block)
       isWalkable(destCell.floor.type, gameState); // Floor is walkable
 
     if (canMove) {
@@ -1325,10 +1347,29 @@ export function moveEntities(grid, gameState) {
         config: { ...destCell.floor.config }
       };
 
+      // Store any item that was on the destination tile (guard will step over it)
+      if (destCell.object?.type?.startsWith('item-')) {
+        movedGuard.config.underlyingObject = {
+          type: destCell.object.type,
+          config: { ...destCell.object.config }
+        };
+      } else {
+        movedGuard.config.underlyingObject = null;
+      }
+
       // Restore the floor at old position (use stored underlying floor)
       const oldFloor = guardObj.config?.underlyingFloor || { type: 'floor', config: {} };
       newGrid[y][x].floor = { type: oldFloor.type, config: { ...oldFloor.config } };
-      newGrid[y][x].object = null;
+
+      // Restore any item that was under the guard
+      if (guardObj.config?.underlyingObject) {
+        newGrid[y][x].object = {
+          type: guardObj.config.underlyingObject.type,
+          config: { ...guardObj.config.underlyingObject.config }
+        };
+      } else {
+        newGrid[y][x].object = null;
+      }
 
       // Move guard to new position (object layer)
       newGrid[nextY][nextX].object = movedGuard;
