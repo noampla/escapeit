@@ -82,7 +82,7 @@ function ToolbarIcon({ type, theme, TILE_TYPES, lockColor }) {
   return <canvas ref={canvasRef} width={16} height={16} style={{ flexShrink: 0 }} />;
 }
 
-export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange, lockColor, onLockColorChange }) {
+export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange, lockColor, onLockColorChange, onTooltipChange }) {
   const theme = useContext(ThemeContext);
   const { t, getTileLabel } = useLanguage();
   const TILE_TYPES = theme?.getTileTypes() || {};
@@ -176,6 +176,15 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
                         e.currentTarget.style.transform = 'translateX(2px)';
                         e.currentTarget.style.boxShadow = '0 4px 12px rgba(100, 100, 100, 0.2), 0 0 0 1px rgba(100, 100, 100, 0.25)';
                       }
+                      // Show tooltip if tile has tooltip text
+                      if (def.tooltip && onTooltipChange) {
+                        const buttonRect = e.currentTarget.getBoundingClientRect();
+                        onTooltipChange({
+                          text: `${getTileLabel(themeId, type, def.label)}: ${def.tooltip}`,
+                          x: buttonRect.right + 10,
+                          y: buttonRect.top,
+                        });
+                      }
                     }}
                     onMouseLeave={(e) => {
                       if (selected !== type) {
@@ -183,6 +192,7 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
                         e.currentTarget.style.transform = 'translateX(0)';
                         e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(100, 100, 100, 0.15)';
                       }
+                      if (onTooltipChange) onTooltipChange(null);
                     }}
                   >
                     <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} lockColor={lockColor} />
