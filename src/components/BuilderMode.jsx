@@ -53,6 +53,33 @@ function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
   return { valid: true };
 }
 
+// Clean up objects with attachToWall that are no longer on walls/boundaries
+function cleanupInvalidObjects(grid, TILE_TYPES) {
+  const gridRows = grid.length;
+  const gridCols = grid[0].length;
+  let modified = false;
+
+  for (let y = 0; y < gridRows; y++) {
+    for (let x = 0; x < gridCols; x++) {
+      const cell = grid[y][x];
+      if (!cell.object) continue;
+
+      const objectDef = TILE_TYPES[cell.object.type];
+      if (!objectDef?.attachToWall) continue;
+
+      // Check if this object is still valid
+      const validation = canPlaceTile(grid, x, y, cell.object.type, TILE_TYPES);
+      if (!validation.valid) {
+        // Remove invalid object
+        cell.object = null;
+        modified = true;
+      }
+    }
+  }
+
+  return modified;
+}
+
 export default function BuilderMode({ onBack, editLevel, themeId }) {
   const theme = useContext(ThemeContext);
   const { t, isRTL, language, setLanguage, getTileLabel, getLocalizedThemeName } = useLanguage();
@@ -84,6 +111,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [loadMenuOpen, setLoadMenuOpen] = useState(false);
   const [loadMenuLevels, setLoadMenuLevels] = useState([]);
   const [placementError, setPlacementError] = useState(null);
+  const [toolbarTooltip, setToolbarTooltip] = useState(null);
   const lastDragPos = useRef(null);
   const placementErrorTimer = useRef(null);
   const [showStoryModal, setShowStoryModal] = useState(false);
@@ -219,6 +247,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         newGrid[y][x].object.config = { ...newGrid[y][x].object.config, lockColor: selectedLockColor };
       }
     }
+    // Clean up objects with attachToWall that are no longer valid
+    cleanupInvalidObjects(newGrid, TILE_TYPES);
     setGrid(newGrid);
     setSelectedCell({ x, y });
     setSaved(false);
@@ -266,6 +296,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           newGrid[y][x].object.config = { ...newGrid[y][x].object.config, lockColor: selectedLockColor };
         }
       }
+      // Clean up objects with attachToWall that are no longer valid
+      cleanupInvalidObjects(newGrid, TILE_TYPES);
       return newGrid;
     });
     setSaved(false);
@@ -274,7 +306,11 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const handleGridRightClick = (x, y) => {
     if (subMode === 'edit') return;
     pushUndo(grid);
-    setGrid(removeTile(grid, x, y));
+    const TILE_TYPES = theme?.getTileTypes() || {};
+    const newGrid = removeTile(grid, x, y);
+    // Clean up objects with attachToWall that are no longer valid
+    cleanupInvalidObjects(newGrid, TILE_TYPES);
+    setGrid(newGrid);
     setSelectedCell(null);
     setSaved(false);
     lastDragPos.current = `${x},${y}`;
@@ -286,7 +322,13 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     if (lastDragPos.current === key) return;
     lastDragPos.current = key;
 
-    setGrid(prev => removeTile(prev, x, y));
+    const TILE_TYPES = theme?.getTileTypes() || {};
+    setGrid(prev => {
+      const newGrid = removeTile(prev, x, y);
+      // Clean up objects with attachToWall that are no longer valid
+      cleanupInvalidObjects(newGrid, TILE_TYPES);
+      return newGrid;
+    });
     setSaved(false);
   };
 
@@ -582,7 +624,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
 
       {/* Main area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} />}
+        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} onTooltipChange={setToolbarTooltip} />}
         <div ref={gridContainerRef} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: 20, position: 'relative' }}>
           {/* Pan arrows */}
           {canPanUp && (
@@ -792,6 +834,29 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
               {t('builder.cancel')}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Toolbar Tooltip */}
+      {toolbarTooltip && (
+        <div style={{
+          position: 'fixed',
+          left: toolbarTooltip.x,
+          top: toolbarTooltip.y,
+          background: 'linear-gradient(145deg, rgba(20, 30, 20, 0.98) 0%, rgba(10, 20, 10, 0.98) 100%)',
+          color: '#e8f8e8',
+          padding: '8px 12px',
+          borderRadius: 8,
+          fontSize: 12,
+          maxWidth: 250,
+          zIndex: 10001,
+          pointerEvents: 'none',
+          whiteSpace: 'pre-wrap',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(68, 170, 68, 0.3)',
+          fontWeight: '500',
+          backdropFilter: 'blur(8px)',
+        }}>
+          {toolbarTooltip.text}
         </div>
       )}
 

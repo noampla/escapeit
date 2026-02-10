@@ -292,8 +292,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     if (!pos) { setTooltip(null); return; }
     const cell = grid[pos.y][pos.x];
     const TILE_TYPES = theme?.getTileTypes() || {};
-    const def = TILE_TYPES[cell.type];
-    if (def && def.tooltip && cell.type !== 'empty' && cell.type !== 'ground') {
+
+    // Prioritize object tooltip over floor tooltip
+    const tileType = cell.object ? cell.object.type : cell.floor?.type;
+    const def = TILE_TYPES[tileType];
+
+    if (def && def.tooltip && tileType !== 'empty' && tileType !== 'ground') {
       const rect = canvasRef.current.getBoundingClientRect();
       setTooltip({
         text: `${def.label}: ${def.tooltip}`,
