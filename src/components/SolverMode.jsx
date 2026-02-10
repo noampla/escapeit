@@ -575,11 +575,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     else if (dx === 1) dir = 'RIGHT';
 
     const currentGrid = gridRef.current;
+    const playerPos = playerPosRef.current;
     const currentGS = {
       ...gameStateRef.current,
       revealedTiles: revealedTilesRef.current,
       lives: livesRef.current,
-      maxLives: level.lives || 3
+      maxLives: level.lives || 3,
+      playerPos: { x: playerPos.x, y: playerPos.y }
     };
 
     // Get available interactions from theme (exclude wear/remove - those use T key)
@@ -621,6 +623,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const completeInteraction = useCallback((interactionType, targetPos) => {
     const currentGrid = gridRef.current;
     const currentGS = gameStateRef.current;
+    const playerPos = playerPosRef.current;
 
     // Clone grid and gameState for theme to modify
     const newGrid = cloneGrid(currentGrid);
@@ -633,6 +636,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       revealedTiles: revealedTilesRef.current, // For visibility checks in interactions
       lives: livesRef.current, // Current lives for healing checks
       maxLives: level.lives || 3, // Maximum lives
+      playerPos: { x: playerPos.x, y: playerPos.y }, // Player position for interaction checks
     };
 
     // Execute interaction through theme
@@ -662,11 +666,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
       // Apply grid changes
       if (result.modifyGrid) {
-        console.log('[COMPLETE] Applying grid changes');
         gridRef.current = newGrid; // Update ref IMMEDIATELY to prevent race condition with moveEntities
         setGrid(newGrid);
-      } else {
-        console.log('[COMPLETE] No grid changes to apply, modifyGrid=', result.modifyGrid);
       }
 
       // Apply inventory/state changes
@@ -764,13 +765,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
   // Toggle wearable items (T key) - separate from main interactions
   const doToggleWear = useCallback(() => {
+    const playerPos = playerPosRef.current;
     const currentGS = {
       ...gameStateRef.current,
       lives: livesRef.current,
-      maxLives: level.lives || 3
+      maxLives: level.lives || 3,
+      playerPos: { x: playerPos.x, y: playerPos.y }
     };
     const currentGrid = gridRef.current;
-    const playerPos = playerPosRef.current;
 
     // Get self-interactions and filter for wear/remove only
     const selfInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, playerPos.x, playerPos.y, true) || [];
@@ -797,19 +799,20 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const interaction = wearInteractions[0];
     const execPos = { x: playerPos.x, y: playerPos.y };
     startInteraction(interaction.id, execPos, interaction.progressColor, interaction.duration, execPos);
-  }, [theme, showMessage, startInteraction]);
+  }, [theme, showMessage, showNotification, startInteraction]);
 
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;
+    const playerPos = playerPosRef.current;
     const currentGS = {
       ...gameStateRef.current,
       revealedTiles: revealedTilesRef.current,
       lives: livesRef.current,
-      maxLives: level.lives || 3
+      maxLives: level.lives || 3,
+      playerPos: { x: playerPos.x, y: playerPos.y }
     };
     const targets = getInteractTargets();
     const playerDir = playerDirectionRef.current;
-    const playerPos = playerPosRef.current;
 
     // Collect all possible actions using theme's interaction system
     const possibleActions = [];
@@ -941,7 +944,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const moveResult = theme?.checkMovementInto?.(targetType, {
       ...currentGS,
       currentTileType: currentType
-    }, targetConfig);
+    }, targetConfig, currentGrid, nx, ny);
 
     if (moveResult) {
       // Handle life loss from hazards
@@ -1218,13 +1221,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
       const keys = keysDown.current;
       const currentGrid = gridRef.current;
+      const pos = playerPosRef.current;
       const currentGS = {
         ...gameStateRef.current,
         revealedTiles: revealedTilesRef.current,
         lives: livesRef.current,
-        maxLives: level.lives || 3
+        maxLives: level.lives || 3,
+        playerPos: { x: pos.x, y: pos.y }
       };
-      const pos = playerPosRef.current;
       const playerDir = playerDirectionRef.current;
 
       // Get adjacent tiles

@@ -124,7 +124,21 @@ export const INTERACTIONS = {
     requirements: {
       tile: 'raft'
     },
+    checkCustom: (gameState, _tile, _grid, x, y) => {
+      // Can't pick up the raft you're standing on
+      const playerPos = gameState.playerPos;
+      if (playerPos && playerPos.x === x && playerPos.y === y) {
+        return false; // Standing on this raft, can't pick it up
+      }
+      return true;
+    },
     execute: (gameState, grid, x, y) => {
+      // Check if standing on the raft being picked up
+      const playerPos = gameState.playerPos;
+      if (playerPos && playerPos.x === x && playerPos.y === y) {
+        return { success: false, messageKey: 'cantPickupRaftOnIt' };
+      }
+
       // Remove raft from object layer (water floor remains)
       grid[y][x].object = null;
 
@@ -308,10 +322,85 @@ export const INTERACTIONS = {
       };
     }
   },
+
+  'wear-sweater': {
+    label: '🧥 Wear Sweater',
+    duration: 1500,
+    requirements: { anyTile: true },
+    checkCustom: (gameState, tile, grid, x, y) => {
+      // Must have sweater in inventory and not already wearing one
+      const hasSweater = gameState.inventory?.some(item => item.itemType === 'sweater');
+      const alreadyWearing = gameState.worn?.body === 'sweater';
+      return hasSweater && !alreadyWearing;
+    },
+    execute: (gameState, grid, x, y) => {
+      const sweaterIdx = gameState.inventory.findIndex(item => item.itemType === 'sweater');
+
+      if (sweaterIdx === -1) {
+        return { success: false, error: 'No sweater in inventory!' };
+      }
+
+      // Remove from inventory
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== sweaterIdx);
+
+      // Initialize worn object if needed
+      if (!gameState.worn) gameState.worn = {};
+      gameState.worn.body = 'sweater';
+
+      return {
+        success: true,
+        messageKey: 'sweaterWorn',
+        modifyInventory: true
+      };
+    }
+  },
+
+  'remove-sweater': {
+    label: '🧥 Remove Sweater',
+    duration: 1000,
+    requirements: { anyTile: true },
+    checkCustom: (gameState, tile, grid, x, y) => {
+      // Must be wearing sweater
+      const isWearingSweater = gameState.worn?.body === 'sweater';
+      if (!isWearingSweater) return false;
+
+      // Cannot remove sweater while standing on snow
+      const currentTile = grid[y]?.[x];
+      const currentTileType = currentTile?.floor?.type || currentTile?.object?.type;
+      if (currentTileType === 'snow') {
+        return false; // This will prevent the interaction from showing up
+      }
+
+      return true;
+    },
+    execute: (gameState, grid, x, y) => {
+      // Double-check: cannot remove while on snow
+      const currentTile = grid[y]?.[x];
+      const currentTileType = currentTile?.floor?.type || currentTile?.object?.type;
+      if (currentTileType === 'snow') {
+        return {
+          success: false,
+          messageKey: 'cantRemoveSweaterOnSnow'
+        };
+      }
+
+      // Remove from worn slot
+      gameState.worn.body = null;
+
+      // Add back to inventory
+      gameState.inventory.push({ itemType: 'sweater' });
+
+      return {
+        success: true,
+        messageKey: 'sweaterRemoved',
+        modifyInventory: true
+      };
+    }
+  },
 };
 
 // Get all available interactions at a position
-export function getAvailableInteractions(gameState, grid, x, y) {
+export function getAvailableInteractions(gameState, grid, x, y, isSelfCheck = false) {
   const tile = grid[y]?.[x];
   if (!tile) return [];
 
@@ -319,7 +408,7 @@ export function getAvailableInteractions(gameState, grid, x, y) {
 
   // Check each interaction
   for (const [id, interaction] of Object.entries(INTERACTIONS)) {
-    if (checkRequirements(interaction.requirements, gameState, tile, interaction)) {
+    if (checkRequirements(interaction.requirements, gameState, tile, interaction, grid, x, y, isSelfCheck)) {
       available.push({
         id,
         label: interaction.label,
@@ -332,19 +421,36 @@ export function getAvailableInteractions(gameState, grid, x, y) {
 }
 
 // Check if requirements are met
-function checkRequirements(requirements, gameState, tile, interaction = null) {
+function checkRequirements(requirements, gameState, tile, interaction = null, grid = null, x = 0, y = 0, isSelfCheck = false) {
   if (!requirements) return true;
 
-  // Check tile type (check both object and floor layers)
-  const tileType = tile.object?.type || tile.floor?.type;
+  // selfOnly/facingOnly checks only apply when finding interactions (isSelfCheck is boolean)
+  // During execution, isSelfCheck is undefined, so we skip these checks
+  if (isSelfCheck !== undefined) {
+    // selfOnly interactions should only match self-checks
+    if (requirements.selfOnly && !isSelfCheck) {
+      return false;
+    }
 
-  if (requirements.tile && tileType !== requirements.tile) {
-    return false;
+    // facingOnly interactions should not match self-checks
+    if (requirements.facingOnly && isSelfCheck) {
+      return false;
+    }
   }
 
-  // Check if tile is one of multiple types
-  if (requirements.tileAny && !requirements.tileAny.includes(tileType)) {
-    return false;
+  // anyTile bypasses tile checking (for self-interactions like wearing items)
+  if (!requirements.anyTile) {
+    // Check tile type (check both object and floor layers)
+    const tileType = tile.object?.type || tile.floor?.type;
+
+    if (requirements.tile && tileType !== requirements.tile) {
+      return false;
+    }
+
+    // Check if tile is one of multiple types
+    if (requirements.tileAny && !requirements.tileAny.includes(tileType)) {
+      return false;
+    }
   }
 
   // Check inventory items
@@ -367,9 +473,9 @@ function checkRequirements(requirements, gameState, tile, interaction = null) {
     }
   }
 
-  // Check custom requirement (e.g., matching key/card color)
+  // Check custom requirement (e.g., matching key/card color, checking current tile for snow)
   if (interaction?.checkCustom) {
-    if (!interaction.checkCustom(gameState, tile)) {
+    if (!interaction.checkCustom(gameState, tile, grid, x, y)) {
       return false;
     }
   }
@@ -413,8 +519,10 @@ export function executeInteraction(interactionId, gameState, grid, x, y, phase =
   }
 
   // Default phase: 'complete'
-  // Check requirements
-  if (!checkRequirements(interaction.requirements, gameState, tile, interaction)) {
+  // Check requirements (pass grid and coordinates for full validation)
+  // Note: During execution, we ignore selfOnly/facingOnly checks (those are for finding interactions)
+  // So we pass isSelfCheck=undefined to skip those checks
+  if (!checkRequirements(interaction.requirements, gameState, tile, interaction, grid, x, y, undefined)) {
     return { success: false, error: 'Requirements not met' };
   }
 

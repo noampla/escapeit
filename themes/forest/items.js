@@ -40,7 +40,9 @@ export const ITEM_TYPES = {
     label: 'Sweater',
     emoji: '🧥',
     color: '#cc4466',
-    description: 'Walk through snowy areas'
+    description: 'Walk through snowy areas. Press T to wear/remove.',
+    wearable: true,
+    wearSlot: 'body'
   },
   wood: {
     label: 'Wood',
@@ -341,3 +343,15 @@ export function getItemLabel(itemType, state = null) {
 
   return item.label;
 }
+
+// Wearable items configuration
+export const WEARABLES = {
+  sweater: {
+    label: 'Sweater',
+    slot: 'body',
+    effects: {
+      // Allows walking on snow tiles
+      snowTraversal: true
+    }
+  }
+};

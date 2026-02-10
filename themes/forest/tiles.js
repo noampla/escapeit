@@ -39,8 +39,8 @@ export const TILE_TYPES = {
     color: '#ddeeff',
     category: 'basic',
     layer: 'floor',
-    tooltip: 'Blocks movement unless player has a Sweater.',
-    walkable: false  // Special: walkable with sweater
+    tooltip: 'Blocks movement unless wearing a Sweater (press T). Can place items here.',
+    walkable: true  // Base walkable so objects can be placed in builder; conditional in gameplay
   },
   raft: {
     label: 'Raft',
@@ -129,7 +129,7 @@ export const TILE_TYPES = {
     layer: 'object',
     isItemTile: true,
     itemType: 'sweater',
-    tooltip: 'Collectible sweater. Press F to pick up. Walk through snow.',
+    tooltip: 'Collectible sweater. Press F to pick up, T to wear. Walk through snow when worn.',
     walkable: true
   },
   'item-wood': {
@@ -214,20 +214,21 @@ export function isWalkable(tileType, gameState = {}) {
   const tile = TILE_TYPES[tileType];
   if (!tile) return false;
 
-  // Basic walkability
-  if (tile.walkable) {
-    return true;
-  }
-
-  // Special cases
+  // Special cases that override base walkability
   if (tileType === 'snow') {
-    // Snow is walkable if player has sweater
-    return gameState.inventory?.some(item => item.itemType === 'sweater') || false;
+    // Snow requires sweater to be WORN (not just in inventory)
+    const isWearingSweater = gameState.worn?.body === 'sweater';
+    return isWearingSweater || false;
   }
 
   if (tileType === 'bear') {
     // Bear is walkable (defeated) if player has knife
     return gameState.inventory?.some(item => item.itemType === 'knife') || false;
+  }
+
+  // Basic walkability (applies to most tiles)
+  if (tile.walkable) {
+    return true;
   }
 
   return false;
@@ -322,6 +323,7 @@ export function getTileEmoji(tileType) {
 // === TILE CLASSIFICATIONS ===
 
 // Tiles that items can be dropped on (raft excluded - can't drop items while on water)
+// Snow excluded - it's a floor but you can't drop items on it (too cold!)
 export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start'];
 
 // Tiles player can interact with (E key)
@@ -354,10 +356,26 @@ function hasItemType(inventory, itemType) {
 
 // Check if player can move into a tile
 // Returns { allowed, message?, loseLife?, moveRaft?, respawn? }
-export function checkMovementInto(tileType, gameState, tileConfig) {
+// NOTE: tileType is the top-most tile (object if present, otherwise floor)
+// We need to check floor layer separately for environmental conditions like snow
+export function checkMovementInto(tileType, gameState, tileConfig, grid, x, y) {
   const inventory = gameState?.inventory || [];
   const currentTileType = gameState?.currentTileType;
 
+  // First check if the FLOOR is snow (regardless of what's on top)
+  // This ensures snow rules apply even when there's an object on the snow
+  if (grid && grid[y]?.[x]?.floor?.type === 'snow') {
+    const isWearingSweater = gameState?.worn?.body === 'sweater';
+    if (!isWearingSweater) {
+      return {
+        allowed: false,
+        messageKey: 'tooCold'
+      };
+    }
+    // Wearing sweater - continue checking object layer below
+  }
+
+  // Now check object layer (or floor if no object)
   switch (tileType) {
     case 'bear':
       // Bear always attacks - must be defeated with interaction
@@ -368,7 +386,9 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       };
 
     case 'snow':
-      if (hasItemType(inventory, 'sweater')) {
+      // This case only triggers if snow is the top-most tile (no object on it)
+      const isWearingSweater = gameState?.worn?.body === 'sweater';
+      if (isWearingSweater) {
         return { allowed: true };
       }
       return {

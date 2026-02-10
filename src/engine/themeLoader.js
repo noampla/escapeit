@@ -260,9 +260,9 @@ export class ThemeLoader {
   // === NEW: Movement Methods ===
 
   // Check if player can move into a tile - returns { allowed, message?, loseLife?, moveRaft?, respawn? }
-  checkMovementInto(tileType, gameState, tileConfig) {
+  checkMovementInto(tileType, gameState, tileConfig, grid, x, y) {
     if (this.tiles?.checkMovementInto) {
-      return this.tiles.checkMovementInto(tileType, gameState, tileConfig);
+      return this.tiles.checkMovementInto(tileType, gameState, tileConfig, grid, x, y);
     }
     // Default: use walkability
     return { allowed: this.isWalkable(tileType, gameState) };

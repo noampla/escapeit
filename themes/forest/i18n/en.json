@@ -6,7 +6,7 @@
     "bearAttack": "Bear attacked!",
     "bearDefeated": "Bear defeated! Got sweater.",
     "bearWarning": "A bear attacks! Hold E near the bear with a knife to defeat it.",
-    "tooCold": "Too cold! You need a Sweater to enter snow.",
+    "tooCold": "Too cold! You need to wear a Sweater (press T) to walk on snow.",
     "cantSwim": "Can't swim! Place a raft on the water.",
     "burned": "Burned by fire!",
     "doorUnlockHint": "Face the door and hold E to unlock with {color} key",
@@ -33,7 +33,10 @@
     "cardDoorUnlocked": "Unlocked {color} door with keycard!",
     "cantPickupRaftOnIt": "Can't pick up raft while standing on it!",
     "guardSpotted": "Spotted by guard!",
-    "poisoned": "You were poisoned!"
+    "poisoned": "You were poisoned!",
+    "sweaterWorn": "Put on the sweater. Now you can walk through snow!",
+    "sweaterRemoved": "Removed the sweater.",
+    "cantRemoveSweaterOnSnow": "Can't remove sweater while standing on snow! You'll freeze!"
   },
   "tiles": {
     "empty": "Empty",
