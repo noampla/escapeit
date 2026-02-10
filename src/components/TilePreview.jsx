@@ -68,9 +68,8 @@ export default function TilePreview({ tileType, theme, lockColor }) {
 
     ctx.clearRect(0, 0, size, size);
 
-    // Draw background with theme color or default
-    const bgColor = tileDef?.color || '#2a3a2a';
-    ctx.fillStyle = bgColor;
+    // Draw white background for better visibility
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.roundRect(0, 0, size, size, 12);
     ctx.fill();
