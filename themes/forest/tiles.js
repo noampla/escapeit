@@ -508,3 +508,47 @@ export function isObjectTile(tileType) {
 export function getDefaultFloor() {
   return { type: 'ground', config: {} };
 }
+
+// === PLAYER RENDERING ===
+
+/**
+ * Render the player with visual indication of worn sweater
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} size - Tile size
+ * @param {string} direction - Player direction ('up', 'down', 'left', 'right')
+ * @param {Object} gameState - Current game state with worn items
+ */
+export function renderPlayer(ctx, x, y, size, _direction, gameState = {}) {
+  const worn = gameState.worn || {};
+  const wearingSweater = worn.body === 'sweater';
+
+  // Draw player emoji
+  ctx.font = '26px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🧑', x, y);
+
+  if (wearingSweater) {
+    // Draw ellipse hood around head (on top of emoji)
+    const sweaterColor = '#c8b4a4';
+    const darkColor = '#8b7355';
+
+    // Ellipse hood - moved up and larger to cover hair
+    ctx.strokeStyle = sweaterColor;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.ellipse(x, y - size * 0.03, size * 0.28, size * 0.33, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Darker outline for visibility
+    ctx.strokeStyle = darkColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x, y - size * 0.03, size * 0.28, size * 0.33, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  return true;
+}
