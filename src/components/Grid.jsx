@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } from '../utils/constants';
 import { getAllHazardZones } from '../engine/hazards';
+import soundManager from '../engine/soundManager';
 
 // Default emoji fallbacks (used if theme doesn't provide getTileEmoji)
 const DEFAULT_TILE_EMOJIS = {
@@ -17,13 +18,15 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {} }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
   const isRightDragging = useRef(false);
   const holdStartTime = useRef(null);
   const holdStartPos = useRef(null);
+  const lastHoverPos = useRef(null);
+  const hoverTimerRef = useRef(null);
 
   // Calculate canvas dimensions based on viewport bounds
   const canvasWidth = viewportBounds
@@ -287,8 +290,36 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       const pos = getTileAt(e);
       if (pos) onRightDrag(pos.x, pos.y, e);
     }
-    if (!showTooltips) { setTooltip(null); return; }
+
     const pos = getTileAt(e);
+
+    // Handle tile preview on hover (with debounce)
+    if (enablePreview && onTileHover && pos) {
+      const posKey = `${pos.x},${pos.y}`;
+      if (lastHoverPos.current !== posKey) {
+        lastHoverPos.current = posKey;
+        // Clear previous timer
+        if (hoverTimerRef.current) {
+          clearTimeout(hoverTimerRef.current);
+        }
+        // Debounce hover to avoid rapid firing
+        hoverTimerRef.current = setTimeout(() => {
+          const cell = grid[pos.y]?.[pos.x];
+          if (cell) {
+            const tileType = cell.object?.type || cell.floor?.type;
+            // Only show preview for meaningful tiles
+            if (tileType && tileType !== 'empty' && tileType !== 'ground' && tileType !== 'floor') {
+              soundManager.play('hover', { volume: 0.4 });
+              onTileHover(cell, pos);
+            } else {
+              onTileHover(null, null);
+            }
+          }
+        }, 150); // 150ms debounce
+      }
+    }
+
+    if (!showTooltips) { setTooltip(null); return; }
     if (!pos) { setTooltip(null); return; }
     const cell = grid[pos.y][pos.x];
     const TILE_TYPES = theme?.getTileTypes() || {};
@@ -339,6 +370,14 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     setTooltip(null);
     isDragging.current = false;
     isRightDragging.current = false;
+    // Clear hover preview
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    lastHoverPos.current = null;
+    if (onTileHover) {
+      onTileHover(null, null);
+    }
   };
 
   return (

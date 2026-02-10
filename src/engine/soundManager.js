@@ -26,6 +26,7 @@ class SoundManager {
       damage: 'damage.mp3',
       win: 'win.mp3',
       lose: 'lose.mp3',
+      hover: 'hover.mp3',
     };
 
     // Procedural sound definitions (used when files not available)
@@ -40,6 +41,7 @@ class SoundManager {
       win: { type: 'sine', frequency: 400, duration: 0.6, attack: 0.05, decay: 0.55, sweep: 400, notes: [400, 500, 600, 800] },
       lose: { type: 'sawtooth', frequency: 300, duration: 0.5, attack: 0.05, decay: 0.45, sweep: -200 },
       explosion: { type: 'noise', frequency: 80, duration: 0.8, attack: 0.01, decay: 0.79, sweep: -60, volume: 3.0 },
+      hover: { type: 'sine', frequency: 800, duration: 0.08, attack: 0.01, decay: 0.07, sweep: 200, volume: 0.5 },
     };
   }
 

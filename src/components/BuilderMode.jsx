@@ -3,6 +3,7 @@ import Grid from './Grid';
 import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
 import SolverMode from './SolverMode';
+import TilePreview from './TilePreview';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid, validateObjectPlacement } from '../engine/tiles';
 import { saveLevel, generateId, loadLevelsByCreator } from '../utils/storage';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
@@ -115,6 +116,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const lastDragPos = useRef(null);
   const placementErrorTimer = useRef(null);
   const [showStoryModal, setShowStoryModal] = useState(false);
+  const [previewTileType, setPreviewTileType] = useState(null);
+  const [enablePreview, setEnablePreview] = useState(true);
 
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -589,6 +592,9 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         <button onClick={() => setShowTooltips(!showTooltips)} style={{ ...barBtn, background: showTooltips ? 'linear-gradient(145deg, #3a4a4a 0%, #2a3a3a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }}>
           {showTooltips ? t('builder.tipsOn') : t('builder.tipsOff')}
         </button>
+        <button onClick={() => setEnablePreview(!enablePreview)} style={{ ...barBtn, background: enablePreview ? 'linear-gradient(145deg, #4a3a4a 0%, #3a2a3a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }} title="Toggle tile preview on hover">
+          {enablePreview ? '🔍 Preview' : '🔍 Off'}
+        </button>
         <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ {t('builder.test')}</button>
         <button onClick={handleClear} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}>{t('builder.clear')}</button>
         {hasStory && (
@@ -624,7 +630,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
 
       {/* Main area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} onTooltipChange={setToolbarTooltip} />}
+        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} onTooltipChange={setToolbarTooltip} onTilePreview={enablePreview ? setPreviewTileType : undefined} />}
         <div ref={gridContainerRef} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: 20, position: 'relative' }}>
           {/* Pan arrows */}
           {canPanUp && (
@@ -866,6 +872,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           storyContent={storyContent}
           onClose={() => setShowStoryModal(false)}
           showOnFirstLoad={showStoryModal}
+        />
+      )}
+
+      {/* Tile Preview on Hover */}
+      {enablePreview && previewTileType && (
+        <TilePreview
+          tileType={previewTileType}
+          theme={theme}
+          lockColor={selectedLockColor}
         />
       )}
     </div>

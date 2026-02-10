@@ -1,6 +1,7 @@
 import { useEffect, useRef, useContext, useMemo } from 'react';
 import { ThemeContext } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
+import soundManager from '../engine/soundManager';
 
 const getCategoryLabel = (t, catId) => {
   const labels = {
@@ -82,7 +83,7 @@ function ToolbarIcon({ type, theme, TILE_TYPES, lockColor }) {
   return <canvas ref={canvasRef} width={16} height={16} style={{ flexShrink: 0 }} />;
 }
 
-export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange, lockColor, onLockColorChange, onTooltipChange }) {
+export default function Toolbar({ selected, onSelect, floorColor, onFloorColorChange, lockColor, onLockColorChange, onTooltipChange, onTilePreview }) {
   const theme = useContext(ThemeContext);
   const { t, getTileLabel } = useLanguage();
   const TILE_TYPES = theme?.getTileTypes() || {};
@@ -185,6 +186,11 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
                           y: buttonRect.top,
                         });
                       }
+                      // Show tile preview with sound
+                      if (onTilePreview) {
+                        soundManager.play('hover', { volume: 0.4 });
+                        onTilePreview(type);
+                      }
                     }}
                     onMouseLeave={(e) => {
                       if (selected !== type) {
@@ -193,6 +199,7 @@ export default function Toolbar({ selected, onSelect, floorColor, onFloorColorCh
                         e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(100, 100, 100, 0.15)';
                       }
                       if (onTooltipChange) onTooltipChange(null);
+                      if (onTilePreview) onTilePreview(null);
                     }}
                   >
                     <ToolbarIcon type={type} theme={theme} TILE_TYPES={TILE_TYPES} lockColor={lockColor} />
