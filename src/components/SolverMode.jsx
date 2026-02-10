@@ -15,6 +15,7 @@ import Leaderboard from './Leaderboard.jsx';
 import soundManager from '../engine/soundManager.js';
 import { moveEntities } from '../engine/entities.js';
 import NotificationPanel from './NotificationPanel';
+import StoryModal from './StoryModal';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -192,6 +193,22 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [interactionState, setInteractionState] = useState(null);
   const [dropMenuOpen, setDropMenuOpen] = useState(false);
   const [mouseHoldState, setMouseHoldState] = useState(null);
+  const [showStoryModal, setShowStoryModal] = useState(false);
+
+  // Check if theme has story content and show on first load
+  const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
+  const hasStory = useMemo(() => theme?.hasStoryContent?.() || false, [theme]);
+
+  useEffect(() => {
+    // Show story modal on first load if theme has story content
+    // Only show once per level per browser session
+    const levelKey = `story-seen-${themeId}-${level.name || level.id || 'unnamed'}`;
+    const hasSeenStory = sessionStorage.getItem(levelKey);
+    if (hasStory && !hasSeenStory) {
+      setShowStoryModal(true);
+      sessionStorage.setItem(levelKey, 'true');
+    }
+  }, [hasStory, themeId, level.name, level.id]);
   const [playerDirection, setPlayerDirection] = useState('down');
   const [moveCount, setMoveCount] = useState(0);
   const [startTime, setStartTime] = useState(Date.now());
@@ -558,7 +575,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     else if (dx === 1) dir = 'RIGHT';
 
     const currentGrid = gridRef.current;
-    const currentGS = { ...gameStateRef.current, revealedTiles: revealedTilesRef.current };
+    const currentGS = {
+      ...gameStateRef.current,
+      revealedTiles: revealedTilesRef.current,
+      lives: livesRef.current,
+      maxLives: level.lives || 3
+    };
 
     // Get available interactions from theme (exclude wear/remove - those use T key)
     const allInteractions = theme?.getAvailableInteractions?.(currentGS, currentGrid, x, y) || [];
@@ -609,6 +631,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       worn: { ...(currentGS.worn || {}) },
       containers: currentGS.containers ? JSON.parse(JSON.stringify(currentGS.containers)) : {},
       revealedTiles: revealedTilesRef.current, // For visibility checks in interactions
+      lives: livesRef.current, // Current lives for healing checks
+      maxLives: level.lives || 3, // Maximum lives
     };
 
     // Execute interaction through theme
@@ -655,6 +679,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           worn: tempGameState.worn ?? prev.worn,
           containers: tempGameState.containers ?? prev.containers,
         }));
+      }
+
+      // Apply life restoration (for healing items like medkit)
+      if (result.restoreLives && result.restoreLives > 0) {
+        const maxLives = level.lives || 3;
+        setLives(prev => Math.min(prev + result.restoreLives, maxLives));
       }
 
       // Show message (translate if messageKey provided)
@@ -734,7 +764,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
   // Toggle wearable items (T key) - separate from main interactions
   const doToggleWear = useCallback(() => {
-    const currentGS = gameStateRef.current;
+    const currentGS = {
+      ...gameStateRef.current,
+      lives: livesRef.current,
+      maxLives: level.lives || 3
+    };
     const currentGrid = gridRef.current;
     const playerPos = playerPosRef.current;
 
@@ -767,7 +801,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
   const doInteract = useCallback(() => {
     const currentGrid = gridRef.current;
-    const currentGS = { ...gameStateRef.current, revealedTiles: revealedTilesRef.current };
+    const currentGS = {
+      ...gameStateRef.current,
+      revealedTiles: revealedTilesRef.current,
+      lives: livesRef.current,
+      maxLives: level.lives || 3
+    };
     const targets = getInteractTargets();
     const playerDir = playerDirectionRef.current;
     const playerPos = playerPosRef.current;
@@ -1179,7 +1218,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
       const keys = keysDown.current;
       const currentGrid = gridRef.current;
-      const currentGS = { ...gameStateRef.current, revealedTiles: revealedTilesRef.current };
+      const currentGS = {
+        ...gameStateRef.current,
+        revealedTiles: revealedTilesRef.current,
+        lives: livesRef.current,
+        maxLives: level.lives || 3
+      };
       const pos = playerPosRef.current;
       const playerDir = playerDirectionRef.current;
 
@@ -2425,8 +2469,44 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             >
               Back to Menu (ESC)
             </button>
+            {hasStory && (
+              <button
+                onClick={() => setShowStoryModal(true)}
+                style={{
+                  padding: '14px 28px',
+                  background: 'linear-gradient(145deg, #2a3a4a 0%, #1a2a3a 100%)',
+                  border: 'none',
+                  borderRadius: 12,
+                  color: '#ffffff',
+                  fontSize: 16,
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 8px 28px rgba(78, 205, 196, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.5)';
+                }}
+              >
+                📖 Help
+              </button>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Story/Tutorial Modal */}
+      {hasStory && (
+        <StoryModal
+          storyContent={storyContent}
+          onClose={() => setShowStoryModal(false)}
+          showOnFirstLoad={showStoryModal}
+        />
       )}
     </div>
   );

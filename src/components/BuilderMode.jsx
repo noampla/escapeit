@@ -9,6 +9,7 @@ import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/c
 import { ThemeContext } from '../App';
 import { useUser } from '../contexts/UserContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
+import StoryModal from './StoryModal';
 
 // Default fallback
 const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
@@ -85,6 +86,11 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [placementError, setPlacementError] = useState(null);
   const lastDragPos = useRef(null);
   const placementErrorTimer = useRef(null);
+  const [showStoryModal, setShowStoryModal] = useState(false);
+
+  // Check if theme has story content
+  const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
+  const hasStory = useMemo(() => theme?.hasStoryContent?.() || false, [theme]);
 
   // Viewport state for infinite grid - center starts at middle of grid
   const [viewportCenter, setViewportCenter] = useState({ x: 50, y: 50 });
@@ -543,6 +549,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         </button>
         <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ {t('builder.test')}</button>
         <button onClick={handleClear} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}>{t('builder.clear')}</button>
+        {hasStory && (
+          <button
+            onClick={() => setShowStoryModal(true)}
+            style={{ ...barBtn, background: 'linear-gradient(145deg, #2a3a4a 0%, #1a2a3a 100%)' }}
+            title="Help & Tutorial"
+          >
+            📖 Help
+          </button>
+        )}
         <button
           onClick={() => setLanguage(language === 'en' ? 'he' : 'en')}
           style={{ ...barBtn, background: 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)', fontWeight: '600' }}
@@ -778,6 +793,15 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Story/Tutorial Modal */}
+      {hasStory && (
+        <StoryModal
+          storyContent={storyContent}
+          onClose={() => setShowStoryModal(false)}
+          showOnFirstLoad={showStoryModal}
+        />
       )}
     </div>
   );

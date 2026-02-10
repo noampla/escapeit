@@ -5,7 +5,23 @@
     "cardDoorUnlockHint": "Face the door and hold E to unlock with {color} keycard",
     "cardDoorLocked": "Access denied! Need a {color} keycard",
     "needKeycard": "Need a {color} keycard!",
-    "cardDoorUnlocked": "Access granted! {color} door unlocked."
+    "cardDoorUnlocked": "Access granted! {color} door unlocked.",
+    "chemicalDoorUnlockHint": "Face the door and hold E to neutralize with {color} chemical vial",
+    "chemicalDoorLocked": "Chemical seal active! Need a {color} chemical vial",
+    "needChemicalVial": "Need a {color} chemical vial to neutralize the seal!",
+    "chemicalDoorNeutralized": "Chemical seal neutralized! {color} door opened.",
+    "terminalAccessGranted": "Terminal accessed! System unlocked.",
+    "terminalNeedCode": "Access denied! Need correct code.",
+    "terminalHacked": "Terminal hacked successfully!",
+    "toxicSpillDamage": "☣️ Toxic chemicals! Need hazmat suit.",
+    "radiationDamage": "☢️ Radiation exposure! Need hazmat suit.",
+    "laserGridDamage": "⚡ Laser grid! Cannot pass!",
+    "brokenGlassDamage": "💥 Broken glass! Watch your step!",
+    "hazmatEquipped": "🦺 Hazmat suit equipped! Protected from toxic hazards.",
+    "hazmatRemoved": "🦺 Hazmat suit removed.",
+    "terminalNeedPower": "⚡ Terminal needs power! Requires a power cell.",
+    "terminalLasersDisabled": "💻 Terminal activated! All laser grids disabled.",
+    "medkitUsed": "❤️ Medical kit used! Health restored."
   },
   "tiles": {
     "empty": "Empty",
@@ -15,9 +31,19 @@
     "exit": "Emergency Exit",
     "door-card": "Security Door",
     "door-card-open": "Open Security Door",
-    "item-card": "Keycard"
+    "item-card": "Keycard",
+    "door-chemical": "Chemical-Sealed Door",
+    "door-chemical-open": "Neutralized Chemical Door",
+    "item-chemical": "Chemical Vial",
+    "terminal": "Access Terminal",
+    "terminal-active": "Active Terminal"
   },
   "items": {
-    "card": "Keycard"
+    "card": "Keycard",
+    "chemical": "Chemical Vial",
+    "tablet": "Data Tablet",
+    "battery": "Power Cell",
+    "hazmat": "Hazmat Suit",
+    "medkit": "Medical Kit"
   }
 }

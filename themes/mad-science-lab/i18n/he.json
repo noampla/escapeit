@@ -5,7 +5,23 @@
     "cardDoorUnlockHint": "עמדו מול הדלת והחזיקו E כדי לפתוח עם כרטיס {color}",
     "cardDoorLocked": "גישה נדחתה! צריך כרטיס {color}",
     "needKeycard": "צריך כרטיס {color}!",
-    "cardDoorUnlocked": "גישה אושרה! דלת {color} נפתחה."
+    "cardDoorUnlocked": "גישה אושרה! דלת {color} נפתחה.",
+    "chemicalDoorUnlockHint": "עמדו מול הדלת והחזיקו E כדי לנטרל עם בקבוק כימי {color}",
+    "chemicalDoorLocked": "חותם כימי פעיל! צריך בקבוק כימי {color}",
+    "needChemicalVial": "צריך בקבוק כימי {color} כדי לנטרל את החותם!",
+    "chemicalDoorNeutralized": "החותם הכימי נוטרל! דלת {color} נפתחה.",
+    "terminalAccessGranted": "גישה למסוף אושרה! המערכת נפתחה.",
+    "terminalNeedCode": "גישה נדחתה! צריך קוד נכון.",
+    "terminalHacked": "המסוף נפרץ בהצלחה!",
+    "toxicSpillDamage": "☣️ כימיקלים רעילים! צריך חליפת חומ\"ס.",
+    "radiationDamage": "☢️ חשיפה לקרינה! צריך חליפת חומ\"ס.",
+    "laserGridDamage": "⚡ רשת לייזר! אי אפשר לעבור!",
+    "brokenGlassDamage": "💥 זכוכית שבורה! שים לב לאן אתה צועד!",
+    "hazmatEquipped": "🦺 חליפת חומ\"ס נלבשה! מוגן מסכנות רעילות.",
+    "hazmatRemoved": "🦺 חליפת חומ\"ס הוסרה.",
+    "terminalNeedPower": "⚡ המסוף צריך חשמל! צריך תא כוח.",
+    "terminalLasersDisabled": "💻 המסוף הופעל! כל רשתות הלייזר כובו.",
+    "medkitUsed": "❤️ ערכת עזרה ראשונה נוצלה! בריאות שוחזרה."
   },
   "tiles": {
     "empty": "ריק",
@@ -15,9 +31,19 @@
     "exit": "יציאת חירום",
     "door-card": "דלת אבטחה",
     "door-card-open": "דלת אבטחה פתוחה",
-    "item-card": "כרטיס גישה"
+    "item-card": "כרטיס גישה",
+    "door-chemical": "דלת אטומה כימית",
+    "door-chemical-open": "דלת כימית מנוטרלת",
+    "item-chemical": "בקבוק כימי",
+    "terminal": "מסוף גישה",
+    "terminal-active": "מסוף פעיל"
   },
   "items": {
-    "card": "כרטיס גישה"
+    "card": "כרטיס גישה",
+    "chemical": "בקבוק כימי",
+    "tablet": "טאבלט מחשב",
+    "battery": "תא כוח",
+    "hazmat": "חליפת חומ\"ס",
+    "medkit": "ערכת עזרה ראשונה"
   }
 }

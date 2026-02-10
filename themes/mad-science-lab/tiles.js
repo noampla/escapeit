@@ -5,12 +5,10 @@ export const FLOOR_COLORS = {
   gray: { label: 'Lab Gray', color: '#2a2a2f' },
   white: { label: 'Clean Room', color: '#3a3a40' },
   green: { label: 'Bio Lab', color: '#1a2a1a' },
-  blue: { label: 'Cryo Lab', color: '#1a1a2a' },
-  yellow: { label: 'Hazard Zone', color: '#2a2a1a' },
-  red: { label: 'Quarantine', color: '#2a1a1a' }
+  blue: { label: 'Cryo Lab', color: '#1a1a2a' }
 };
 
-// Lock colors for keycards and doors
+// Lock colors for keycards, chemical vials, and doors
 export const LOCK_COLORS = {
   red: { label: 'Red', color: '#ff4444', dark: '#aa2222', glow: 'rgba(255, 68, 68, 0.4)' },
   blue: { label: 'Blue', color: '#4488ff', dark: '#2255aa', glow: 'rgba(68, 136, 255, 0.4)' },
@@ -20,6 +18,7 @@ export const LOCK_COLORS = {
 };
 
 export const TILE_TYPES = {
+  // === BASIC TILES ===
   empty: {
     label: 'Empty',
     color: '#050508',
@@ -28,6 +27,7 @@ export const TILE_TYPES = {
     tooltip: 'Empty void. Not walkable.',
     walkable: false
   },
+
   wall: {
     label: 'Wall',
     color: '#1a1a1f',
@@ -36,6 +36,7 @@ export const TILE_TYPES = {
     tooltip: 'Laboratory wall. Blocks movement.',
     walkable: false
   },
+
   floor: {
     label: 'Floor',
     color: '#2a2a2f',
@@ -46,6 +47,7 @@ export const TILE_TYPES = {
     tooltip: 'Lab floor. Shift+click to change color.',
     walkable: true
   },
+
   start: {
     label: 'Entry Point (Start)',
     color: '#1a4a1a',
@@ -55,6 +57,7 @@ export const TILE_TYPES = {
     tooltip: 'Player spawn point. Only one per level.',
     walkable: true
   },
+
   exit: {
     label: 'Emergency Exit',
     color: '#4a1a1a',
@@ -65,7 +68,7 @@ export const TILE_TYPES = {
     walkable: true
   },
 
-  // Security Doors
+  // === SECURITY DOORS ===
   'door-card': {
     label: 'Security Door',
     color: '#2a2a3a',
@@ -76,6 +79,7 @@ export const TILE_TYPES = {
     tooltip: 'Electronic security door. Requires matching colored keycard.',
     walkable: false
   },
+
   'door-card-open': {
     label: 'Open Security Door',
     color: '#1a1a2a',
@@ -83,7 +87,89 @@ export const TILE_TYPES = {
     walkable: true
   },
 
-  // Keycard item tile
+  // === CHEMICAL DOORS ===
+  'door-chemical': {
+    label: 'Chemical-Sealed Door',
+    color: '#2a1a2a',
+    category: 'interactive',
+    layer: 'object',
+    configurable: true,
+    defaultConfig: { lockColor: 'red' },
+    tooltip: 'Door with chemical lock. Requires matching chemical vial to neutralize seal.',
+    walkable: false
+  },
+
+  'door-chemical-open': {
+    label: 'Neutralized Chemical Door',
+    color: '#1a1a2a',
+    layer: 'object',
+    walkable: true
+  },
+
+  // === TERMINALS ===
+  'terminal': {
+    label: 'Access Terminal',
+    color: '#1a2a3a',
+    category: 'interactive',
+    layer: 'object',
+    tooltip: 'Computer access terminal. Requires data tablet to access.',
+    walkable: false
+  },
+
+  'terminal-active': {
+    label: 'Active Terminal',
+    color: '#1a3a2a',
+    layer: 'object',
+    walkable: false
+  },
+
+  // === HAZARDS ===
+  'toxic_spill': {
+    label: 'Toxic Spill',
+    color: '#2a4a1a',
+    category: 'hazard',
+    layer: 'object',
+    tooltip: 'Hazardous chemical spill. Need hazmat suit!',
+    walkable: true
+  },
+
+  'radiation': {
+    label: 'Radiation Zone',
+    color: '#4a4a1a',
+    category: 'hazard',
+    layer: 'object',
+    tooltip: 'Radioactive area. Need hazmat suit!',
+    walkable: true
+  },
+
+  'laser_grid': {
+    label: 'Laser Grid',
+    color: '#5a1a1a',
+    category: 'hazard',
+    layer: 'object',
+    tooltip: 'Security laser grid. Blocks movement!',
+    walkable: false
+  },
+
+  'broken-glass': {
+    label: 'Broken Glass',
+    color: '#3a3a3a',
+    category: 'hazard',
+    layer: 'object',
+    tooltip: 'Shattered glass. Causes damage!',
+    walkable: true
+  },
+
+  'laser_grid_disabled': {
+    label: 'Disabled Laser Grid',
+    color: '#2a2a2a',
+    category: 'object',
+    layer: 'object',
+    tooltip: 'Deactivated laser grid. Safe to pass.',
+    walkable: true
+  },
+
+  // === ITEM TILES (Pickupable Items) ===
   'item-card': {
     label: 'Keycard',
     color: '#3a3a4a',
@@ -94,6 +180,63 @@ export const TILE_TYPES = {
     configurable: true,
     defaultConfig: { lockColor: 'red' },
     tooltip: 'Access keycard. Opens matching colored security doors.',
+    walkable: true
+  },
+
+  'item-chemical': {
+    label: 'Chemical Vial',
+    color: '#3a3a4a',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'chemical',
+    configurable: true,
+    defaultConfig: { lockColor: 'red' },
+    tooltip: 'Chemical compound vial. Neutralizes matching colored chemical-sealed doors.',
+    walkable: true
+  },
+
+  'item-tablet': {
+    label: 'Data Tablet',
+    color: '#3a4a5a',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'tablet',
+    tooltip: 'Electronic tablet for accessing terminals.',
+    walkable: true
+  },
+
+  'item-battery': {
+    label: 'Power Cell',
+    color: '#3a5a3a',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'battery',
+    tooltip: 'High-capacity power cell.',
+    walkable: true
+  },
+
+  'item-hazmat': {
+    label: 'Hazmat Suit',
+    color: '#5a4a2a',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'hazmat',
+    tooltip: 'Full hazmat protection suit. Protects from hazards.',
+    walkable: true
+  },
+
+  'item-medkit': {
+    label: 'Medical Kit',
+    color: '#5a3a3a',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'medkit',
+    tooltip: 'Emergency medical supplies. Restores health.',
     walkable: true
   }
 };
@@ -116,10 +259,26 @@ export const CONFIG_SCHEMA = {
       default: 'red'
     }
   },
+  'door-chemical': {
+    lockColor: {
+      type: 'select',
+      label: 'Chemical Type',
+      options: 'LOCK_COLORS',
+      default: 'red'
+    }
+  },
   'item-card': {
     lockColor: {
       type: 'select',
       label: 'Access Level',
+      options: 'LOCK_COLORS',
+      default: 'red'
+    }
+  },
+  'item-chemical': {
+    lockColor: {
+      type: 'select',
+      label: 'Chemical Type',
       options: 'LOCK_COLORS',
       default: 'red'
     }
@@ -134,8 +293,14 @@ export const CONFIG_HELP = {
   'door-card': {
     lockColor: 'Security clearance level. Only a keycard of the same color can open it.'
   },
+  'door-chemical': {
+    lockColor: 'Chemical compound type. Only matching chemical vial can neutralize it.'
+  },
   'item-card': {
     lockColor: 'Security clearance level. Opens doors with matching color.'
+  },
+  'item-chemical': {
+    lockColor: 'Chemical compound type. Neutralizes doors with matching color.'
   }
 };
 
@@ -148,30 +313,22 @@ export function isWalkable(tileType, gameState = {}) {
 
 // Custom rendering for tiles
 export function renderTile(ctx, tile, cx, cy, size) {
-  // Guard against undefined tile
   if (!tile) return false;
 
-  // Floor renders with configured color and grid pattern
+  // Floor with grid pattern
   if (tile.type === 'floor') {
     const floorColor = tile.config?.floorColor || 'gray';
     const colorData = FLOOR_COLORS[floorColor] || FLOOR_COLORS.gray;
 
-    // Base floor color
     ctx.fillStyle = colorData.color;
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
 
-    // Subtle grid pattern (lab floor tiles)
+    // Grid pattern
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
-
-    // Horizontal line
     ctx.beginPath();
     ctx.moveTo(cx - size/2, cy);
     ctx.lineTo(cx + size/2, cy);
-    ctx.stroke();
-
-    // Vertical line
-    ctx.beginPath();
     ctx.moveTo(cx, cy - size/2);
     ctx.lineTo(cx, cy + size/2);
     ctx.stroke();
@@ -179,17 +336,14 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
-  // Wall with industrial panel look
+  // Wall with panel effect
   if (tile.type === 'wall') {
-    // Base wall color
     ctx.fillStyle = '#1a1a1f';
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
 
-    // Panel effect
     ctx.fillStyle = '#222228';
     ctx.fillRect(cx - size * 0.42, cy - size * 0.42, size * 0.84, size * 0.84);
 
-    // Panel border highlight
     ctx.strokeStyle = '#2a2a30';
     ctx.lineWidth = 2;
     ctx.strokeRect(cx - size * 0.42, cy - size * 0.42, size * 0.84, size * 0.84);
@@ -209,26 +363,22 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
-  // Start tile - airlock/entry
+  // Start tile - entry point
   if (tile.type === 'start') {
-    // Dark floor base
     ctx.fillStyle = '#1a2a1a';
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
 
-    // Entry marker circle
     ctx.strokeStyle = '#39ff14';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(cx, cy, size * 0.35, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Inner circle
     ctx.strokeStyle = 'rgba(57, 255, 20, 0.5)';
     ctx.beginPath();
     ctx.arc(cx, cy, size * 0.25, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Center dot
     ctx.fillStyle = '#39ff14';
     ctx.beginPath();
     ctx.arc(cx, cy, size * 0.08, 0, Math.PI * 2);
@@ -239,11 +389,10 @@ export function renderTile(ctx, tile, cx, cy, size) {
 
   // Exit tile - emergency exit
   if (tile.type === 'exit') {
-    // Dark floor base
     ctx.fillStyle = '#2a1a1a';
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
 
-    // Exit door frame
+    // Door frame
     ctx.fillStyle = '#3a2020';
     ctx.fillRect(cx - size * 0.35, cy - size * 0.45, size * 0.7, size * 0.9);
 
@@ -273,15 +422,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
     const lockColor = tile.config?.lockColor || 'red';
     const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
 
-    // Door frame (dark metal)
     ctx.fillStyle = '#1a1a2a';
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
 
-    // Door panel (metallic)
     ctx.fillStyle = '#2a2a3a';
     ctx.fillRect(cx - size * 0.4, cy - size * 0.45, size * 0.8, size * 0.9);
 
-    // Horizontal lines (door segments)
     ctx.strokeStyle = '#1a1a2a';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -291,51 +437,38 @@ export function renderTile(ctx, tile, cx, cy, size) {
     ctx.lineTo(cx + size * 0.4, cy + size * 0.2);
     ctx.stroke();
 
-    // Card reader panel
+    // Card reader
     ctx.fillStyle = '#0a0a15';
     ctx.fillRect(cx + size * 0.15, cy - size * 0.35, size * 0.2, size * 0.25);
 
-    // Card slot
     ctx.fillStyle = '#151520';
     ctx.fillRect(cx + size * 0.18, cy - size * 0.28, size * 0.14, size * 0.04);
 
-    // LED indicator (colored glow)
+    // LED indicator
     ctx.fillStyle = colorData.glow;
     ctx.beginPath();
     ctx.arc(cx + size * 0.25, cy - size * 0.18, size * 0.06, 0, Math.PI * 2);
     ctx.fill();
 
-    // LED core
     ctx.fillStyle = colorData.color;
     ctx.beginPath();
     ctx.arc(cx + size * 0.25, cy - size * 0.18, size * 0.04, 0, Math.PI * 2);
     ctx.fill();
-
-    // Lock icon
-    ctx.fillStyle = colorData.dark;
-    ctx.fillRect(cx - size * 0.08, cy + size * 0.28, size * 0.16, size * 0.12);
-    ctx.beginPath();
-    ctx.arc(cx, cy + size * 0.28, size * 0.08, Math.PI, 0);
-    ctx.stroke();
 
     return true;
   }
 
   // Open Security Door
   if (tile.type === 'door-card-open') {
-    // Door frame
     ctx.fillStyle = '#1a1a2a';
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
 
-    // Open doorway (dark interior)
     ctx.fillStyle = '#0a0a10';
     ctx.fillRect(cx - size * 0.35, cy - size * 0.45, size * 0.7, size * 0.9);
 
-    // Door panel slid to the side
     ctx.fillStyle = '#2a2a3a';
     ctx.fillRect(cx + size * 0.2, cy - size * 0.45, size * 0.25, size * 0.9);
 
-    // Panel edge highlight
     ctx.fillStyle = '#3a3a4a';
     ctx.fillRect(cx + size * 0.2, cy - size * 0.45, size * 0.03, size * 0.9);
 
@@ -352,24 +485,239 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Chemical-Sealed Door
+  if (tile.type === 'door-chemical') {
+    const lockColor = tile.config?.lockColor || 'red';
+    const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
+
+    ctx.fillStyle = '#1a1a2a';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    ctx.fillStyle = '#2a1a2a';
+    ctx.fillRect(cx - size * 0.4, cy - size * 0.45, size * 0.8, size * 0.9);
+
+    // Chemical seal (glowing liquid effect)
+    ctx.fillStyle = colorData.glow;
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.4, size * 0.7, size * 0.8);
+
+    ctx.fillStyle = 'rgba(10, 10, 20, 0.7)';
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.4, size * 0.7, size * 0.8);
+
+    // Chemical streams
+    for (let i = 0; i < 3; i++) {
+      const x = cx - size * 0.2 + i * size * 0.2;
+      ctx.fillStyle = colorData.color;
+      ctx.fillRect(x, cy - size * 0.4, size * 0.04, size * 0.8);
+    }
+
+    // Warning symbol
+    ctx.strokeStyle = colorData.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    return true;
+  }
+
+  // Open Chemical Door
+  if (tile.type === 'door-chemical-open') {
+    ctx.fillStyle = '#1a1a2a';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    ctx.fillStyle = '#0a0a10';
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.45, size * 0.7, size * 0.9);
+
+    // Neutralized indicator
+    ctx.fillStyle = 'rgba(68, 255, 136, 0.2)';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.4, size * 0.6, size * 0.8);
+
+    return true;
+  }
+
+  // Terminal
+  if (tile.type === 'terminal') {
+    // Monitor base
+    ctx.fillStyle = '#1a1a2a';
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.5);
+
+    // Screen (dark)
+    ctx.fillStyle = '#0a1a2a';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.35);
+
+    // Stand
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(cx - size * 0.15, cy + size * 0.25, size * 0.3, size * 0.1);
+
+    return true;
+  }
+
+  // Active Terminal
+  if (tile.type === 'terminal-active') {
+    ctx.fillStyle = '#1a1a2a';
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.5);
+
+    // Screen (glowing green)
+    ctx.fillStyle = '#0a3a2a';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.35);
+
+    // Terminal text lines
+    ctx.fillStyle = '#44ff88';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(cx - size * 0.25, cy - size * 0.1 + i * size * 0.1, size * 0.4, size * 0.02);
+    }
+
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(cx - size * 0.15, cy + size * 0.25, size * 0.3, size * 0.1);
+
+    return true;
+  }
+
+  // Toxic Spill
+  if (tile.type === 'toxic_spill') {
+    ctx.fillStyle = '#44aa33';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, size * 0.4, size * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#338822';
+    ctx.beginPath();
+    ctx.ellipse(cx - size * 0.1, cy, size * 0.25, size * 0.2, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bubbles
+    ctx.fillStyle = '#55cc44';
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.15, cy - size * 0.1, size * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.2, cy + size * 0.1, size * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
+  // Radiation Zone
+  if (tile.type === 'radiation') {
+    ctx.fillStyle = 'rgba(200, 200, 0, 0.2)';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    ctx.fillStyle = '#aaaa00';
+    ctx.strokeStyle = '#cccc00';
+    ctx.lineWidth = 2;
+
+    // Radiation symbol
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (let i = 0; i < 3; i++) {
+      const angle = (i * 120 - 90) * Math.PI / 180;
+      const x1 = cx + Math.cos(angle) * size * 0.12;
+      const y1 = cy + Math.sin(angle) * size * 0.12;
+      const x2 = cx + Math.cos(angle) * size * 0.35;
+      const y2 = cy + Math.sin(angle) * size * 0.35;
+
+      ctx.beginPath();
+      ctx.arc(x2, y2, size * 0.1, angle + Math.PI, angle + Math.PI * 2);
+      ctx.lineTo(x1, y1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    return true;
+  }
+
+  // Laser Grid
+  if (tile.type === 'laser_grid') {
+    ctx.fillStyle = '#3a3a4a';
+    // Left emitter
+    ctx.fillRect(cx - size * 0.48, cy - size * 0.1, size * 0.08, size * 0.2);
+    // Right emitter
+    ctx.fillRect(cx + size * 0.4, cy - size * 0.1, size * 0.08, size * 0.2);
+
+    // Laser beams
+    ctx.strokeStyle = '#ff3333';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 10;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx - size * 0.4, cy + i * size * 0.1);
+      ctx.lineTo(cx + size * 0.4, cy + i * size * 0.1);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+
+    return true;
+  }
+
+  // Disabled Laser Grid
+  if (tile.type === 'laser_grid_disabled') {
+    ctx.fillStyle = '#2a2a2a';
+    // Left emitter
+    ctx.fillRect(cx - size * 0.48, cy - size * 0.1, size * 0.08, size * 0.2);
+    // Right emitter
+    ctx.fillRect(cx + size * 0.4, cy - size * 0.1, size * 0.08, size * 0.2);
+
+    // Gray (disabled) laser beams - dashed to show they're off
+    ctx.setLineDash([size * 0.05, size * 0.05]);
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 2;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx - size * 0.4, cy + i * size * 0.1);
+      ctx.lineTo(cx + size * 0.4, cy + i * size * 0.1);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    return true;
+  }
+
+  // Broken Glass
+  if (tile.type === 'broken-glass') {
+    // Glass shards
+    ctx.fillStyle = '#888';
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1;
+
+    // Random shard positions
+    const shards = [
+      { x: -0.2, y: -0.15, w: 0.15, h: 0.2 },
+      { x: 0.1, y: -0.1, w: 0.12, h: 0.18 },
+      { x: -0.15, y: 0.15, w: 0.18, h: 0.15 },
+      { x: 0.15, y: 0.1, w: 0.1, h: 0.12 }
+    ];
+
+    for (const shard of shards) {
+      ctx.beginPath();
+      ctx.moveTo(cx + shard.x * size, cy + shard.y * size);
+      ctx.lineTo(cx + (shard.x + shard.w) * size, cy + shard.y * size);
+      ctx.lineTo(cx + (shard.x + shard.w * 0.5) * size, cy + (shard.y + shard.h) * size);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    return true;
+  }
+
   // Keycard item tile
   if (tile.type === 'item-card') {
     const lockColor = tile.config?.lockColor || 'red';
     const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
 
-    // Card body (white/light gray)
     ctx.fillStyle = '#e8e8f0';
     ctx.fillRect(cx - size * 0.28, cy - size * 0.18, size * 0.56, size * 0.36);
 
-    // Colored stripe at top
     ctx.fillStyle = colorData.color;
     ctx.fillRect(cx - size * 0.28, cy - size * 0.18, size * 0.56, size * 0.1);
 
-    // Chip (gold)
     ctx.fillStyle = '#daa520';
     ctx.fillRect(cx - size * 0.18, cy + size * 0.02, size * 0.14, size * 0.1);
 
-    // Chip lines
     ctx.strokeStyle = '#aa8510';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -379,9 +727,50 @@ export function renderTile(ctx, tile, cx, cy, size) {
     ctx.lineTo(cx - size * 0.11, cy + size * 0.12);
     ctx.stroke();
 
-    // Magnetic stripe
     ctx.fillStyle = '#333';
     ctx.fillRect(cx + size * 0.05, cy + size * 0.02, size * 0.18, size * 0.06);
+
+    return true;
+  }
+
+  // Chemical Vial item tile
+  if (tile.type === 'item-chemical') {
+    const lockColor = tile.config?.lockColor || 'red';
+    const colorData = LOCK_COLORS[lockColor] || LOCK_COLORS.red;
+
+    // Vial body
+    ctx.fillStyle = 'rgba(200, 220, 240, 0.3)';
+    ctx.fillRect(cx - size * 0.12, cy - size * 0.2, size * 0.24, size * 0.35);
+
+    ctx.strokeStyle = 'rgba(200, 220, 240, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - size * 0.12, cy - size * 0.2, size * 0.24, size * 0.35);
+
+    // Chemical liquid
+    const liquidHeight = size * 0.28;
+    const liquidY = cy + size * 0.15 - liquidHeight;
+
+    ctx.fillStyle = colorData.glow;
+    ctx.fillRect(cx - size * 0.14, liquidY, size * 0.28, liquidHeight);
+
+    ctx.fillStyle = colorData.color;
+    ctx.fillRect(cx - size * 0.12, liquidY, size * 0.24, liquidHeight);
+
+    // Bubbles
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.05, liquidY + size * 0.08, size * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.04, liquidY + size * 0.15, size * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cap
+    ctx.fillStyle = '#555';
+    ctx.fillRect(cx - size * 0.14, cy - size * 0.25, size * 0.28, size * 0.05);
+
+    ctx.fillStyle = '#777';
+    ctx.fillRect(cx - size * 0.14, cy - size * 0.25, size * 0.28, size * 0.02);
 
     return true;
   }
@@ -392,46 +781,55 @@ export function renderTile(ctx, tile, cx, cy, size) {
 // Get emoji for tile rendering (fallback)
 export function getTileEmoji(tileType) {
   const emojiMap = {
+    // Basic tiles - custom rendered
     empty: null,
     wall: null,
     floor: null,
     start: null,
     exit: null,
-    'door-card': null,
-    'door-card-open': null,
-    'item-card': null
+
+    // Doors - use emojis for story modal
+    'door-card': '🚪',
+    'door-card-open': '🚪',
+    'door-chemical': '🚪',
+    'door-chemical-open': '🚪',
+
+    // Terminals - use emoji for story modal
+    'terminal': '💻',
+    'terminal-active': '💻',
+
+    // Hazards - show emojis in toolbar
+    'toxic_spill': '☣️',
+    'radiation': '☢️',
+    'laser_grid': '🔴',
+    'broken-glass': '💥',
+
+    // Items - show emojis in toolbar
+    'item-card': '🔑',
+    'item-chemical': '🧪',
+    'item-tablet': '📱',
+    'item-battery': '🔋',
+    'item-hazmat': '🦺',
+    'item-medkit': '⚕️'
   };
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;
 }
 
 // === TILE CLASSIFICATIONS ===
-
-// Tiles that items can be dropped on
 export const GROUND_TILES = ['floor', 'start', 'exit'];
-
-// Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['floor', 'start', 'exit', 'door-card'];
-
-// Tiles to ignore for floor color detection
-export const IGNORE_TILES = ['wall', 'empty', 'door-card', 'door-card-open'];
-
-// Tiles that use lock colors
-export const LOCK_TILES = ['door-card', 'item-card'];
-
-// Hazard tile types (none yet)
-export const HAZARD_TILE_TYPES = [];
+export const INTERACTABLE_TILES = ['floor', 'start', 'exit', 'door-card', 'door-chemical', 'terminal'];
+export const IGNORE_TILES = ['wall', 'empty', 'door-card', 'door-card-open', 'door-chemical', 'door-chemical-open', 'laser_grid', 'laser_grid_disabled'];
+export const LOCK_TILES = ['door-card', 'item-card', 'door-chemical', 'item-chemical'];
+export const HAZARD_TILE_TYPES = ['toxic_spill', 'radiation', 'laser_grid', 'broken-glass'];
 
 // === MOVEMENT RULES ===
-
-// Helper to check if inventory has item with matching color
 function hasMatchingItem(inventory, itemType, lockColor) {
   return inventory?.some(item =>
     item.itemType === itemType && item.lockColor === lockColor
   ) || false;
 }
 
-// Check if player can move into a tile
 export function checkMovementInto(tileType, gameState, tileConfig) {
   const inventory = gameState?.inventory || [];
 
@@ -453,45 +851,46 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
       };
     }
 
+    case 'door-chemical': {
+      const doorColor = tileConfig?.lockColor || 'red';
+      const hasChemical = hasMatchingItem(inventory, 'chemical', doorColor);
+      if (hasChemical) {
+        return {
+          allowed: false,
+          messageKey: 'chemicalDoorUnlockHint',
+          messageParams: { color: doorColor }
+        };
+      }
+      return {
+        allowed: false,
+        messageKey: 'chemicalDoorLocked',
+        messageParams: { color: doorColor }
+      };
+    }
+
     default:
       return { allowed: isWalkable(tileType, gameState) };
   }
 }
 
-// Check if player meets exit requirements
 export function checkExitRequirements(gameState, exitConfig) {
   return { allowed: true };
 }
 
 // === TWO-LAYER SYSTEM HELPERS ===
-
-/**
- * Get the layer a tile type belongs to
- * @param {string} tileType - The tile type
- * @returns {'floor'|'object'} - The layer
- */
 export function getTileLayer(tileType) {
   const tile = TILE_TYPES[tileType];
-  return tile?.layer || 'floor'; // Default to floor for safety
+  return tile?.layer || 'floor';
 }
 
-/**
- * Check if a tile type is a floor tile
- */
 export function isFloorTile(tileType) {
   return getTileLayer(tileType) === 'floor';
 }
 
-/**
- * Check if a tile type is an object tile
- */
 export function isObjectTile(tileType) {
   return getTileLayer(tileType) === 'object';
 }
 
-/**
- * Get default floor for this theme
- */
 export function getDefaultFloor() {
   return { type: 'floor', config: { floorColor: 'gray' } };
 }

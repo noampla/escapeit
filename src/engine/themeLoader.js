@@ -32,6 +32,7 @@ export class ThemeLoader {
     this.interactions = null;
     this.hazards = null;
     this.sounds = null;
+    this.story = null;
     this.language = 'en'; // Default language for message translation
   }
 
@@ -91,6 +92,15 @@ export class ThemeLoader {
         soundManager.clearThemeSounds();
       }
 
+      // Try to load theme-specific story/tutorial (optional module)
+      try {
+        const storyModule = await import(`../../themes/${this.themeId}/story.js`);
+        this.story = storyModule;
+      } catch {
+        // No story.js for this theme
+        this.story = null;
+      }
+
       // Load theme-specific translations (optional)
       await this.loadThemeTranslations();
 
@@ -120,6 +130,15 @@ export class ThemeLoader {
 
   getConfigHelp() {
     return this.tiles?.CONFIG_HELP || {};
+  }
+
+  // Story/Tutorial functions
+  hasStoryContent() {
+    return this.story?.hasStoryContent?.() || false;
+  }
+
+  getStoryContent() {
+    return this.story?.getStoryContent?.() || null;
   }
 
   // Tile functions
