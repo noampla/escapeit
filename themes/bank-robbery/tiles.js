@@ -468,9 +468,19 @@ export function renderTile(ctx, tile, cx, cy, size) {
   // Floor renders with configured color
   if (tile.type === 'floor') {
     const floorColor = tile.config?.floorColor || 'gray';
-    const colorData = FLOOR_COLORS[floorColor] || FLOOR_COLORS.gray;
 
-    ctx.fillStyle = colorData.color;
+    // Check if floorColor is a hex color (starts with #) or a color name key
+    let actualColor;
+    if (typeof floorColor === 'string' && floorColor.startsWith('#')) {
+      // Direct hex color from random generator
+      actualColor = floorColor;
+    } else {
+      // Color name key that maps to FLOOR_COLORS
+      const colorData = FLOOR_COLORS[floorColor] || FLOOR_COLORS.gray;
+      actualColor = colorData.color;
+    }
+
+    ctx.fillStyle = actualColor;
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
     return true;
   }

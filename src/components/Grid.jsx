@@ -69,8 +69,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         // === LAYER 1: FLOOR ===
         const floorDef = TILE_TYPES[cell.floor?.type] || TILE_TYPES.empty || { color: '#333' };
 
-        // Draw floor background color
-        ctx.fillStyle = floorDef.color;
+        // Draw floor background color (use config floorColor if available)
+        ctx.fillStyle = cell.floor?.config?.floorColor || floorDef.color;
         ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
         // Draw grid border
