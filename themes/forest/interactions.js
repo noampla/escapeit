@@ -17,9 +17,20 @@ export const INTERACTIONS = {
     label: 'Cut Tree',
     duration: 1500,
     requirements: { inventory: ['axe'], tile: 'tree' },
+    checkCustom: (gameState, tile, grid, _x, _y) => {
+      // Can only chop trees if standing on the same floor type
+      const playerPos = gameState.playerPos;
+      if (!playerPos) return true; // Fallback: allow if no player position
+
+      const targetFloor = tile.floor?.type;
+      const playerFloor = grid[playerPos.y]?.[playerPos.x]?.floor?.type;
+
+      // Must be standing on the same floor type
+      return targetFloor === playerFloor;
+    },
     execute: (gameState, grid, x, y) => {
-      // Replace tree (floor) with ground, place wood item (object)
-      grid[y][x].floor = { type: 'ground', config: {} };
+      // Tree is now an object tile - replace tree object with wood item object
+      // Keep the floor layer as-is (could be ground, snow, etc.)
       grid[y][x].object = { type: 'item-wood', config: {} };
       return {
         success: true,

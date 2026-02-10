@@ -20,7 +20,7 @@ export const TILE_TYPES = {
     label: 'Tree',
     color: '#2d4a1a',
     category: 'basic',
-    layer: 'floor',
+    layer: 'object',
     configurable: false,
     defaultConfig: {},
     tooltip: 'Blocks movement. Cut with axe (hold E) to get wood.',
