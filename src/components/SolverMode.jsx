@@ -400,7 +400,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     if (isContainer) {
       const containerDef = theme?.getContainerDef?.(itemType);
       const slot = containerDef?.slot || itemType;
-      const newCapacity = cell.config?.capacity || containerDef?.defaultCapacity || 10000;
+      const newCapacity = cell.object?.config?.capacity || containerDef?.defaultCapacity || 10000;
       const existingContainer = currentGS.containers?.[slot];
 
       setGameState(prev => {
