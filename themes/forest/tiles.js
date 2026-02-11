@@ -26,6 +26,16 @@ export const TILE_TYPES = {
     tooltip: 'Blocks movement. Cut with axe (hold E) to get wood.',
     walkable: false
   },
+  boulder: {
+    label: 'Boulder',
+    color: '#5a5a5a',
+    category: 'basic',
+    layer: 'object',
+    configurable: false,
+    defaultConfig: {},
+    tooltip: 'Large rock. Blocks movement.',
+    walkable: false
+  },
   water: {
     label: 'Water',
     color: '#2266aa',
@@ -279,6 +289,44 @@ function drawRaft(ctx, cx, cy, size) {
   ctx.stroke();
 }
 
+// Draw a boulder (large gray rock)
+function drawBoulder(ctx, cx, cy, size) {
+  // Main boulder shape (irregular rock)
+  ctx.fillStyle = '#6a6a6a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.42, size * 0.38, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Darker shadow on bottom
+  ctx.fillStyle = '#4a4a4a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + size * 0.15, size * 0.38, size * 0.2, 0.2, 0, Math.PI);
+  ctx.fill();
+
+  // Rock texture highlights (lighter spots)
+  ctx.fillStyle = '#8a8a8a';
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.12, cy - size * 0.1, size * 0.15, size * 0.12, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.15, cy + size * 0.05, size * 0.1, size * 0.08, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cracks in the rock
+  ctx.strokeStyle = '#3a3a3a';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - size * 0.25, cy - size * 0.05);
+  ctx.lineTo(cx - size * 0.1, cy + size * 0.1);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx + size * 0.1, cy - size * 0.15);
+  ctx.lineTo(cx + size * 0.25, cy + size * 0.05);
+  ctx.stroke();
+}
+
 // Custom rendering for tiles (optional - most use emoji/color)
 export function renderTile(ctx, tile, cx, cy, size) {
   // Guard against undefined tile
@@ -287,6 +335,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
   // Raft gets custom rendering
   if (tile.type === 'raft') {
     drawRaft(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Boulder gets custom rendering
+  if (tile.type === 'boulder') {
+    drawBoulder(ctx, cx, cy, size);
     return true;
   }
 
@@ -299,6 +353,7 @@ export function getTileEmoji(tileType) {
   const emojiMap = {
     ground: null,  // No emoji for ground (just color)
     tree: '🌲',
+    boulder: null,  // Custom draw
     water: '🌊',
     snow: '❄️',
     raft: '🪵',
@@ -330,7 +385,7 @@ export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start'];
 export const INTERACTABLE_TILES = ['tree', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
 
 // Tiles to ignore for floor color detection when picking up items
-export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'water', 'snow', 'bear'];
+export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'water', 'snow', 'bear'];
 
 // Tiles that use lock colors (doors, keys, cards)
 export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
