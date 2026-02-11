@@ -36,6 +36,16 @@ export const TILE_TYPES = {
     tooltip: 'Large rock. Blocks movement.',
     walkable: false
   },
+  'thorny-bush': {
+    label: 'Thorny Bush',
+    color: '#4a6b3a',
+    category: 'basic',
+    layer: 'object',
+    configurable: false,
+    defaultConfig: {},
+    tooltip: 'Dense thorny bush. Blocks movement. Clear with knife (hold E).',
+    walkable: false
+  },
   water: {
     label: 'Water',
     color: '#2266aa',
@@ -327,6 +337,62 @@ function drawBoulder(ctx, cx, cy, size) {
   ctx.stroke();
 }
 
+// Draw a thorny bush
+function drawThornyBush(ctx, cx, cy, size) {
+  // Main bush body (dark green cluster)
+  ctx.fillStyle = '#3a5a2a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.4, size * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lighter green highlights (front leaves)
+  ctx.fillStyle = '#4a6b3a';
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.15, cy - size * 0.1, size * 0.2, size * 0.18, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.12, cy + size * 0.08, size * 0.18, size * 0.15, 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - size * 0.18, size * 0.15, size * 0.13, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Thorns (sharp brown spikes)
+  ctx.strokeStyle = '#5a4a3a';
+  ctx.lineWidth = 2;
+
+  // Draw several thorns at various angles
+  const thornPositions = [
+    { x: -0.25, y: -0.15, angle: -0.5 },
+    { x: 0.28, y: -0.08, angle: 0.3 },
+    { x: -0.3, y: 0.12, angle: -0.8 },
+    { x: 0.25, y: 0.18, angle: 0.7 },
+    { x: 0.05, y: -0.25, angle: 0 },
+    { x: -0.12, y: 0.25, angle: -0.3 }
+  ];
+
+  thornPositions.forEach(thorn => {
+    const startX = cx + thorn.x * size;
+    const startY = cy + thorn.y * size;
+    const length = size * 0.12;
+    const endX = startX + Math.cos(thorn.angle) * length;
+    const endY = startY + Math.sin(thorn.angle) * length;
+
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+
+    // Thorn tip (darker)
+    ctx.fillStyle = '#4a3a2a';
+    ctx.beginPath();
+    ctx.arc(endX, endY, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
 // Custom rendering for tiles (optional - most use emoji/color)
 export function renderTile(ctx, tile, cx, cy, size) {
   // Guard against undefined tile
@@ -344,6 +410,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Thorny bush gets custom rendering
+  if (tile.type === 'thorny-bush') {
+    drawThornyBush(ctx, cx, cy, size);
+    return true;
+  }
+
   // All other tiles use emoji or color
   return false;
 }
@@ -354,6 +426,7 @@ export function getTileEmoji(tileType) {
     ground: null,  // No emoji for ground (just color)
     tree: '🌲',
     boulder: null,  // Custom draw
+    'thorny-bush': null,  // Custom draw
     water: '🌊',
     snow: '❄️',
     raft: '🪵',
@@ -382,10 +455,10 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['tree', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
+export const INTERACTABLE_TILES = ['tree', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
 
 // Tiles to ignore for floor color detection when picking up items
-export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'water', 'snow', 'bear'];
+export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'thorny-bush', 'water', 'snow', 'bear'];
 
 // Tiles that use lock colors (doors, keys, cards)
 export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
