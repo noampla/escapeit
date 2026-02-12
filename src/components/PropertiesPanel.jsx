@@ -22,7 +22,9 @@ export default function PropertiesPanel({
   grid, selectedCell, onConfigChange, showHelp = true,
   // Mission props
   missions = [], onMissionsChange, lives, onLivesChange, fixedOrder, onFixedOrderChange,
-  inventoryCapacity, onInventoryCapacityChange
+  inventoryCapacity, onInventoryCapacityChange,
+  // Path editing
+  onStartPathEdit
 }) {
   const theme = useContext(ThemeContext);
   const { t, isRTL, getTileLabel } = useLanguage();
@@ -216,6 +218,74 @@ export default function PropertiesPanel({
             </div>
           );
         }
+
+        case 'textarea':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <textarea
+                style={{
+                  ...inputStyle,
+                  minHeight: 80,
+                  resize: 'vertical',
+                  fontFamily: 'inherit'
+                }}
+                value={currentValue || fieldDef.default || ''}
+                onChange={e => update(fieldKey, e.target.value)}
+                placeholder={fieldDef.placeholder || ''}
+              />
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
+
+        case 'path':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <div
+                style={{
+                  ...inputStyle,
+                  background: '#1a1a1a',
+                  minHeight: 60,
+                  padding: 8,
+                  borderRadius: 4,
+                  color: '#aaa',
+                  fontSize: 11,
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  if (onStartPathEdit) {
+                    onStartPathEdit(x, y, fieldKey);
+                  }
+                }}
+              >
+                <p style={{ margin: '0 0 6px', color: '#bbb' }}>
+                  {(currentValue && currentValue.length > 0)
+                    ? `${currentValue.length} tiles in path. Click to edit.`
+                    : 'Click to create path on map'}
+                </p>
+                {currentValue && currentValue.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {currentValue.map((tile, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          background: '#444',
+                          padding: '2px 6px',
+                          borderRadius: 3,
+                          fontSize: 10,
+                          color: '#ddd'
+                        }}
+                      >
+                        {idx + 1}: ({tile.x},{tile.y})
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
 
         default:
           return null;

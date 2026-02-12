@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -148,6 +148,52 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.globalAlpha = 1;
     }
 
+    // Path tiles overlay (for path editing mode)
+    if (pathTiles && pathTiles.length > 0) {
+      pathTiles.forEach((tile, idx) => {
+        const px = (tile.x - offsetX) * TILE_SIZE;
+        const py = (tile.y - offsetY) * TILE_SIZE;
+
+        // Skip if out of viewport bounds
+        if (viewportBounds) {
+          if (tile.x < viewportBounds.minX || tile.x > viewportBounds.maxX ||
+              tile.y < viewportBounds.minY || tile.y > viewportBounds.maxY) {
+            return;
+          }
+        }
+
+        // Highlight tile
+        ctx.fillStyle = 'rgba(100, 150, 255, 0.4)';
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
+        // Border
+        ctx.strokeStyle = 'rgba(100, 150, 255, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(px + 1.5, py + 1.5, TILE_SIZE - 3, TILE_SIZE - 3);
+
+        // Path number
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText((idx + 1).toString(), px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+
+        // Draw connection line to next tile
+        if (idx < pathTiles.length - 1) {
+          const nextTile = pathTiles[idx + 1];
+          const nx = (nextTile.x - offsetX) * TILE_SIZE;
+          const ny = (nextTile.y - offsetY) * TILE_SIZE;
+
+          ctx.strokeStyle = 'rgba(100, 150, 255, 0.6)';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+          ctx.lineTo(nx + TILE_SIZE / 2, ny + TILE_SIZE / 2);
+          ctx.stroke();
+        }
+      });
+    }
+
     // Interaction progress overlay on target tile
     if (interactionTarget && interactionProgress > 0) {
       const itx = (interactionTarget.x - offsetX) * TILE_SIZE;
@@ -242,7 +288,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles]);
 
   useEffect(() => {
     draw();

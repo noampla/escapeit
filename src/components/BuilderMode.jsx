@@ -124,6 +124,10 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateSeed, setGenerateSeed] = useState('');
 
+  // Path editing state
+  const [pathEditMode, setPathEditMode] = useState(null); // { x, y, fieldKey } when editing path
+  const [pathTiles, setPathTiles] = useState([]); // Current path being edited
+
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
   const hasStory = useMemo(() => theme?.hasStoryContent?.() || false, [theme]);
@@ -214,6 +218,12 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   }, []);
 
   const handleGridClick = (x, y, e) => {
+    // Handle path editing mode
+    if (pathEditMode) {
+      handlePathTileClick(x, y);
+      return;
+    }
+
     if (subMode === 'edit' || (e && e.shiftKey)) {
       setSelectedCell({ x, y });
       return;
@@ -353,6 +363,79 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
 
     setGrid(newGrid);
     setSaved(false);
+  };
+
+  // Start path editing mode
+  const handleStartPathEdit = (x, y, fieldKey) => {
+    const cell = grid[y][x];
+    const config = cell.object?.config || cell.floor?.config || {};
+    const currentPath = config[fieldKey] || [];
+
+    setPathEditMode({ x, y, fieldKey });
+    setPathTiles([...currentPath]);
+  };
+
+  // Handle clicking on grid tiles while in path edit mode
+  const handlePathTileClick = (tileX, tileY) => {
+    if (!pathEditMode) return false;
+
+    // Check if tile already in path
+    const existingIndex = pathTiles.findIndex(t => t.x === tileX && t.y === tileY);
+
+    if (existingIndex !== -1) {
+      // Remove tile and all tiles after it
+      setPathTiles(pathTiles.slice(0, existingIndex));
+    } else {
+      // Add tile to path
+      // Validate that tile is connected to the last tile (if path not empty)
+      if (pathTiles.length > 0) {
+        const lastTile = pathTiles[pathTiles.length - 1];
+        const isAdjacent =
+          (Math.abs(tileX - lastTile.x) === 1 && tileY === lastTile.y) ||
+          (Math.abs(tileY - lastTile.y) === 1 && tileX === lastTile.x);
+
+        if (!isAdjacent) {
+          setPlacementError('Path tiles must be connected (up/down/left/right)!');
+          if (placementErrorTimer.current) clearTimeout(placementErrorTimer.current);
+          placementErrorTimer.current = setTimeout(() => setPlacementError(null), 2000);
+          return true; // Handled, but invalid
+        }
+      }
+
+      setPathTiles([...pathTiles, { x: tileX, y: tileY }]);
+    }
+
+    return true; // Event handled
+  };
+
+  // Save path and exit path edit mode
+  const handleSavePathEdit = () => {
+    if (!pathEditMode) return;
+
+    const { x, y, fieldKey } = pathEditMode;
+    const newGrid = cloneGrid(grid);
+    const cell = newGrid[y][x];
+
+    // Update config with new path
+    const config = cell.object?.config || cell.floor?.config || {};
+    const newConfig = { ...config, [fieldKey]: pathTiles };
+
+    if (cell.object) {
+      cell.object.config = newConfig;
+    } else if (cell.floor) {
+      cell.floor.config = newConfig;
+    }
+
+    setGrid(newGrid);
+    setSaved(false);
+    setPathEditMode(null);
+    setPathTiles([]);
+  };
+
+  // Cancel path editing
+  const handleCancelPathEdit = () => {
+    setPathEditMode(null);
+    setPathTiles([]);
   };
 
   const handleSave = () => {
@@ -681,9 +764,54 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         </span>
       </div>
 
+      {/* Path edit mode banner */}
+      {pathEditMode && (
+        <div style={{
+          background: 'linear-gradient(135deg, #3a4a5a 0%, #2a3a4a 100%)',
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          borderBottom: '2px solid #4a5a6a',
+          color: '#ddd'
+        }}>
+          <span style={{ fontSize: 14, fontWeight: '600' }}>
+            🛤️ Path Edit Mode - Click tiles to build path ({pathTiles.length} tiles)
+          </span>
+          <button
+            onClick={handleSavePathEdit}
+            style={{
+              padding: '6px 16px',
+              background: 'linear-gradient(135deg, #3a5a3a 0%, #2a4a2a 100%)',
+              color: '#fff',
+              border: '1px solid #4a6a4a',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            ✓ Save Path
+          </button>
+          <button
+            onClick={handleCancelPathEdit}
+            style={{
+              padding: '6px 16px',
+              background: 'linear-gradient(135deg, #5a3a3a 0%, #4a2a2a 100%)',
+              color: '#fff',
+              border: '1px solid #6a4a4a',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            ✕ Cancel
+          </button>
+        </div>
+      )}
+
       {/* Main area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {subMode === 'build' && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} onTooltipChange={setToolbarTooltip} onTilePreview={enablePreview ? setPreviewTileType : undefined} />}
+        {subMode === 'build' && !pathEditMode && <Toolbar selected={selectedTool} onSelect={setSelectedTool} floorColor={selectedFloorColor} onFloorColorChange={setSelectedFloorColor} lockColor={selectedLockColor} onLockColorChange={setSelectedLockColor} onTooltipChange={setToolbarTooltip} onTilePreview={enablePreview ? setPreviewTileType : undefined} />}
         <div ref={gridContainerRef} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: 20, position: 'relative' }}>
           {/* Pan arrows */}
           {canPanUp && (
@@ -737,13 +865,14 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           <Grid
             grid={grid}
             onClick={handleGridClick}
-            onDrag={subMode === 'build' ? handleGridDrag : undefined}
-            onRightClick={subMode === 'build' ? handleGridRightClick : undefined}
-            onRightDrag={subMode === 'build' ? handleGridRightDrag : undefined}
+            onDrag={subMode === 'build' && !pathEditMode ? handleGridDrag : undefined}
+            onRightClick={subMode === 'build' && !pathEditMode ? handleGridRightClick : undefined}
+            onRightDrag={subMode === 'build' && !pathEditMode ? handleGridRightDrag : undefined}
             showHazardZones={showHazardZones}
             showTooltips={showTooltips}
             theme={theme}
             viewportBounds={viewportBounds}
+            pathTiles={pathEditMode ? pathTiles : undefined}
           />
           {/* Placement error message */}
           {placementError && (
@@ -778,6 +907,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           onFixedOrderChange={f => { setFixedOrder(f); setSaved(false); }}
           inventoryCapacity={inventoryCapacity}
           onInventoryCapacityChange={c => { setInventoryCapacity(c); setSaved(false); }}
+          onStartPathEdit={handleStartPathEdit}
         />
       </div>
 

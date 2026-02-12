@@ -37,7 +37,10 @@
     "poisoned": "הורעלת!",
     "sweaterWorn": "לבשת את הסוודר. עכשיו אפשר ללכת דרך השלג!",
     "sweaterRemoved": "הורדת את הסוודר.",
-    "cantRemoveSweaterOnSnow": "לא יכול להוריד סוודר בזמן שעומד על שלג! תקפא!"
+    "cantRemoveSweaterOnSnow": "לא יכול להוריד סוודר בזמן שעומד על שלג! תקפא!",
+    "ancientGateOpened": "🌟 השער העתיק נפתח עם זוהר מיסטי!",
+    "pathBroken": "❌ שברת את רצף השביל. התחל מחדש מההתחלה.",
+    "pathLeft": "❌ עזבת את השביל. התחל מחדש מההתחלה."
   },
   "tiles": {
     "empty": "ריק",
@@ -66,7 +69,9 @@
     "item-knife": "סכין",
     "item-sweater": "סוודר",
     "item-wood": "עץ",
-    "item-raft": "רפסודה"
+    "item-raft": "רפסודה",
+    "ancient-gate": "שער עתיק",
+    "sign": "שלט"
   },
   "items": {
     "key": "מפתח",

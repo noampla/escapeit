@@ -37,7 +37,10 @@
     "poisoned": "You were poisoned!",
     "sweaterWorn": "Put on the sweater. Now you can walk through snow!",
     "sweaterRemoved": "Removed the sweater.",
-    "cantRemoveSweaterOnSnow": "Can't remove sweater while standing on snow! You'll freeze!"
+    "cantRemoveSweaterOnSnow": "Can't remove sweater while standing on snow! You'll freeze!",
+    "ancientGateOpened": "🌟 The ancient gate opens with a mystical glow!",
+    "pathBroken": "❌ You broke the path sequence. Start again from the beginning.",
+    "pathLeft": "❌ You left the path. Start again from the beginning."
   },
   "tiles": {
     "empty": "Empty",
@@ -66,7 +69,9 @@
     "item-knife": "Knife",
     "item-sweater": "Sweater",
     "item-wood": "Wood",
-    "item-raft": "Raft"
+    "item-raft": "Raft",
+    "ancient-gate": "Ancient Gate",
+    "sign": "Sign"
   },
   "items": {
     "key": "Key",

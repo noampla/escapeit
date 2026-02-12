@@ -423,6 +423,25 @@ export const INTERACTIONS = {
       };
     }
   },
+
+  'read-sign': {
+    label: '📜 Read Sign',
+    duration: 500,
+    requirements: { tile: 'sign' },
+    execute: (_gameState, grid, x, y) => {
+      const tile = grid[y][x];
+      const message = tile.object?.config?.message || 'This sign has no message.';
+
+      return {
+        success: true,
+        message: message,
+        showModal: true,
+        modalTitle: '📜 Sign',
+        modifyGrid: false,
+        modifyInventory: false
+      };
+    }
+  },
 };
 
 // Get all available interactions at a position

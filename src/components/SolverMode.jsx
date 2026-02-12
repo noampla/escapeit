@@ -194,6 +194,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [dropMenuOpen, setDropMenuOpen] = useState(false);
   const [mouseHoldState, setMouseHoldState] = useState(null);
   const [showStoryModal, setShowStoryModal] = useState(false);
+  const [messageModal, setMessageModal] = useState(null); // { title, message }
 
   // Check if theme has story content and show on first load
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -693,6 +694,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         const msg = getMessage(themeId, result.messageKey, result.messageParams || {});
         showMessage(msg, 1500, 'success');
       } else if (result.message) {
+        // Check if this should be shown as a modal (for sign reading, etc.)
+        if (result.showModal) {
+          setMessageModal({ title: result.modalTitle || '', message: result.message });
+        }
+        // Always also show in the notification system (message log)
         showMessage(result.message, 1500, 'success');
       }
     } else if (result?.error) {
@@ -703,7 +709,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Mark that E/number key must be released before starting new interaction
     interactionKeyReleasedRef.current = false;
     cancelInteraction();
-  }, [theme, showMessage, cancelInteraction]);
+  }, [theme, showMessage, cancelInteraction, setMessageModal]);
 
   const doPickup = useCallback(() => {
     const currentGrid = gridRef.current;
@@ -995,6 +1001,22 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setMoveCount(prev => prev + 1);
       revealTargetTile();
 
+      // Check ancient gate path progress after movement
+      const pathResult = theme?.checkAncientGatePath?.(currentGS, currentGrid, nx, ny);
+      if (pathResult) {
+        console.log('[Ancient Gate] Path check result:', pathResult);
+        if (pathResult.gateOpened) {
+          soundManager.play('success');
+          showMessage(pathResult.message, 3000, 'success');
+          if (pathResult.modifyGrid) {
+            setGrid(cloneGrid(currentGrid));
+          }
+        } else if (pathResult.pathBroken || pathResult.pathLeft) {
+          soundManager.play('blocked');
+          showMessage(pathResult.message, 2000, 'warning');
+        }
+      }
+
       // Immediate hazard check on entering a new tile
       const hazard = theme?.checkHazardAt?.(currentGrid, nx, ny, currentGS);
       if (hazard && hazard.continuous) {
@@ -1014,6 +1036,22 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
       revealTargetTile();
+
+      // Check ancient gate path progress after movement
+      const pathResult = theme?.checkAncientGatePath?.(gameStateRef.current, currentGrid, nx, ny);
+      if (pathResult) {
+        console.log('[Ancient Gate] Path check result (fallback):', pathResult);
+        if (pathResult.gateOpened) {
+          soundManager.play('success');
+          showMessage(pathResult.message, 3000, 'success');
+          if (pathResult.modifyGrid) {
+            setGrid(cloneGrid(currentGrid));
+          }
+        } else if (pathResult.pathBroken || pathResult.pathLeft) {
+          soundManager.play('blocked');
+          showMessage(pathResult.message, 2000, 'warning');
+        }
+      }
 
       // Immediate hazard check on entering a new tile
       const hazard = theme?.checkHazardAt?.(currentGrid, nx, ny, gameStateRef.current);
@@ -2511,6 +2549,90 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           onClose={() => setShowStoryModal(false)}
           showOnFirstLoad={showStoryModal}
         />
+      )}
+
+      {/* Message Modal (for sign reading, etc.) */}
+      {messageModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+          onClick={() => setMessageModal(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#2a2a3e',
+              border: '2px solid #4a4a6e',
+              borderRadius: '8px',
+              padding: '24px',
+              maxWidth: '500px',
+              minWidth: '300px',
+              position: 'relative',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                background: 'none',
+                border: 'none',
+                color: '#aaa',
+                fontSize: '24px',
+                cursor: 'pointer',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+              }}
+              onClick={() => setMessageModal(null)}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#3a3a4e';
+                e.target.style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#aaa';
+              }}
+            >
+              ×
+            </button>
+
+            {/* Title (if provided) */}
+            {messageModal.title && (
+              <h3 style={{ margin: '0 0 16px 0', color: '#eee', fontSize: '20px' }}>
+                {messageModal.title}
+              </h3>
+            )}
+
+            {/* Message content */}
+            <div
+              style={{
+                color: '#ddd',
+                fontSize: '16px',
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap',
+                marginTop: messageModal.title ? '0' : '8px',
+              }}
+            >
+              {messageModal.message}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

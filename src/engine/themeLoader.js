@@ -268,6 +268,15 @@ export class ThemeLoader {
     return { allowed: this.isWalkable(tileType, gameState) };
   }
 
+  // Check ancient gate path progress after player movement
+  // Returns { gateOpened, pathBroken, pathLeft, message, modifyGrid } or null
+  checkAncientGatePath(gameState, grid, newX, newY) {
+    if (this.tiles?.checkAncientGatePath) {
+      return this.tiles.checkAncientGatePath(gameState, grid, newX, newY);
+    }
+    return null; // No ancient gate logic in this theme
+  }
+
   // === NEW: Exit Configuration ===
 
   // Get exit tile types for this theme

@@ -199,6 +199,29 @@ export const TILE_TYPES = {
     tooltip: 'Without Knife: lose a life, pushed back. With Knife: bear defeated, get Sweater.',
     walkable: false  // Special: walkable with knife
   },
+  'ancient-gate': {
+    label: 'Ancient Gate',
+    color: '#7a6a5a',
+    category: 'interactive',
+    layer: 'object',
+    configurable: true,
+    defaultConfig: {
+      pathTiles: [],  // Array of {x, y} coordinates in the correct order
+      isOpen: false   // Runtime state - whether the gate is currently open
+    },
+    tooltip: 'Ancient stone gate. Create a path by clicking tiles in order. Walk the path correctly to open.',
+    walkable: false  // Not walkable until path is completed
+  },
+  sign: {
+    label: 'Sign',
+    color: '#8b7355',
+    category: 'interactive',
+    layer: 'object',
+    configurable: true,
+    defaultConfig: { message: 'Press E to read this sign.' },
+    tooltip: 'A sign with a message. Press E to read.',
+    walkable: true
+  },
 };
 
 export const CONFIG_HELP = {
@@ -207,6 +230,12 @@ export const CONFIG_HELP = {
   },
   friend: {
     name: 'Name for this friend. Shown in messages and missions.',
+  },
+  'ancient-gate': {
+    pathTiles: 'Click tiles on the map to define the path. Tiles must be connected (up/down/left/right). Player must walk the path in order without leaving.',
+  },
+  sign: {
+    message: 'The message that appears when the player presses E to read the sign.',
   },
 };
 
@@ -226,11 +255,26 @@ export const CONFIG_SCHEMA = {
       placeholder: 'e.g. Alice',
       default: ''
     }
+  },
+  'ancient-gate': {
+    pathTiles: {
+      type: 'path',  // Special type handled by the builder
+      label: 'Path Tiles',
+      default: []
+    }
+  },
+  sign: {
+    message: {
+      type: 'textarea',
+      label: 'Sign Message',
+      placeholder: 'Enter the message to display...',
+      default: 'Press E to read this sign.'
+    }
   }
 };
 
 // Check if a tile is walkable, considering game state
-export function isWalkable(tileType, gameState = {}) {
+export function isWalkable(tileType, gameState = {}, tileConfig = {}) {
   const tile = TILE_TYPES[tileType];
   if (!tile) return false;
 
@@ -244,6 +288,11 @@ export function isWalkable(tileType, gameState = {}) {
   if (tileType === 'bear') {
     // Bear is walkable (defeated) if player has knife
     return gameState.inventory?.some(item => item.itemType === 'knife') || false;
+  }
+
+  if (tileType === 'ancient-gate') {
+    // Ancient gate is only walkable if it's open (path completed)
+    return tileConfig?.isOpen === true;
   }
 
   // Basic walkability (applies to most tiles)
@@ -393,6 +442,115 @@ function drawThornyBush(ctx, cx, cy, size) {
   });
 }
 
+// Draw an ancient stone gate
+function drawAncientGate(ctx, cx, cy, size, config = {}) {
+  const isOpen = config?.isOpen || false;
+  const gateColor = '#6a5a4a';
+  const stoneColor = '#8a7a6a';
+  const darkStone = '#5a4a3a';
+
+  // Left pillar
+  ctx.fillStyle = stoneColor;
+  ctx.fillRect(cx - size * 0.45, cy - size * 0.4, size * 0.25, size * 0.8);
+
+  // Stone texture on left pillar
+  ctx.fillStyle = darkStone;
+  ctx.fillRect(cx - size * 0.42, cy - size * 0.35, size * 0.08, size * 0.1);
+  ctx.fillRect(cx - size * 0.38, cy - size * 0.1, size * 0.1, size * 0.12);
+  ctx.fillRect(cx - size * 0.40, cy + size * 0.15, size * 0.09, size * 0.08);
+
+  // Right pillar
+  ctx.fillStyle = stoneColor;
+  ctx.fillRect(cx + size * 0.2, cy - size * 0.4, size * 0.25, size * 0.8);
+
+  // Stone texture on right pillar
+  ctx.fillStyle = darkStone;
+  ctx.fillRect(cx + size * 0.23, cy - size * 0.30, size * 0.09, size * 0.11);
+  ctx.fillRect(cx + size * 0.25, cy - size * 0.05, size * 0.08, size * 0.1);
+  ctx.fillRect(cx + size * 0.28, cy + size * 0.2, size * 0.1, size * 0.09);
+
+  // Top archway
+  ctx.fillStyle = stoneColor;
+  ctx.fillRect(cx - size * 0.45, cy - size * 0.45, size * 0.9, size * 0.15);
+
+  // Arch detail
+  ctx.fillStyle = darkStone;
+  ctx.beginPath();
+  ctx.arc(cx, cy - size * 0.3, size * 0.35, Math.PI, 0, false);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = darkStone;
+  ctx.stroke();
+
+  if (!isOpen) {
+    // Closed gate (wooden bars)
+    ctx.fillStyle = gateColor;
+    const barCount = 5;
+    const barWidth = size * 0.08;
+    const spacing = (size * 0.6) / barCount;
+
+    for (let i = 0; i < barCount; i++) {
+      const x = cx - size * 0.3 + i * spacing;
+      ctx.fillRect(x, cy - size * 0.25, barWidth, size * 0.65);
+
+      // Wood grain
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.fillRect(x + barWidth * 0.2, cy - size * 0.25, barWidth * 0.1, size * 0.65);
+      ctx.fillStyle = gateColor;
+    }
+
+    // Horizontal support bars
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.15, size * 0.7, size * 0.08);
+    ctx.fillRect(cx - size * 0.35, cy + size * 0.15, size * 0.7, size * 0.08);
+  } else {
+    // Open gate - draw mystical glow
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.4);
+    gradient.addColorStop(0, 'rgba(100, 200, 255, 0.3)');
+    gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(cx - size * 0.4, cy - size * 0.3, size * 0.8, size * 0.6);
+  }
+}
+
+// Draw a wooden sign
+function drawSign(ctx, cx, cy, size) {
+  const woodColor = '#8b7355';
+  const darkWood = '#6b5335';
+  const postColor = '#7a6a5a';
+
+  // Wooden post
+  ctx.fillStyle = postColor;
+  ctx.fillRect(cx - size * 0.08, cy, size * 0.16, size * 0.4);
+
+  // Sign board
+  ctx.fillStyle = woodColor;
+  ctx.fillRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.35);
+
+  // Wood grain lines
+  ctx.strokeStyle = darkWood;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - size * 0.3, cy - size * 0.15);
+  ctx.lineTo(cx + size * 0.3, cy - size * 0.15);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx - size * 0.3, cy);
+  ctx.lineTo(cx + size * 0.3, cy);
+  ctx.stroke();
+
+  // Border
+  ctx.strokeStyle = darkWood;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.35);
+
+  // Message indicator (scroll icon)
+  ctx.font = `${size * 0.15}px serif`;
+  ctx.fillStyle = darkWood;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('📜', cx, cy - size * 0.07);
+}
+
 // Custom rendering for tiles (optional - most use emoji/color)
 export function renderTile(ctx, tile, cx, cy, size) {
   // Guard against undefined tile
@@ -413,6 +571,18 @@ export function renderTile(ctx, tile, cx, cy, size) {
   // Thorny bush gets custom rendering
   if (tile.type === 'thorny-bush') {
     drawThornyBush(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Ancient gate gets custom rendering
+  if (tile.type === 'ancient-gate') {
+    drawAncientGate(ctx, cx, cy, size, tile.config);
+    return true;
+  }
+
+  // Sign gets custom rendering
+  if (tile.type === 'sign') {
+    drawSign(ctx, cx, cy, size);
     return true;
   }
 
@@ -443,6 +613,8 @@ export function getTileEmoji(tileType) {
     fire: '🔥',
     bear: '🐻',
     empty: null,  // No emoji for empty (just color)
+    'ancient-gate': null,  // Custom draw
+    sign: null,  // Custom draw
   };
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;
@@ -455,7 +627,7 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['tree', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
+export const INTERACTABLE_TILES = ['tree', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign'];
 
 // Tiles to ignore for floor color detection when picking up items
 export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'thorny-bush', 'water', 'snow', 'bear'];
@@ -586,7 +758,7 @@ export function checkMovementInto(tileType, gameState, tileConfig, grid, x, y) {
 
     default:
       // Use default walkability
-      return { allowed: isWalkable(tileType, gameState) };
+      return { allowed: isWalkable(tileType, gameState, tileConfig) };
   }
 }
 
@@ -602,6 +774,118 @@ export function checkExitRequirements(gameState, exitConfig) {
   }
 
   return { allowed: true };
+}
+
+// === ANCIENT GATE PATH SYSTEM ===
+
+/**
+ * Check and update ancient gate path progress when player moves
+ * Called after each player movement
+ * @param {Object} gameState - Current game state
+ * @param {Array} grid - Game grid
+ * @param {number} newX - New player X position
+ * @param {number} newY - New player Y position
+ * @returns {Object|null} - Result object if gate opened, null otherwise
+ */
+export function checkAncientGatePath(gameState, grid, newX, newY) {
+  // Initialize path progress tracking if needed
+  if (!gameState.ancientGateProgress) {
+    gameState.ancientGateProgress = {};
+  }
+
+  console.log(`[Ancient Gate] Player moved to (${newX}, ${newY})`);
+
+  // Find all ancient gates in the grid
+  const gates = [];
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[y].length; x++) {
+      const cell = grid[y][x];
+      if (cell.object?.type === 'ancient-gate') {
+        gates.push({ x, y, config: cell.object.config });
+      }
+    }
+  }
+
+  console.log(`[Ancient Gate] Found ${gates.length} gates`);
+
+  // Check each gate's path
+  for (const gate of gates) {
+    const gateKey = `${gate.x},${gate.y}`;
+    const pathTiles = gate.config?.pathTiles || [];
+
+    console.log(`[Ancient Gate] Gate at (${gate.x}, ${gate.y}), path length: ${pathTiles.length}, isOpen: ${gate.config?.isOpen}`);
+
+    // Skip if no path defined or already open
+    if (pathTiles.length === 0 || gate.config?.isOpen) {
+      continue;
+    }
+
+    // Get current progress for this gate
+    const progress = gameState.ancientGateProgress[gateKey] || { step: 0, active: false };
+    console.log(`[Ancient Gate] Progress for gate ${gateKey}:`, progress);
+
+    // Check if player is on a path tile
+    const currentStepIndex = pathTiles.findIndex(tile => tile.x === newX && tile.y === newY);
+    console.log(`[Ancient Gate] Player on path tile? Index: ${currentStepIndex}`);
+
+    if (currentStepIndex !== -1) {
+      // Player is on a path tile
+      if (currentStepIndex === 0) {
+        // Starting the path
+        console.log('[Ancient Gate] Starting path!');
+        progress.step = 1;
+        progress.active = true;
+        gameState.ancientGateProgress[gateKey] = progress;
+      } else if (progress.active && currentStepIndex === progress.step) {
+        // Correct next step
+        console.log(`[Ancient Gate] Correct step! Now at ${progress.step + 1}/${pathTiles.length}`);
+        progress.step++;
+        gameState.ancientGateProgress[gateKey] = progress;
+
+        // Check if path completed
+        if (progress.step >= pathTiles.length) {
+          // Path completed! Open the gate
+          console.log('[Ancient Gate] PATH COMPLETED! Opening gate!');
+          grid[gate.y][gate.x].object.config.isOpen = true;
+
+          // Reset progress
+          gameState.ancientGateProgress[gateKey] = { step: 0, active: false };
+
+          return {
+            gateOpened: true,
+            message: '🌟 The ancient gate opens with a mystical glow!',
+            modifyGrid: true
+          };
+        }
+      } else if (progress.active) {
+        // Wrong tile - reset progress
+        console.log(`[Ancient Gate] Wrong tile! Expected step ${progress.step}, got ${currentStepIndex}`);
+        progress.step = 0;
+        progress.active = false;
+        gameState.ancientGateProgress[gateKey] = progress;
+
+        return {
+          pathBroken: true,
+          message: '❌ You broke the path sequence. Start again from the beginning.',
+          modifyGrid: false
+        };
+      }
+    } else if (progress.active) {
+      // Player left the path - reset progress
+      console.log('[Ancient Gate] Left the path!');
+      progress.step = 0;
+      progress.active = false;
+      gameState.ancientGateProgress[gateKey] = progress;
+
+      return {
+        pathLeft: true,
+        message: '❌ You left the path. Start again from the beginning.',
+        modifyGrid: false
+      };
+    }
+  }
+
+  return null;
 }
 
 // === TWO-LAYER SYSTEM HELPERS ===
