@@ -22,6 +22,12 @@ export const ITEM_TYPES = {
     color: '#aaaacc',
     description: 'Opens matching colored card doors'
   },
+  'guard-card': {
+    label: 'Guard Card',
+    emoji: null, // Custom rendered
+    color: '#3355bb',
+    description: 'Security card. Opens guard doors. Obtained by poisoning guards.'
+  },
   uniform: {
     label: 'Guard Uniform',
     emoji: null, // Custom rendered
@@ -147,6 +153,38 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     // Chip
     ctx.fillStyle = '#daa520';
     ctx.fillRect(cx - size * 0.2, cy, size * 0.15, size * 0.12);
+
+    return true;
+  }
+
+  // Guard Card item (in inventory)
+  if (itemType === 'guard-card') {
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+
+    // Card body (blue security card)
+    ctx.fillStyle = '#2244aa';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.4);
+
+    // Darker blue stripe
+    ctx.fillStyle = '#1a3388';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.12);
+
+    // Gold chip
+    ctx.fillStyle = '#ffdd00';
+    ctx.fillRect(cx - size * 0.2, cy, size * 0.15, size * 0.12);
+
+    // Badge symbol (small shield)
+    ctx.fillStyle = '#ffdd00';
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.15, cy - size * 0.05);
+    ctx.lineTo(cx + size * 0.08, cy);
+    ctx.lineTo(cx + size * 0.08, cy + size * 0.08);
+    ctx.lineTo(cx + size * 0.15, cy + size * 0.12);
+    ctx.lineTo(cx + size * 0.22, cy + size * 0.08);
+    ctx.lineTo(cx + size * 0.22, cy);
+    ctx.closePath();
+    ctx.fill();
 
     return true;
   }

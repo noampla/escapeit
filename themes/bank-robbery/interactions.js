@@ -80,6 +80,37 @@ export const INTERACTIONS = {
     }
   },
 
+  'unlock-door-guard': {
+    label: 'Unlock Guard Door',
+    duration: 1000,
+    requirements: { tile: 'door-guard' },
+    checkCustom: (gameState, tile) => {
+      return gameState.inventory?.some(item => item.itemType === 'guard-card');
+    },
+    execute: (gameState, grid, x, y) => {
+      const guardCardIdx = gameState.inventory.findIndex(
+        item => item.itemType === 'guard-card'
+      );
+
+      if (guardCardIdx === -1) {
+        return { success: false, messageKey: 'needGuardCard' };
+      }
+
+      // Open the door (update object layer only)
+      grid[y][x].object = { type: 'door-guard-open', config: {} };
+
+      // Remove the guard card
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== guardCardIdx);
+
+      return {
+        success: true,
+        messageKey: 'guardDoorUnlocked',
+        modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
   'wear-uniform': {
     label: 'Wear Uniform',
     duration: 1500,
@@ -632,6 +663,9 @@ export const INTERACTIONS = {
       };
 
       console.log('[POISON] Guard after sleep:', grid[guardPos.y][guardPos.x].object?.config);
+
+      // Add guard card to player's inventory
+      gameState.inventory.push({ itemType: 'guard-card' });
 
       // Remove poison from inventory
       gameState.inventory = gameState.inventory.filter((_, i) => i !== poisonIdx);

@@ -40,6 +40,21 @@ export const INTERACTIONS = {
     }
   },
 
+  'clear-thorny-bush': {
+    label: 'Clear Bush',
+    duration: 1500,
+    requirements: { inventory: ['knife'], tile: 'thorny-bush' },
+    execute: (gameState, grid, x, y) => {
+      // Remove thorny bush from object layer
+      grid[y][x].object = null;
+      return {
+        success: true,
+        messageKey: 'thornyBushCleared',
+        modifyGrid: true
+      };
+    }
+  },
+
   'fill-bucket': {
     label: 'Fill Bucket',
     duration: 1500,

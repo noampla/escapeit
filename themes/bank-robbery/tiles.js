@@ -76,6 +76,14 @@ export const TILE_TYPES = {
     tooltip: 'Electronic door. Requires matching colored keycard to open.',
     walkable: false
   },
+  'door-guard': {
+    label: 'Guard Door',
+    color: '#1a3388',
+    category: 'interactive',
+    layer: 'object',
+    tooltip: 'Security door. Requires guard card to open.',
+    walkable: false
+  },
 
   // Open doors (created when doors are unlocked)
   'door-key-open': {
@@ -87,6 +95,12 @@ export const TILE_TYPES = {
   'door-card-open': {
     label: 'Open Card Door',
     color: '#555566',
+    layer: 'object',
+    walkable: true
+  },
+  'door-guard-open': {
+    label: 'Open Guard Door',
+    color: '#0d1a44',
     layer: 'object',
     walkable: true
   },
@@ -114,6 +128,16 @@ export const TILE_TYPES = {
     configurable: true,
     defaultConfig: { lockColor: 'red' },
     tooltip: 'Collectible keycard. Opens matching colored card doors.',
+    walkable: true
+  },
+  'item-guard-card': {
+    label: 'Guard Card',
+    color: '#3355bb',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'guard-card',
+    tooltip: 'Guard security card. Opens guard doors. Obtained by poisoning guards.',
     walkable: true
   },
   'item-uniform': {
@@ -468,9 +492,19 @@ export function renderTile(ctx, tile, cx, cy, size) {
   // Floor renders with configured color
   if (tile.type === 'floor') {
     const floorColor = tile.config?.floorColor || 'gray';
-    const colorData = FLOOR_COLORS[floorColor] || FLOOR_COLORS.gray;
 
-    ctx.fillStyle = colorData.color;
+    // Check if floorColor is a hex color (starts with #) or a color name key
+    let actualColor;
+    if (typeof floorColor === 'string' && floorColor.startsWith('#')) {
+      // Direct hex color from random generator
+      actualColor = floorColor;
+    } else {
+      // Color name key that maps to FLOOR_COLORS
+      const colorData = FLOOR_COLORS[floorColor] || FLOOR_COLORS.gray;
+      actualColor = colorData.color;
+    }
+
+    ctx.fillStyle = actualColor;
     ctx.fillRect(cx - size/2, cy - size/2, size, size);
     return true;
   }
@@ -557,6 +591,46 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Guard Door
+  if (tile.type === 'door-guard') {
+    // Heavy security door frame (dark blue)
+    ctx.fillStyle = '#0d1a44';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Door panel (blue-gray metal)
+    ctx.fillStyle = '#1a3388';
+    ctx.fillRect(cx - size * 0.4, cy - size * 0.45, size * 0.8, size * 0.9);
+
+    // Guard badge symbol (shield shape)
+    ctx.fillStyle = '#ffdd00';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - size * 0.15);
+    ctx.lineTo(cx - size * 0.12, cy - size * 0.05);
+    ctx.lineTo(cx - size * 0.12, cy + size * 0.1);
+    ctx.lineTo(cx, cy + size * 0.2);
+    ctx.lineTo(cx + size * 0.12, cy + size * 0.1);
+    ctx.lineTo(cx + size * 0.12, cy - size * 0.05);
+    ctx.closePath();
+    ctx.fill();
+
+    // Badge outline
+    ctx.strokeStyle = '#cc9900';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Card reader slot (right side)
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(cx + size * 0.15, cy - size * 0.08, size * 0.15, size * 0.16);
+
+    // Blue LED (locked)
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.22, cy - size * 0.2, size * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
   // Key item
   if (tile.type === 'item-key') {
     const lockColor = tile.config?.lockColor || 'red';
@@ -603,6 +677,35 @@ export function renderTile(ctx, tile, cx, cy, size) {
     // Chip
     ctx.fillStyle = '#daa520';
     ctx.fillRect(cx - size * 0.2, cy, size * 0.15, size * 0.12);
+
+    return true;
+  }
+
+  // Guard Card item
+  if (tile.type === 'item-guard-card') {
+    // Card body (blue security card)
+    ctx.fillStyle = '#2244aa';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.4);
+
+    // Darker blue stripe
+    ctx.fillStyle = '#1a3388';
+    ctx.fillRect(cx - size * 0.3, cy - size * 0.2, size * 0.6, size * 0.12);
+
+    // Gold chip
+    ctx.fillStyle = '#ffdd00';
+    ctx.fillRect(cx - size * 0.2, cy, size * 0.15, size * 0.12);
+
+    // Badge symbol (small shield)
+    ctx.fillStyle = '#ffdd00';
+    ctx.beginPath();
+    ctx.moveTo(cx + size * 0.15, cy - size * 0.05);
+    ctx.lineTo(cx + size * 0.08, cy);
+    ctx.lineTo(cx + size * 0.08, cy + size * 0.08);
+    ctx.lineTo(cx + size * 0.15, cy + size * 0.12);
+    ctx.lineTo(cx + size * 0.22, cy + size * 0.08);
+    ctx.lineTo(cx + size * 0.22, cy);
+    ctx.closePath();
+    ctx.fill();
 
     return true;
   }
@@ -656,6 +759,33 @@ export function renderTile(ctx, tile, cx, cy, size) {
 
     // Door panel edge
     ctx.fillStyle = '#999aab';
+    ctx.fillRect(cx + size * 0.25, cy - size * 0.45, size * 0.03, size * 0.9);
+
+    // Green LED (unlocked)
+    ctx.fillStyle = '#44cc44';
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.35, cy - size * 0.35, size * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    return true;
+  }
+
+  // Open Guard Door
+  if (tile.type === 'door-guard-open') {
+    // Dark blue security door frame
+    ctx.fillStyle = '#0d1a44';
+    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+    // Floor visible through open door
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(cx - size * 0.35, cy - size * 0.45, size * 0.7, size * 0.9);
+
+    // Door panel slid to the side (blue metal)
+    ctx.fillStyle = '#1a3388';
+    ctx.fillRect(cx + size * 0.25, cy - size * 0.45, size * 0.2, size * 0.9);
+
+    // Door panel edge
+    ctx.fillStyle = '#2244aa';
     ctx.fillRect(cx + size * 0.25, cy - size * 0.45, size * 0.03, size * 0.9);
 
     // Green LED (unlocked)
@@ -1156,8 +1286,10 @@ export function getTileEmoji(tileType) {
     exit: '🚐',
     'door-key': null,
     'door-card': null,
+    'door-guard': null,
     'item-key': null,
     'item-card': null,
+    'item-guard-card': null, // Custom rendered
     'item-uniform': null, // Custom rendered
     'item-mirror': null, // Custom rendered
     camera: null, // Custom rendered
@@ -1173,10 +1305,10 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['floor', 'start', 'exit'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['door-key', 'door-card', 'vault-door', 'floor', 'start', 'exit'];
+export const INTERACTABLE_TILES = ['door-key', 'door-card', 'door-guard', 'vault-door', 'floor', 'start', 'exit'];
 
 // Tiles to ignore for floor color detection when picking up items
-export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'camera', 'laser'];
+export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-guard', 'door-key-open', 'door-card-open', 'door-guard-open', 'camera', 'laser'];
 
 // Tiles that use lock colors (doors, keys, cards)
 export const LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
@@ -1230,6 +1362,20 @@ export function checkMovementInto(tileType, gameState, tileConfig) {
         allowed: false,
         messageKey: 'cardDoorLocked',
         messageParams: { color: doorColor }
+      };
+    }
+
+    case 'door-guard': {
+      const hasGuardCard = inventory?.some(item => item.itemType === 'guard-card');
+      if (hasGuardCard) {
+        return {
+          allowed: false,
+          messageKey: 'guardDoorUnlockHint'
+        };
+      }
+      return {
+        allowed: false,
+        messageKey: 'guardDoorLocked'
       };
     }
 

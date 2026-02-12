@@ -4,6 +4,7 @@ import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
 import SolverMode from './SolverMode';
 import TilePreview from './TilePreview';
+import RandomMapGeneratorPanel from './RandomMapGeneratorPanel';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid, validateObjectPlacement } from '../engine/tiles';
 import { saveLevel, generateId, loadLevelsByCreator } from '../utils/storage';
 import { generateMap, getMapInfo } from '../engine/mapGenerator';
@@ -119,6 +120,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [showStoryModal, setShowStoryModal] = useState(false);
   const [previewTileType, setPreviewTileType] = useState(null);
   const [enablePreview, setEnablePreview] = useState(true);
+  const [showRandomGenerator, setShowRandomGenerator] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateSeed, setGenerateSeed] = useState('');
 
@@ -417,6 +419,36 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     setTestMode(true);
   };
 
+  const handleGenerateRandom = (newGrid, newMissions) => {
+    pushUndo(grid);
+
+    // Debug: Check cells specifically for floorColor
+    console.log('Received grid from generator, checking cells for floorColor:');
+    let foundColored = 0;
+    for (let y = 40; y < 60 && foundColored < 5; y++) {
+      for (let x = 40; x < 60 && foundColored < 5; x++) {
+        const cell = newGrid[y][x];
+        if (cell.floor?.config?.floorColor) {
+          console.log(`Cell [${y}][${x}] has floorColor:`, cell.floor.config.floorColor, cell);
+          foundColored++;
+        }
+      }
+    }
+    if (foundColored === 0) {
+      console.error('NO CELLS WITH floorColor FOUND! Checking random cells:');
+      for (let i = 0; i < 5; i++) {
+        const y = 45 + i;
+        const x = 45 + i;
+        console.log(`Cell [${y}][${x}]:`, newGrid[y][x]);
+      }
+    }
+
+    setGrid(newGrid);
+    setMissions(newMissions);
+    setSaved(false);
+    setShowRandomGenerator(false);
+  };
+
   // Keyboard shortcuts: R to test, Arrow keys to pan viewport
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -614,6 +646,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         <button onClick={() => setEnablePreview(!enablePreview)} style={{ ...barBtn, background: enablePreview ? 'linear-gradient(145deg, #4a3a4a 0%, #3a2a3a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }} title="Toggle tile preview on hover">
           {enablePreview ? '🔍 Preview' : '🔍 Off'}
         </button>
+        <button onClick={() => setShowRandomGenerator(true)} style={{ ...barBtn, background: 'linear-gradient(145deg, #4a3a5a 0%, #3a2a4a 100%)' }}>🎲 {t('builder.randomGen') || 'Random'}</button>
         <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ {t('builder.test')}</button>
         <button onClick={() => setShowGenerateModal(true)} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a3a5a 0%, #2a2a4a 100%)' }}>🎲 Generate</button>
         <button onClick={handleClear} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}>{t('builder.clear')}</button>
@@ -990,6 +1023,14 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           tileType={previewTileType}
           theme={theme}
           lockColor={selectedLockColor}
+        />
+      )}
+
+      {/* Random Map Generator */}
+      {showRandomGenerator && (
+        <RandomMapGeneratorPanel
+          onGenerate={handleGenerateRandom}
+          onClose={() => setShowRandomGenerator(false)}
         />
       )}
     </div>
