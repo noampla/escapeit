@@ -11,6 +11,13 @@ function findItemIndex(inventory, itemType) {
   return inventory.findIndex(item => item.itemType === itemType);
 }
 
+// Check if player has sweater (in inventory or worn)
+function hasSweater(gameState) {
+  const inInventory = gameState.inventory?.some(item => item.itemType === 'sweater');
+  const isWearing = gameState.worn?.body === 'sweater';
+  return inInventory || isWearing;
+}
+
 // Interaction definitions
 export const INTERACTIONS = {
   'cut-tree': {
@@ -19,14 +26,20 @@ export const INTERACTIONS = {
     requirements: { inventory: ['axe'], tile: 'tree' },
     checkCustom: (gameState, tile, grid, _x, _y) => {
       // Can only chop trees if standing on the same floor type
+      // Exception: sweater allows interacting with things on snow from non-snow tiles
       const playerPos = gameState.playerPos;
       if (!playerPos) return true; // Fallback: allow if no player position
 
       const targetFloor = tile.floor?.type;
       const playerFloor = grid[playerPos.y]?.[playerPos.x]?.floor?.type;
 
-      // Must be standing on the same floor type
-      return targetFloor === playerFloor;
+      // Same floor type - always allowed
+      if (targetFloor === playerFloor) return true;
+
+      // Different floor types - only allow if target is snow and player has sweater
+      if (targetFloor === 'snow' && hasSweater(gameState)) return true;
+
+      return false;
     },
     execute: (gameState, grid, x, y) => {
       // Tree is now an object tile - replace tree object with wood item object
