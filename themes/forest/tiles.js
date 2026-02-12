@@ -199,31 +199,6 @@ export const TILE_TYPES = {
     tooltip: 'Without Knife: lose a life, pushed back. With Knife: bear defeated, get Sweater.',
     walkable: false  // Special: walkable with knife
   },
-  sign: {
-    label: 'Sign',
-    color: '#8b7355',
-    category: 'interactive',
-    layer: 'object',
-    configurable: true,
-    defaultConfig: {
-      text: 'Read the sign for a clue...'
-    },
-    tooltip: 'Sign with a message. Stand on it and hold E to read.',
-    walkable: true
-  },
-  'path-gate': {
-    label: 'Ancient Stone Gate',
-    color: '#555555',
-    category: 'interactive',
-    layer: 'object',
-    configurable: true,
-    defaultConfig: {
-      sequence: '[]',
-      openMessage: 'The ancient gate opens with a grinding sound!'
-    },
-    tooltip: 'Ancient stone gate. Walk the correct path to open.',
-    walkable: false
-  },
 };
 
 export const CONFIG_HELP = {
@@ -232,13 +207,6 @@ export const CONFIG_HELP = {
   },
   friend: {
     name: 'Name for this friend. Shown in messages and missions.',
-  },
-  sign: {
-    text: 'Text displayed when player reads the sign. Use for hints and clues.',
-  },
-  'path-gate': {
-    sequence: 'Click tiles on the grid to build the path sequence. Player must walk these tiles in order to open the gate.',
-    openMessage: 'Message shown when gate opens after completing the path.',
   },
 };
 
@@ -257,27 +225,6 @@ export const CONFIG_SCHEMA = {
       label: 'Friend Name',
       placeholder: 'e.g. Alice',
       default: ''
-    }
-  },
-  sign: {
-    text: {
-      type: 'text',
-      label: 'Sign Text',
-      placeholder: 'Enter clue or message...',
-      default: 'Read the sign for a clue...'
-    }
-  },
-  'path-gate': {
-    sequence: {
-      type: 'path',  // Special type for path builder
-      label: 'Path Sequence',
-      default: '[]'
-    },
-    openMessage: {
-      type: 'text',
-      label: 'Message When Opened',
-      placeholder: 'The gate opens...',
-      default: 'The ancient gate opens with a grinding sound!'
     }
   }
 };
@@ -305,112 +252,6 @@ export function isWalkable(tileType, gameState = {}) {
   }
 
   return false;
-}
-
-// Draw a wooden sign post
-function drawSign(ctx, cx, cy, size) {
-  const s = size * 0.35;
-
-  // Post (vertical wooden pole)
-  ctx.fillStyle = '#6b4910';
-  ctx.fillRect(cx - s * 0.15, cy - s * 0.3, s * 0.3, s * 1.4);
-
-  // Post wood grain
-  ctx.fillStyle = '#5a3808';
-  ctx.fillRect(cx - s * 0.05, cy - s * 0.3, s * 0.03, s * 1.4);
-
-  // Sign board (horizontal plank)
-  ctx.fillStyle = '#8b6914';
-  ctx.fillRect(cx - s * 0.9, cy - s * 0.5, s * 1.8, s * 0.6);
-
-  // Board highlight (lighter wood)
-  ctx.fillStyle = '#a58420';
-  ctx.fillRect(cx - s * 0.9, cy - s * 0.5, s * 1.8, s * 0.15);
-
-  // Board wood grain
-  ctx.fillStyle = '#6b4910';
-  ctx.fillRect(cx - s * 0.7, cy - s * 0.45, s * 0.05, s * 0.5);
-  ctx.fillRect(cx - s * 0.2, cy - s * 0.45, s * 0.05, s * 0.5);
-  ctx.fillRect(cx + s * 0.3, cy - s * 0.45, s * 0.05, s * 0.5);
-
-  // Nails/attachment points
-  ctx.fillStyle = '#444444';
-  ctx.beginPath();
-  ctx.arc(cx - s * 0.1, cy - s * 0.3, s * 0.08, 0, Math.PI * 2);
-  ctx.arc(cx + s * 0.1, cy - s * 0.3, s * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-// Draw an ancient stone gate/archway
-function drawPathGate(ctx, cx, cy, size) {
-  const s = size * 0.45;
-
-  // Left pillar
-  ctx.fillStyle = '#666666';
-  ctx.fillRect(cx - s * 0.9, cy - s * 0.8, s * 0.35, s * 1.8);
-
-  // Left pillar darker side
-  ctx.fillStyle = '#555555';
-  ctx.fillRect(cx - s * 0.65, cy - s * 0.8, s * 0.1, s * 1.8);
-
-  // Left pillar cracks
-  ctx.strokeStyle = '#444444';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.8, cy - s * 0.3);
-  ctx.lineTo(cx - s * 0.7, cy + s * 0.2);
-  ctx.stroke();
-
-  // Right pillar
-  ctx.fillStyle = '#666666';
-  ctx.fillRect(cx + s * 0.55, cy - s * 0.8, s * 0.35, s * 1.8);
-
-  // Right pillar darker side
-  ctx.fillStyle = '#555555';
-  ctx.fillRect(cx + s * 0.55, cy - s * 0.8, s * 0.1, s * 1.8);
-
-  // Right pillar cracks
-  ctx.beginPath();
-  ctx.moveTo(cx + s * 0.7, cy - s * 0.4);
-  ctx.lineTo(cx + s * 0.65, cy + s * 0.1);
-  ctx.stroke();
-
-  // Archway top (curved stone)
-  ctx.fillStyle = '#6a6a6a';
-  ctx.beginPath();
-  ctx.arc(cx, cy - s * 0.5, s * 0.75, Math.PI, 0);
-  ctx.lineTo(cx + s * 0.75, cy - s * 0.2);
-  ctx.lineTo(cx - s * 0.75, cy - s * 0.2);
-  ctx.closePath();
-  ctx.fill();
-
-  // Archway top darker inner curve
-  ctx.fillStyle = '#555555';
-  ctx.beginPath();
-  ctx.arc(cx, cy - s * 0.5, s * 0.55, Math.PI, 0);
-  ctx.lineTo(cx + s * 0.55, cy - s * 0.3);
-  ctx.lineTo(cx - s * 0.55, cy - s * 0.3);
-  ctx.closePath();
-  ctx.fill();
-
-  // Dark doorway/shadow
-  ctx.fillStyle = '#2a2a2a';
-  ctx.fillRect(cx - s * 0.5, cy - s * 0.4, s * 1.0, s * 1.4);
-
-  // Ancient runes (simple mystical symbols)
-  ctx.strokeStyle = '#888888';
-  ctx.lineWidth = 2;
-  // Left pillar rune
-  ctx.beginPath();
-  ctx.moveTo(cx - s * 0.75, cy - s * 0.6);
-  ctx.lineTo(cx - s * 0.75, cy - s * 0.4);
-  ctx.moveTo(cx - s * 0.8, cy - s * 0.5);
-  ctx.lineTo(cx - s * 0.7, cy - s * 0.5);
-  ctx.stroke();
-  // Right pillar rune
-  ctx.beginPath();
-  ctx.arc(cx + s * 0.7, cy - s * 0.55, s * 0.08, 0, Math.PI * 2);
-  ctx.stroke();
 }
 
 // Draw a raft (wooden planks on water)
@@ -575,18 +416,6 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
-  // Sign gets custom rendering
-  if (tile.type === 'sign') {
-    drawSign(ctx, cx, cy, size);
-    return true;
-  }
-
-  // Path gate gets custom rendering
-  if (tile.type === 'path-gate') {
-    drawPathGate(ctx, cx, cy, size);
-    return true;
-  }
-
   // All other tiles use emoji or color
   return false;
 }
@@ -613,8 +442,6 @@ export function getTileEmoji(tileType) {
     friend: '👤',
     fire: '🔥',
     bear: '🐻',
-    sign: null,  // Custom draw
-    'path-gate': null,  // Custom draw
     empty: null,  // No emoji for empty (just color)
   };
 
@@ -628,7 +455,7 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['tree', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign', 'path-gate'];
+export const INTERACTABLE_TILES = ['tree', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card'];
 
 // Tiles to ignore for floor color detection when picking up items
 export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'thorny-bush', 'water', 'snow', 'bear'];

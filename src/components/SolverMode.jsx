@@ -17,17 +17,6 @@ import { moveEntities } from '../engine/entities.js';
 import NotificationPanel from './NotificationPanel';
 import StoryModal from './StoryModal';
 
-// Dynamically import theme hooks
-async function loadThemeHooks(themeId) {
-  try {
-    const hooks = await import(`../../themes/${themeId}/hooks.js`);
-    return hooks;
-  } catch (e) {
-    // Theme doesn't have hooks, return empty object
-    return {};
-  }
-}
-
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
 
@@ -142,17 +131,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
   }, [theme, language]);
 
-  // Load theme hooks and initialize theme-specific game state
-  useEffect(() => {
-    loadThemeHooks(themeId).then(hooks => {
-      setThemeHooks(hooks);
-      // Initialize game state with theme-specific data
-      if (hooks.initializeGameState) {
-        setGameState(prev => hooks.initializeGameState(prev));
-      }
-    });
-  }, [themeId]);
-
   // Helper to get localized mission description
   const getMissionDescription = (mission) => {
     if (mission.description) return mission.description;
@@ -198,7 +176,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [playerPos, setPlayerPos] = useState(() => ({ ...startPos }));
   const [lives, setLives] = useState(level.lives || 3);
   const maxInventory = level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY;
-  const [themeHooks, setThemeHooks] = useState(null);
   const [gameState, setGameState] = useState({
     collectedItems: [],
     rescuedFriends: 0,
@@ -217,7 +194,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [dropMenuOpen, setDropMenuOpen] = useState(false);
   const [mouseHoldState, setMouseHoldState] = useState(null);
   const [showStoryModal, setShowStoryModal] = useState(false);
-  const [signDialog, setSignDialog] = useState(null); // { text: string } or null
 
   // Check if theme has story content and show on first load
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -262,7 +238,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const dropMenuOpenRef = useRef(dropMenuOpen);
   const inlineMenuRef = useRef(inlineMenu);
   const showRestartConfirmRef = useRef(showRestartConfirm);
-  const signDialogRef = useRef(signDialog);
 
   gridRef.current = grid;
   gameStateRef.current = gameState;
@@ -274,7 +249,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   dropMenuOpenRef.current = dropMenuOpen;
   inlineMenuRef.current = inlineMenu;
   showRestartConfirmRef.current = showRestartConfirm;
-  signDialogRef.current = signDialog;
 
   // Notification helper using translation keys
   const showNotification = useCallback((key, type = 'info', params = {}, duration = null) => {
@@ -500,10 +474,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const targets = [];
 
     const currentCell = currentGrid[pos.y][pos.x];
-    // Check if player is standing on an item OR any other interactable tile
-    if (itemTilePattern.test(currentCell.object?.type) ||
-        interactableTiles.includes(currentCell.object?.type) ||
-        interactableTiles.includes(currentCell.floor?.type)) {
+    if (itemTilePattern.test(currentCell.object?.type)) {
       targets.push({ x: pos.x, y: pos.y, dir: 'self' });
     }
 
@@ -717,21 +688,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         setLives(prev => Math.min(prev + result.restoreLives, maxLives));
       }
 
-      // Handle sign dialog
-      if (result.showSignDialog && result.signText) {
-        setSignDialog({ text: result.signText });
-      }
-
       // Show message (translate if messageKey provided)
       if (result.messageKey) {
         const msg = getMessage(themeId, result.messageKey, result.messageParams || {});
-        const duration = result.messageDuration || 1500;
-        const type = result.messageType || 'success';
-        showMessage(msg, duration, type);
+        showMessage(msg, 1500, 'success');
       } else if (result.message) {
-        const duration = result.messageDuration || 1500;
-        const type = result.messageType || 'success';
-        showMessage(result.message, duration, type);
+        showMessage(result.message, 1500, 'success');
       }
     } else if (result?.error) {
       soundManager.play('blocked');
@@ -1090,11 +1052,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         e.stopPropagation();
       }
 
-      // Block all inputs except ESC when sign dialog is open
-      if (signDialogRef.current && key !== 'escape') {
-        return;
-      }
-
       keysDown.current.add(key);
 
       // Track order of arrow/WASD keys for movement priority
@@ -1115,11 +1072,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
 
       if (key === 'escape') {
-        // Close sign dialog first
-        if (signDialogRef.current) {
-          setSignDialog(null);
-          return;
-        }
         if (inlineMenuRef.current) {
           setInlineMenu(null);
           return;
@@ -1492,28 +1444,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   useEffect(() => {
     if (gameOver) return;
     const locKey = `${playerPos.x},${playerPos.y}`;
-
-    // Add to reachedLocations only if it's a new location
     if (!gameState.reachedLocations.includes(locKey)) {
       setGameState(prev => ({
         ...prev,
         reachedLocations: [...prev.reachedLocations, locKey],
       }));
     }
-
-    // Call theme's onPlayerMove hook if available
-    if (themeHooks?.onPlayerMove) {
-      themeHooks.onPlayerMove({
-        playerPos,
-        grid: gridRef.current,
-        gameState: gameStateRef.current,
-        setGameState,
-        setGrid,
-        showMessage,
-        cloneGrid
-      });
-    }
-  }, [playerPos, gameOver, gameState.reachedLocations, showMessage, themeHooks]);
+  }, [playerPos, gameOver]);
 
   // Timer for elapsed time
   useEffect(() => {
@@ -2574,84 +2511,6 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           onClose={() => setShowStoryModal(false)}
           showOnFirstLoad={showStoryModal}
         />
-      )}
-
-      {/* Sign Dialog */}
-      {signDialog && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: '#2a2a2a',
-            border: '2px solid #8b6914',
-            borderRadius: '8px',
-            padding: '20px',
-            maxWidth: '350px',
-            width: 'auto',
-            minWidth: '250px',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8)',
-            zIndex: 9999,
-          }}
-        >
-          {/* Close X button */}
-          <button
-            onClick={() => setSignDialog(null)}
-            style={{
-              position: 'absolute',
-              top: '8px',
-              right: '8px',
-              background: 'transparent',
-              border: 'none',
-              color: '#8b6914',
-              fontSize: '20px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              width: '24px',
-              height: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.color = '#f0e6d2';
-              e.target.style.transform = 'scale(1.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.color = '#8b6914';
-              e.target.style.transform = 'scale(1)';
-            }}
-            title="Close (ESC)"
-          >
-            ×
-          </button>
-
-          {/* Wooden sign decoration */}
-          <div style={{
-            position: 'absolute',
-            top: '-12px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: '24px',
-          }}>
-            📜
-          </div>
-
-          {/* Sign text */}
-          <div style={{
-            color: '#f0e6d2',
-            fontSize: '16px',
-            lineHeight: '1.5',
-            textAlign: 'center',
-            marginTop: '8px',
-            whiteSpace: 'pre-wrap',
-            fontFamily: 'serif',
-          }}>
-            {signDialog.text}
-          </div>
-        </div>
       )}
     </div>
   );

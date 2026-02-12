@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathSequence = null }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -187,40 +187,6 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.strokeRect(barX, barY, barWidth, barHeight);
     }
 
-    // Path sequence visualization (for path builder mode)
-    if (pathSequence && pathSequence.length > 0) {
-      pathSequence.forEach((pos, idx) => {
-        const px = (pos.x - offsetX) * TILE_SIZE;
-        const py = (pos.y - offsetY) * TILE_SIZE;
-        const cx = px + TILE_SIZE / 2;
-        const cy = py + TILE_SIZE / 2;
-
-        // Only draw if tile is in viewport
-        if (pos.x >= startX && pos.x <= endX && pos.y >= startY && pos.y <= endY) {
-          // Draw highlight circle
-          ctx.fillStyle = 'rgba(100, 150, 255, 0.3)';
-          ctx.beginPath();
-          ctx.arc(cx, cy, TILE_SIZE * 0.4, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Draw border
-          ctx.strokeStyle = 'rgba(100, 150, 255, 0.8)';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-
-          // Draw number
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 20px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.strokeStyle = '#000';
-          ctx.lineWidth = 3;
-          ctx.strokeText(String(idx + 1), cx, cy);
-          ctx.fillText(String(idx + 1), cx, cy);
-        }
-      });
-    }
-
     // Player
     if (playerPos) {
       const ppx = (playerPos.x - offsetX) * TILE_SIZE, ppy = (playerPos.y - offsetY) * TILE_SIZE;
@@ -276,7 +242,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathSequence]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState]);
 
   useEffect(() => {
     draw();

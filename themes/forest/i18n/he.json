@@ -66,9 +66,7 @@
     "item-knife": "סכין",
     "item-sweater": "סוודר",
     "item-wood": "עץ",
-    "item-raft": "רפסודה",
-    "sign": "שלט",
-    "path-gate": "שער אבן עתיק"
+    "item-raft": "רפסודה"
   },
   "items": {
     "key": "מפתח",
@@ -81,9 +79,5 @@
     "sweater": "סוודר",
     "wood": "עץ",
     "raft": "רפסודה"
-  },
-  "interactions": {
-    "read-sign": "קרא שלט",
-    "unlock-path-gate": "פתח שער"
   }
 }
