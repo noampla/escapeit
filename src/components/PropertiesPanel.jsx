@@ -1,4 +1,4 @@
-import { useContext, useMemo } from 'react';
+import { useContext, useMemo, useState } from 'react';
 import { ThemeContext } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
 import { BASE_MISSION_TYPES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
@@ -77,6 +77,43 @@ export default function PropertiesPanel({
   const updateMission = (idx, field, value) => {
     const updated = missions.map((m, i) => i === idx ? { ...m, [field]: value } : m);
     onMissionsChange?.(updated);
+  };
+
+  // Drag and drop state for mission reordering
+  const [draggedMission, setDraggedMission] = useState(null);
+  const [dragOverMission, setDragOverMission] = useState(null);
+
+  const handleDragStart = (e, idx) => {
+    setDraggedMission(idx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    if (draggedMission !== null && draggedMission !== idx) {
+      setDragOverMission(idx);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverMission(null);
+  };
+
+  const handleDrop = (e, idx) => {
+    e.preventDefault();
+    if (draggedMission !== null && draggedMission !== idx) {
+      const reordered = [...missions];
+      const [moved] = reordered.splice(draggedMission, 1);
+      reordered.splice(idx, 0, moved);
+      onMissionsChange?.(reordered);
+    }
+    setDraggedMission(null);
+    setDragOverMission(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedMission(null);
+    setDragOverMission(null);
   };
 
   // Build properties section content
@@ -282,15 +319,31 @@ export default function PropertiesPanel({
             const def = missionDef(m.type);
             const isCoord = def?.coordBased;
             const targetOptions = def?.needsTarget && !isCoord ? getTargetOptions(m.type) : [];
+            const isDragging = draggedMission === i;
+            const isDragOver = dragOverMission === i;
 
             return (
-              <div key={i} style={{
-                padding: '8px 10px',
-                background: '#2a2a2a',
-                borderRadius: 6,
-                border: '1px solid #444',
-              }}>
+              <div
+                key={i}
+                draggable
+                onDragStart={(e) => handleDragStart(e, i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, i)}
+                onDragEnd={handleDragEnd}
+                style={{
+                  padding: '8px 10px',
+                  background: isDragOver ? '#3a3a4a' : '#2a2a2a',
+                  borderRadius: 6,
+                  border: isDragOver ? `2px solid ${primaryColor}` : '1px solid #444',
+                  opacity: isDragging ? 0.5 : 1,
+                  cursor: 'grab',
+                  transition: 'background 0.15s, border 0.15s',
+                }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  {/* Drag handle */}
+                  <span style={{ color: '#666', fontSize: 12, cursor: 'grab', userSelect: 'none' }} title="Drag to reorder">⋮⋮</span>
                   <span style={{ color: '#666', fontSize: 10, width: 18 }}>#{i + 1}</span>
                   <select
                     value={m.type}
