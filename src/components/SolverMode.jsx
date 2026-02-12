@@ -1001,19 +1001,17 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setMoveCount(prev => prev + 1);
       revealTargetTile();
 
-      // Check ancient gate path progress after movement
-      const pathResult = theme?.checkAncientGatePath?.(currentGS, currentGrid, nx, ny);
-      if (pathResult) {
-        console.log('[Ancient Gate] Path check result:', pathResult);
-        if (pathResult.gateOpened) {
-          soundManager.play('success');
-          showMessage(pathResult.message, 3000, 'success');
-          if (pathResult.modifyGrid) {
-            setGrid(cloneGrid(currentGrid));
-          }
-        } else if (pathResult.pathBroken || pathResult.pathLeft) {
-          soundManager.play('blocked');
-          showMessage(pathResult.message, 2000, 'warning');
+      // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
+      const postMoveResult = theme?.onPlayerMove?.(currentGS, currentGrid, nx, ny);
+      if (postMoveResult) {
+        // Only provide feedback on success (gate opening), silent on failure
+        if (postMoveResult.success && postMoveResult.message) {
+          const sound = postMoveResult.sound || 'success';
+          soundManager.play(sound);
+          showMessage(postMoveResult.message, 3000, 'success');
+        }
+        if (postMoveResult.modifyGrid) {
+          setGrid(cloneGrid(currentGrid));
         }
       }
 
@@ -1037,19 +1035,18 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setMoveCount(prev => prev + 1);
       revealTargetTile();
 
-      // Check ancient gate path progress after movement
-      const pathResult = theme?.checkAncientGatePath?.(gameStateRef.current, currentGrid, nx, ny);
-      if (pathResult) {
-        console.log('[Ancient Gate] Path check result (fallback):', pathResult);
-        if (pathResult.gateOpened) {
-          soundManager.play('success');
-          showMessage(pathResult.message, 3000, 'success');
-          if (pathResult.modifyGrid) {
-            setGrid(cloneGrid(currentGrid));
-          }
-        } else if (pathResult.pathBroken || pathResult.pathLeft) {
-          soundManager.play('blocked');
-          showMessage(pathResult.message, 2000, 'warning');
+      // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
+      const postMoveResult = theme?.onPlayerMove?.(gameStateRef.current, currentGrid, nx, ny);
+      if (postMoveResult) {
+        if (postMoveResult.message) {
+          const msgType = postMoveResult.success ? 'success' : 'warning';
+          const duration = postMoveResult.success ? 3000 : 2000;
+          const sound = postMoveResult.sound || (postMoveResult.success ? 'success' : 'blocked');
+          soundManager.play(sound);
+          showMessage(postMoveResult.message, duration, msgType);
+        }
+        if (postMoveResult.modifyGrid) {
+          setGrid(cloneGrid(currentGrid));
         }
       }
 

@@ -42,6 +42,7 @@ class SoundManager {
       lose: { type: 'sawtooth', frequency: 300, duration: 0.5, attack: 0.05, decay: 0.45, sweep: -200 },
       explosion: { type: 'noise', frequency: 80, duration: 0.8, attack: 0.01, decay: 0.79, sweep: -60, volume: 3.0 },
       hover: { type: 'sine', frequency: 800, duration: 0.08, attack: 0.01, decay: 0.07, sweep: 200, volume: 0.5 },
+      success: { type: 'sine', frequency: 500, duration: 0.5, attack: 0.02, decay: 0.48, sweep: 200, notes: [500, 650, 800] },
     };
   }
 

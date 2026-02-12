@@ -268,13 +268,14 @@ export class ThemeLoader {
     return { allowed: this.isWalkable(tileType, gameState) };
   }
 
-  // Check ancient gate path progress after player movement
-  // Returns { gateOpened, pathBroken, pathLeft, message, modifyGrid } or null
-  checkAncientGatePath(gameState, grid, newX, newY) {
-    if (this.tiles?.checkAncientGatePath) {
-      return this.tiles.checkAncientGatePath(gameState, grid, newX, newY);
+  // Called after player movement - allows theme to respond to player movement
+  // Can be used for path tracking, puzzles, environmental changes, etc.
+  // Returns { message, modifyGrid, sound } or null
+  onPlayerMove(gameState, grid, newX, newY) {
+    if (this.tiles?.onPlayerMove) {
+      return this.tiles.onPlayerMove(gameState, grid, newX, newY);
     }
-    return null; // No ancient gate logic in this theme
+    return null; // Theme doesn't need post-movement logic
   }
 
   // === NEW: Exit Configuration ===

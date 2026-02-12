@@ -776,24 +776,21 @@ export function checkExitRequirements(gameState, exitConfig) {
   return { allowed: true };
 }
 
-// === ANCIENT GATE PATH SYSTEM ===
+// === POST-MOVEMENT LOGIC ===
 
 /**
- * Check and update ancient gate path progress when player moves
- * Called after each player movement
+ * Called after player movement - handles path tracking for ancient gates
  * @param {Object} gameState - Current game state
  * @param {Array} grid - Game grid
  * @param {number} newX - New player X position
  * @param {number} newY - New player Y position
- * @returns {Object|null} - Result object if gate opened, null otherwise
+ * @returns {Object|null} - Result object { success, message, modifyGrid } or null
  */
-export function checkAncientGatePath(gameState, grid, newX, newY) {
+export function onPlayerMove(gameState, grid, newX, newY) {
   // Initialize path progress tracking if needed
   if (!gameState.ancientGateProgress) {
     gameState.ancientGateProgress = {};
   }
-
-  console.log(`[Ancient Gate] Player moved to (${newX}, ${newY})`);
 
   // Find all ancient gates in the grid
   const gates = [];
@@ -806,14 +803,10 @@ export function checkAncientGatePath(gameState, grid, newX, newY) {
     }
   }
 
-  console.log(`[Ancient Gate] Found ${gates.length} gates`);
-
   // Check each gate's path
   for (const gate of gates) {
     const gateKey = `${gate.x},${gate.y}`;
     const pathTiles = gate.config?.pathTiles || [];
-
-    console.log(`[Ancient Gate] Gate at (${gate.x}, ${gate.y}), path length: ${pathTiles.length}, isOpen: ${gate.config?.isOpen}`);
 
     // Skip if no path defined or already open
     if (pathTiles.length === 0 || gate.config?.isOpen) {
@@ -822,63 +815,56 @@ export function checkAncientGatePath(gameState, grid, newX, newY) {
 
     // Get current progress for this gate
     const progress = gameState.ancientGateProgress[gateKey] || { step: 0, active: false };
-    console.log(`[Ancient Gate] Progress for gate ${gateKey}:`, progress);
 
     // Check if player is on a path tile
     const currentStepIndex = pathTiles.findIndex(tile => tile.x === newX && tile.y === newY);
-    console.log(`[Ancient Gate] Player on path tile? Index: ${currentStepIndex}`);
 
     if (currentStepIndex !== -1) {
       // Player is on a path tile
       if (currentStepIndex === 0) {
         // Starting the path
-        console.log('[Ancient Gate] Starting path!');
         progress.step = 1;
         progress.active = true;
         gameState.ancientGateProgress[gateKey] = progress;
       } else if (progress.active && currentStepIndex === progress.step) {
         // Correct next step
-        console.log(`[Ancient Gate] Correct step! Now at ${progress.step + 1}/${pathTiles.length}`);
         progress.step++;
         gameState.ancientGateProgress[gateKey] = progress;
 
         // Check if path completed
         if (progress.step >= pathTiles.length) {
           // Path completed! Open the gate
-          console.log('[Ancient Gate] PATH COMPLETED! Opening gate!');
           grid[gate.y][gate.x].object.config.isOpen = true;
 
           // Reset progress
           gameState.ancientGateProgress[gateKey] = { step: 0, active: false };
 
           return {
-            gateOpened: true,
+            success: true,
             message: '🌟 The ancient gate opens with a mystical glow!',
             modifyGrid: true
           };
         }
       } else if (progress.active) {
         // Wrong tile - reset progress
-        console.log(`[Ancient Gate] Wrong tile! Expected step ${progress.step}, got ${currentStepIndex}`);
         progress.step = 0;
         progress.active = false;
         gameState.ancientGateProgress[gateKey] = progress;
 
         return {
-          pathBroken: true,
+          success: false,
           message: '❌ You broke the path sequence. Start again from the beginning.',
           modifyGrid: false
         };
       }
     } else if (progress.active) {
       // Player left the path - reset progress
-      console.log('[Ancient Gate] Left the path!');
       progress.step = 0;
       progress.active = false;
       gameState.ancientGateProgress[gateKey] = progress;
 
       return {
-        pathLeft: true,
+        success: false,
         message: '❌ You left the path. Start again from the beginning.',
         modifyGrid: false
       };
