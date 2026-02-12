@@ -6,6 +6,7 @@ import SolverMode from './SolverMode';
 import TilePreview from './TilePreview';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid, validateObjectPlacement } from '../engine/tiles';
 import { saveLevel, generateId, loadLevelsByCreator } from '../utils/storage';
+import { generateMap, getMapInfo } from '../engine/mapGenerator';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { useUser } from '../contexts/UserContext.jsx';
@@ -118,6 +119,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [showStoryModal, setShowStoryModal] = useState(false);
   const [previewTileType, setPreviewTileType] = useState(null);
   const [enablePreview, setEnablePreview] = useState(true);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateSeed, setGenerateSeed] = useState('');
 
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -393,6 +396,22 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     }
   };
 
+  const handleGenerate = (useSeed) => {
+    const hasContent = grid.some(row => row.some(cell => cell.floor?.type !== 'empty' || cell.object));
+    if (hasContent && !confirm(t('builder.confirmGenerate') || 'This will replace the current map. Continue?')) {
+      return;
+    }
+    pushUndo(grid);
+    const seed = useSeed && generateSeed.trim() ? parseInt(generateSeed.trim(), 36) || Date.now() : Date.now();
+    const newGrid = generateMap({ seed, theme });
+    setGrid(newGrid);
+    setSaved(false);
+    setShowGenerateModal(false);
+    setGenerateSeed('');
+    // Center viewport on the generated map area (offset 10,10 + half of 25x20)
+    setViewportCenter({ x: 22, y: 20 });
+  };
+
   const handleTest = () => {
     // No mission check needed - SolverMode automatically adds the default escape mission
     setTestMode(true);
@@ -596,6 +615,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           {enablePreview ? '🔍 Preview' : '🔍 Off'}
         </button>
         <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ {t('builder.test')}</button>
+        <button onClick={() => setShowGenerateModal(true)} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a3a5a 0%, #2a2a4a 100%)' }}>🎲 Generate</button>
         <button onClick={handleClear} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}>{t('builder.clear')}</button>
         {hasStory && (
           <button
@@ -839,6 +859,95 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             >
               {t('builder.cancel')}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Map Modal */}
+      {showGenerateModal && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.75)',
+            zIndex: 50,
+          }}
+          onClick={() => setShowGenerateModal(false)}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(160deg, rgba(30, 30, 40, 0.98) 0%, rgba(20, 20, 30, 0.98) 100%)',
+              border: '2px solid rgba(100, 100, 200, 0.4)',
+              borderRadius: 20,
+              padding: 40,
+              minWidth: 400,
+              maxWidth: 500,
+              boxShadow: '0 25px 80px rgba(0, 0, 0, 0.9), inset 0 2px 0 rgba(255, 255, 255, 0.08)',
+              backdropFilter: 'blur(20px)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{
+              color: '#aabbff',
+              margin: '0 0 20px 0',
+              fontSize: 24,
+              fontWeight: '800',
+              textShadow: '0 0 20px rgba(170, 187, 255, 0.5)',
+            }}>
+              🎲 Generate Random Map
+            </h2>
+            <p style={{ color: '#aaa', fontSize: 14, marginBottom: 20 }}>
+              Generate a dungeon-style layout with rooms and corridors.
+              You can optionally enter a seed to reproduce the same map later.
+            </p>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ color: '#ccc', fontSize: 13, display: 'block', marginBottom: 8 }}>
+                Seed (optional):
+              </label>
+              <input
+                value={generateSeed}
+                onChange={e => setGenerateSeed(e.target.value.toUpperCase())}
+                placeholder="Leave empty for random"
+                style={{
+                  padding: '10px 16px',
+                  background: 'rgba(30, 30, 40, 0.9)',
+                  border: '1px solid rgba(100, 100, 150, 0.3)',
+                  borderRadius: 8,
+                  color: '#ffffff',
+                  fontSize: 14,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  fontFamily: 'monospace',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => handleGenerate(true)}
+                style={{
+                  ...barBtn,
+                  flex: 1,
+                  background: 'linear-gradient(145deg, #3a4a5a 0%, #2a3a4a 100%)',
+                  padding: '12px 20px',
+                }}
+              >
+                🎲 Generate
+              </button>
+              <button
+                onClick={() => setShowGenerateModal(false)}
+                style={{
+                  ...barBtn,
+                  flex: 1,
+                  padding: '12px 20px',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
