@@ -5,7 +5,6 @@ import { useUser } from '../contexts/UserContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getTopScoresByTime, getTopScoresBySteps, formatTime } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
-import MapPreview from './MapPreview.jsx';
 
 // Mini leaderboard preview showing top 3 for time and steps
 function LeaderboardPreview({ mapId }) {
@@ -129,26 +128,6 @@ const SORT_OPTIONS = [
   { id: 'newest', labelKey: 'levelSelect.sortNewest', icon: '🆕' },
 ];
 
-// Get difficulty score for a level based on theme and missions
-function getDifficultyScore(level) {
-  const theme = getThemeById(level.themeId);
-  let score = 0;
-
-  // Theme difficulty
-  const themeDifficulty = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
-  score += themeDifficulty[theme?.difficulty] || 2;
-
-  // Mission count adds difficulty
-  score += (level.missions?.length || 0) * 0.5;
-
-  // Less lives = harder
-  const lives = level.lives || 3;
-  if (lives <= 1) score += 2;
-  else if (lives <= 2) score += 1;
-
-  return score;
-}
-
 // Shuffle array (Fisher-Yates)
 function shuffleArray(array) {
   const shuffled = [...array];
@@ -162,14 +141,22 @@ function shuffleArray(array) {
 export default function LevelSelect({ onSelect, onEdit, onBack }) {
   const { t, isRTL, getLocalizedThemeName } = useLanguage();
   const [levels, setLevels] = useState([]);
+  const [bestTimes, setBestTimes] = useState({}); // mapId -> best time in seconds
   const { userId } = useUser();
   const [modalLevel, setModalLevel] = useState(null);
   const [sortBy, setSortBy] = useState('random');
   const [hoveredCard, setHoveredCard] = useState(null);
 
   useEffect(() => {
-    loadLevels().then(loaded => {
+    loadLevels().then(async (loaded) => {
       setLevels(loaded);
+      // Fetch best times for all levels
+      const times = {};
+      await Promise.all(loaded.map(async (level) => {
+        const scores = await getTopScoresByTime(level.id, 1);
+        times[level.id] = scores[0]?.time || null; // null means no scores yet
+      }));
+      setBestTimes(times);
     });
   }, []);
 
@@ -179,9 +166,27 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
 
     switch (sortBy) {
       case 'easy':
-        return [...levels].sort((a, b) => getDifficultyScore(a) - getDifficultyScore(b));
+        // Sort by fastest solve time (easiest = quickest to solve)
+        // Maps with no scores go to the end
+        return [...levels].sort((a, b) => {
+          const timeA = bestTimes[a.id];
+          const timeB = bestTimes[b.id];
+          if (timeA === null && timeB === null) return 0;
+          if (timeA === null) return 1; // no score goes last
+          if (timeB === null) return -1;
+          return timeA - timeB; // lower time = easier
+        });
       case 'hard':
-        return [...levels].sort((a, b) => getDifficultyScore(b) - getDifficultyScore(a));
+        // Sort by slowest solve time (hardest = took longest to solve)
+        // Maps with no scores go last
+        return [...levels].sort((a, b) => {
+          const timeA = bestTimes[a.id];
+          const timeB = bestTimes[b.id];
+          if (timeA === null && timeB === null) return 0;
+          if (timeA === null) return 1; // no score goes last
+          if (timeB === null) return -1;
+          return timeB - timeA; // higher time = harder
+        });
       case 'newest':
         return [...levels].sort((a, b) => {
           const dateA = a.createdAt?.toDate?.() || new Date(0);
@@ -192,7 +197,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
       default:
         return shuffleArray(levels);
     }
-  }, [levels, sortBy]);
+  }, [levels, sortBy, bestTimes]);
 
   const handleDelete = (id, name) => {
     if (confirm(t('levelSelect.deleteConfirm', { name }))) {
@@ -354,14 +359,22 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                   onMouseLeave={() => setHoveredCard(null)}
                   onClick={() => onSelect(level)}
                 >
-                  {/* Map Preview */}
+                  {/* Theme Icon */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'center',
-                    padding: '14px 14px 10px',
-                    background: 'rgba(0, 0, 0, 0.3)',
+                    alignItems: 'center',
+                    padding: '20px 14px',
+                    background: `radial-gradient(circle at center, ${theme?.primaryColor || '#666'}15 0%, rgba(0,0,0,0.4) 70%)`,
                   }}>
-                    <MapPreview grid={level.grid} size={110} />
+                    <div style={{
+                      fontSize: 64,
+                      filter: `drop-shadow(0 0 20px ${theme?.primaryColor || '#666'}66)`,
+                      transition: 'transform 0.3s ease',
+                      transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+                    }}>
+                      {theme?.emoji || '🎮'}
+                    </div>
                   </div>
 
                   {/* Content */}
@@ -414,6 +427,10 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                       borderTop: '1px solid rgba(255,255,255,0.08)',
                       paddingTop: 12,
                       marginBottom: 14,
+                      height: 75,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}>
                       <LeaderboardPreview mapId={level.id} />
                     </div>
@@ -464,48 +481,46 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                         🏆
                       </button>
 
-                      {/* Edit/Delete - only visible on hover for creators */}
-                      {isCreator && isHovered && (
-                        <>
-                          {onEdit && (
-                            <button
-                              onClick={() => onEdit(level)}
-                              style={{
-                                ...btnStyle,
-                                padding: '12px 14px',
-                                background: 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)',
-                                fontSize: 15,
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.background = 'linear-gradient(145deg, #5a5a3a 0%, #4a4a2a 100%)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.background = 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)';
-                              }}
-                              title={t('levelSelect.edit')}
-                            >
-                              ✏
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(level.id, level.name)}
-                            style={{
-                              ...btnStyle,
-                              padding: '12px 14px',
-                              background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)',
-                              fontSize: 15,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.background = 'linear-gradient(145deg, #6a3a3a 0%, #5a2a2a 100%)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.background = 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)';
-                            }}
-                            title={t('levelSelect.delete')}
-                          >
-                            🗑
-                          </button>
-                        </>
+                      {/* Edit/Delete - always visible for creators */}
+                      {isCreator && onEdit && (
+                        <button
+                          onClick={() => onEdit(level)}
+                          style={{
+                            ...btnStyle,
+                            padding: '12px 14px',
+                            background: 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)',
+                            fontSize: 15,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = 'linear-gradient(145deg, #5a5a3a 0%, #4a4a2a 100%)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)';
+                          }}
+                          title={t('levelSelect.edit')}
+                        >
+                          ✏
+                        </button>
+                      )}
+                      {isCreator && (
+                        <button
+                          onClick={() => handleDelete(level.id, level.name)}
+                          style={{
+                            ...btnStyle,
+                            padding: '12px 14px',
+                            background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)',
+                            fontSize: 15,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = 'linear-gradient(145deg, #6a3a3a 0%, #5a2a2a 100%)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)';
+                          }}
+                          title={t('levelSelect.delete')}
+                        >
+                          🗑
+                        </button>
                       )}
                     </div>
                   </div>
