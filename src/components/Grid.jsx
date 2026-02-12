@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allGatePaths }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -149,8 +149,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     }
 
     // All gate paths overlay (always visible in builder with reduced opacity)
-    if (allGatePaths && allGatePaths.length > 0) {
-      allGatePaths.forEach((gatePath) => {
+    if (allTilePaths && allTilePaths.length > 0) {
+      allTilePaths.forEach((gatePath) => {
         const tiles = gatePath.tiles || [];
         tiles.forEach((tile, idx) => {
           const px = (tile.x - offsetX) * TILE_SIZE;
@@ -323,7 +323,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allGatePaths]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths]);
 
   useEffect(() => {
     draw();

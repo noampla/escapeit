@@ -139,23 +139,37 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [pathEditMode, setPathEditMode] = useState(null); // { x, y, fieldKey } when editing path
   const [pathTiles, setPathTiles] = useState([]); // Current path being edited
 
-  // Collect all ancient gate paths from the grid for display
-  const allGatePaths = useMemo(() => {
+  // Collect all tile paths from the grid for display (theme-agnostic)
+  // Looks for any tile that has a 'path' type field in its CONFIG_SCHEMA
+  const allTilePaths = useMemo(() => {
     const paths = [];
+    const CONFIG_SCHEMA = theme?.getConfigSchema?.() || {};
+
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[y].length; x++) {
         const cell = grid[y][x];
-        if (cell.object?.type === 'ancient-gate' && cell.object.config?.pathTiles) {
-          paths.push({
-            gateX: x,
-            gateY: y,
-            tiles: cell.object.config.pathTiles
-          });
+        // Check both object and floor layers
+        for (const layer of [cell.object, cell.floor]) {
+          if (!layer?.type || !layer.config) continue;
+
+          // Check if this tile type has any 'path' fields in its config schema
+          const schema = CONFIG_SCHEMA[layer.type];
+          if (!schema) continue;
+
+          for (const [fieldKey, fieldDef] of Object.entries(schema)) {
+            if (fieldDef.type === 'path' && layer.config[fieldKey]?.length > 0) {
+              paths.push({
+                sourceX: x,
+                sourceY: y,
+                tiles: layer.config[fieldKey]
+              });
+            }
+          }
         }
       }
     }
     return paths;
-  }, [grid]);
+  }, [grid, theme]);
 
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -913,7 +927,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             theme={theme}
             viewportBounds={viewportBounds}
             pathTiles={pathEditMode ? pathTiles : undefined}
-            allGatePaths={allGatePaths}
+            allTilePaths={allTilePaths}
           />
           {/* Placement error message */}
           {placementError && (
