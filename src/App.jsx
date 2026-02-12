@@ -95,16 +95,18 @@ function AppContent() {
 
     return (
       <ThemeContext.Provider value={theme}>
-        <BuilderMode
-          themeId={selectedTheme}
-          onBack={() => {
-            setMode('menu');
-            setEditLevel(null);
-            setSelectedTheme(null);
-            setTheme(null);
-          }}
-          editLevel={editLevel}
-        />
+        <NotificationProvider themeColors={theme?.getNotificationColors?.()}>
+          <BuilderMode
+            themeId={selectedTheme}
+            onBack={() => {
+              setMode('menu');
+              setEditLevel(null);
+              setSelectedTheme(null);
+              setTheme(null);
+            }}
+            editLevel={editLevel}
+          />
+        </NotificationProvider>
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
       </ThemeContext.Provider>
     );

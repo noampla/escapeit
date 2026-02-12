@@ -156,15 +156,30 @@ export const INTERACTIONS = {
       if (playerPos && playerPos.x === x && playerPos.y === y) {
         return false; // Standing on this raft, can't pick it up
       }
-      return true;
-    },
-    execute: (gameState, grid, x, y) => {
-      // Check if standing on the raft being picked up
-      const playerPos = gameState.playerPos;
-      if (playerPos && playerPos.x === x && playerPos.y === y) {
-        return { success: false, messageKey: 'cantPickupRaftOnIt' };
+
+      // Check inventory capacity - prevent interaction from starting if full
+      const maxInventory = gameState.maxInventory || 10;
+      if (gameState.inventory.length >= maxInventory) {
+        return false; // Inventory full, can't pick it up
       }
 
+      return true;
+    },
+    // Return error info when checkCustom fails
+    getCheckFailureReason: (gameState, _tile, _grid, x, y) => {
+      const playerPos = gameState.playerPos;
+      if (playerPos && playerPos.x === x && playerPos.y === y) {
+        return { messageKey: 'cantPickupRaftOnIt' };
+      }
+
+      const maxInventory = gameState.maxInventory || 10;
+      if (gameState.inventory.length >= maxInventory) {
+        return { messageKey: 'inventoryFull', messageParams: { max: maxInventory } };
+      }
+
+      return null;
+    },
+    execute: (gameState, grid, x, y) => {
       // Remove raft from object layer (water floor remains)
       grid[y][x].object = null;
 

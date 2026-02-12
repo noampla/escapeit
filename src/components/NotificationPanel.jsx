@@ -15,7 +15,8 @@ export default function NotificationPanel({ collapsed = false }) {
   if (!notificationCtx) return null;
 
   const { current, history, getRecentHistory, dismissFromHistory, clearHistory, clearCurrent } = notificationCtx;
-  const recentNotifications = getRecentHistory(5);
+  // Show all available history instead of limiting to 5
+  const recentNotifications = history;
 
   // Format timestamp
   const formatTime = (timestamp) => {
@@ -176,7 +177,7 @@ export default function NotificationPanel({ collapsed = false }) {
                     borderRadius: 8,
                     border: `1px solid ${notification.colors.border}30`,
                     cursor: 'pointer',
-                    opacity: 1 - (index * 0.1),
+                    opacity: Math.max(0.6, 1 - (index * 0.05)),
                     transition: 'all 0.2s ease',
                   }}
                   onClick={() => dismissFromHistory(notification.id)}

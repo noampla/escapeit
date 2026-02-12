@@ -542,13 +542,6 @@ function drawSign(ctx, cx, cy, size) {
   ctx.strokeStyle = darkWood;
   ctx.lineWidth = 2;
   ctx.strokeRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.35);
-
-  // Message indicator (scroll icon)
-  ctx.font = `${size * 0.15}px serif`;
-  ctx.fillStyle = darkWood;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('📜', cx, cy - size * 0.07);
 }
 
 // Custom rendering for tiles (optional - most use emoji/color)
@@ -599,7 +592,7 @@ export function getTileEmoji(tileType) {
     'thorny-bush': null,  // Custom draw
     water: '🌊',
     snow: '❄️',
-    raft: '🪵',
+    raft: null,  // Custom draw (wooden planks on water)
     campfire: '🏕️',
     car: '🚗',
     'item-key': '🔑',
@@ -609,6 +602,7 @@ export function getTileEmoji(tileType) {
     'item-knife': '🔪',
     'item-sweater': '🧥',
     'item-wood': null,  // Custom draw
+    'item-raft': '🛶',  // Raft item uses boat emoji
     friend: '👤',
     fire: '🔥',
     bear: '🐻',

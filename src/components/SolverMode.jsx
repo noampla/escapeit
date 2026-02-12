@@ -383,7 +383,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const isContainer = theme?.isContainer?.(itemType);
 
     if (!isContainer && currentGS.inventory.length >= maxInventory) {
-      showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
+      soundManager.play('blocked');
+      const msg = getMessage(themeId, 'inventoryFull', { max: maxInventory });
+      showMessage(msg, 3000, 'warning');
       return false;
     }
 
@@ -637,6 +639,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       revealedTiles: revealedTilesRef.current, // For visibility checks in interactions
       lives: livesRef.current, // Current lives for healing checks
       maxLives: level.lives || 3, // Maximum lives
+      maxInventory: maxInventory, // Maximum inventory capacity
       playerPos: { x: playerPos.x, y: playerPos.y }, // Player position for interaction checks
     };
 
@@ -735,7 +738,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Check if standing on an item
     if (currentCell.object?.type.startsWith('item-')) {
       if (currentGS.inventory.length >= maxInventory) {
-        showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
+        soundManager.play('blocked');
+        const msg = getMessage(themeId, 'inventoryFull', { max: maxInventory });
+        showMessage(msg, 3000, 'warning');
         return;
       }
       pickUpItem(currentCell, pos.x, pos.y);
@@ -756,7 +761,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         const adjCell = currentGrid[ny][nx];
         if (adjCell.object?.type?.startsWith('item-') && theme?.canPickupFromAdjacent?.(adjCell.object.type)) {
           if (currentGS.inventory.length >= maxInventory) {
-            showNotification('notifications.inventoryFull', 'warning', { max: maxInventory });
+            soundManager.play('blocked');
+            const msg = getMessage(themeId, 'inventoryFull', { max: maxInventory });
+            showMessage(msg, 3000, 'warning');
             return;
           }
           pickUpItem(adjCell, nx, ny);
@@ -776,6 +783,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       ...gameStateRef.current,
       lives: livesRef.current,
       maxLives: level.lives || 3,
+      maxInventory: maxInventory,
       playerPos: { x: playerPos.x, y: playerPos.y }
     };
     const currentGrid = gridRef.current;
@@ -815,6 +823,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       revealedTiles: revealedTilesRef.current,
       lives: livesRef.current,
       maxLives: level.lives || 3,
+      maxInventory: maxInventory,
       playerPos: { x: playerPos.x, y: playerPos.y }
     };
     const targets = getInteractTargets();
@@ -883,8 +892,40 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     }
 
     if (possibleActions.length === 0) {
+      // Check if there's an interaction that failed checkCustom and get the failure reason
+      let failureReason = null;
+
+      for (const target of relevantTargets) {
+        const allInteractions = theme?.getInteractions?.() || {};
+        for (const [id, interaction] of Object.entries(allInteractions)) {
+          // Check if this interaction would normally be available but failed checkCustom
+          const tile = currentGrid[target.y][target.x];
+          const tileType = tile.object?.type || tile.floor?.type;
+
+          // Check if tile type matches
+          if (interaction.requirements?.tile === tileType ||
+              interaction.requirements?.tileAny?.includes(tileType)) {
+            // Check if it has checkCustom and it fails
+            if (interaction.checkCustom && !interaction.checkCustom(currentGS, tile, currentGrid, target.x, target.y)) {
+              // Get the failure reason if available
+              if (interaction.getCheckFailureReason) {
+                failureReason = interaction.getCheckFailureReason(currentGS, tile, currentGrid, target.x, target.y);
+              }
+              break;
+            }
+          }
+        }
+        if (failureReason) break;
+      }
+
+      // Show specific failure reason if available, otherwise generic message
       soundManager.play('blocked');
-      showNotification('notifications.nothingHere', 'info');
+      if (failureReason?.messageKey) {
+        const msg = getMessage(themeId, failureReason.messageKey, failureReason.messageParams || {});
+        showMessage(msg, 3000, 'warning');
+      } else {
+        showNotification('notifications.nothingHere', 'info');
+      }
       return;
     }
 
@@ -1510,7 +1551,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const exitCell = level.grid[exitPos.y][exitPos.x];
 
     // Use theme's exit requirements check
-    const exitResult = theme?.checkExitRequirements?.(gameState, exitCell.config);
+    // Get config from the appropriate layer (object takes priority over floor)
+    const exitConfig = exitCell.object?.config || exitCell.floor?.config || {};
+    const exitResult = theme?.checkExitRequirements?.(gameState, exitConfig);
     if (exitResult && !exitResult.allowed) {
       if (!exitMessageShownRef.current) {
         exitMessageShownRef.current = true;

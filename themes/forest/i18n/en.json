@@ -38,6 +38,7 @@
     "sweaterWorn": "Put on the sweater. Now you can walk through snow!",
     "sweaterRemoved": "Removed the sweater.",
     "cantRemoveSweaterOnSnow": "Can't remove sweater while standing on snow! You'll freeze!",
+    "inventoryFull": "Inventory full! ({max} items max) Press Q to drop items.",
     "ancientGateOpened": "🌟 The ancient gate opens with a mystical glow!",
     "pathBroken": "❌ You broke the path sequence. Start again from the beginning.",
     "pathLeft": "❌ You left the path. Start again from the beginning."

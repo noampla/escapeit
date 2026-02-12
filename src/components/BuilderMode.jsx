@@ -94,7 +94,18 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     }
     return createEmptyGrid();
   });
-  const [selectedTool, setSelectedTool] = useState('floor');
+  // Default to the first basic floor tile from the theme, or 'ground' for forest
+  const getDefaultTool = useCallback(() => {
+    const TILE_TYPES = theme?.getTileTypes() || {};
+    // Find the first walkable floor tile in the 'basic' category
+    const basicFloorTile = Object.keys(TILE_TYPES).find(key => {
+      const tile = TILE_TYPES[key];
+      return tile.category === 'basic' && tile.layer === 'floor' && tile.walkable === true;
+    });
+    return basicFloorTile || 'ground'; // Fallback to 'ground'
+  }, [theme]);
+
+  const [selectedTool, setSelectedTool] = useState(() => getDefaultTool());
   const [selectedFloorColor, setSelectedFloorColor] = useState('gray');
   const [selectedLockColor, setSelectedLockColor] = useState('red');
   const [selectedCell, setSelectedCell] = useState(null);
@@ -127,6 +138,24 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   // Path editing state
   const [pathEditMode, setPathEditMode] = useState(null); // { x, y, fieldKey } when editing path
   const [pathTiles, setPathTiles] = useState([]); // Current path being edited
+
+  // Collect all ancient gate paths from the grid for display
+  const allGatePaths = useMemo(() => {
+    const paths = [];
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[y].length; x++) {
+        const cell = grid[y][x];
+        if (cell.object?.type === 'ancient-gate' && cell.object.config?.pathTiles) {
+          paths.push({
+            gateX: x,
+            gateY: y,
+            tiles: cell.object.config.pathTiles
+          });
+        }
+      }
+    }
+    return paths;
+  }, [grid]);
 
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -532,6 +561,17 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     setShowRandomGenerator(false);
   };
 
+  // Ensure selectedTool is valid for the current theme
+  useEffect(() => {
+    const TILE_TYPES = theme?.getTileTypes() || {};
+    // Check if current selected tool exists in the theme
+    if (!TILE_TYPES[selectedTool]) {
+      // Reset to default tool for this theme
+      const defaultTool = getDefaultTool();
+      setSelectedTool(defaultTool);
+    }
+  }, [theme, selectedTool, getDefaultTool]);
+
   // Keyboard shortcuts: R to test, Arrow keys to pan viewport
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -873,6 +913,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             theme={theme}
             viewportBounds={viewportBounds}
             pathTiles={pathEditMode ? pathTiles : undefined}
+            allGatePaths={allGatePaths}
           />
           {/* Placement error message */}
           {placementError && (

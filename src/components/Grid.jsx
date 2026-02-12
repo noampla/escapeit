@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allGatePaths }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -146,6 +146,41 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         ctx.strokeRect(zpx + 1, zpy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
       }
       ctx.globalAlpha = 1;
+    }
+
+    // All gate paths overlay (always visible in builder with reduced opacity)
+    if (allGatePaths && allGatePaths.length > 0) {
+      allGatePaths.forEach((gatePath) => {
+        const tiles = gatePath.tiles || [];
+        tiles.forEach((tile, idx) => {
+          const px = (tile.x - offsetX) * TILE_SIZE;
+          const py = (tile.y - offsetY) * TILE_SIZE;
+
+          // Skip if out of viewport bounds
+          if (viewportBounds) {
+            if (tile.x < viewportBounds.minX || tile.x > viewportBounds.maxX ||
+                tile.y < viewportBounds.minY || tile.y > viewportBounds.maxY) {
+              return;
+            }
+          }
+
+          // Highlight tile with reduced opacity
+          ctx.fillStyle = 'rgba(100, 150, 255, 0.15)';
+          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
+          // Subtle border
+          ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+
+          // Path number with reduced opacity
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText((idx + 1).toString(), px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+        });
+      });
     }
 
     // Path tiles overlay (for path editing mode)
@@ -288,7 +323,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allGatePaths]);
 
   useEffect(() => {
     draw();
