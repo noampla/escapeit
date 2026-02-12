@@ -66,7 +66,9 @@
     "item-knife": "Knife",
     "item-sweater": "Sweater",
     "item-wood": "Wood",
-    "item-raft": "Raft"
+    "item-raft": "Raft",
+    "sign": "Sign",
+    "path-gate": "Ancient Stone Gate"
   },
   "items": {
     "key": "Key",
@@ -79,5 +81,9 @@
     "sweater": "Sweater",
     "wood": "Wood",
     "raft": "Raft"
+  },
+  "interactions": {
+    "read-sign": "Read Sign",
+    "unlock-path-gate": "Open Gate"
   }
 }

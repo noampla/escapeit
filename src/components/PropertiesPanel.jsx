@@ -22,7 +22,9 @@ export default function PropertiesPanel({
   grid, selectedCell, onConfigChange, showHelp = true,
   // Mission props
   missions = [], onMissionsChange, lives, onLivesChange, fixedOrder, onFixedOrderChange,
-  inventoryCapacity, onInventoryCapacityChange
+  inventoryCapacity, onInventoryCapacityChange,
+  // Path builder props
+  pathBuilderMode, onPathBuilderModeChange
 }) {
   const theme = useContext(ThemeContext);
   const { t, isRTL, getTileLabel } = useLanguage();
@@ -114,6 +116,96 @@ export default function PropertiesPanel({
     const renderField = (fieldKey, fieldDef, isFirst) => {
       const currentValue = config[fieldKey];
       const baseLabel = { ...labelStyle, marginTop: isFirst ? 0 : 10 };
+
+      // Special case: path type fields get path builder UI
+      if (fieldDef.type === 'path') {
+        // Parse current sequence
+        let sequence = [];
+        try {
+          sequence = currentValue ? JSON.parse(currentValue) : [];
+        } catch (e) {
+          sequence = [];
+        }
+
+        const isBuilding = pathBuilderMode;
+
+        return (
+          <div key={fieldKey}>
+            <label style={baseLabel}>{fieldDef.label}</label>
+
+            {/* Path builder toggle button */}
+            <button
+              onClick={() => onPathBuilderModeChange?.(!isBuilding)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: isBuilding ? primaryColor : '#3a3a3a',
+                border: isBuilding ? `2px solid ${primaryColor}` : '1px solid #555',
+                borderRadius: 6,
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: '600',
+                cursor: 'pointer',
+                marginBottom: 8,
+                transition: 'all 0.2s',
+              }}
+            >
+              {isBuilding ? '✓ Click tiles to build path' : '+ Build Path by Clicking'}
+            </button>
+
+            {/* Path sequence display */}
+            {sequence.length > 0 && (
+              <div style={{
+                background: '#2a2a2a',
+                border: '1px solid #444',
+                borderRadius: 4,
+                padding: 8,
+                marginBottom: 8,
+              }}>
+                <div style={{ color: '#aaa', fontSize: 10, marginBottom: 6 }}>Path ({sequence.length} tiles):</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {sequence.map((pos, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: '#3a3a3a',
+                        padding: '4px 8px',
+                        borderRadius: 4,
+                        fontSize: 10,
+                        color: '#ddd',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <span style={{ color: primaryColor, fontWeight: 'bold' }}>{idx + 1}</span>
+                      <span>({pos.x}, {pos.y})</span>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => update('sequence', '[]')}
+                  style={{
+                    width: '100%',
+                    padding: '6px',
+                    background: '#4a2a2a',
+                    border: 'none',
+                    borderRadius: 4,
+                    color: '#ccc',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    marginTop: 8,
+                  }}
+                >
+                  Clear Path
+                </button>
+              </div>
+            )}
+
+            <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+          </div>
+        );
+      }
 
       switch (fieldDef.type) {
         case 'checkbox':

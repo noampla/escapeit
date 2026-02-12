@@ -17,6 +17,13 @@ import StoryModal from './StoryModal';
 // Default fallback
 const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
 
+// Check if a tile has a config field of type 'path' in its CONFIG_SCHEMA
+function hasPathField(tileType, CONFIG_SCHEMA) {
+  const schema = CONFIG_SCHEMA[tileType];
+  if (!schema) return false;
+  return Object.values(schema).some(field => field.type === 'path');
+}
+
 // Check if a tile can be placed at position (for tiles with placement restrictions like camera)
 function canPlaceTile(grid, x, y, tileType, TILE_TYPES) {
   const tileDef = TILE_TYPES[tileType];
@@ -88,6 +95,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const { t, isRTL, language, setLanguage, getTileLabel, getLocalizedThemeName } = useLanguage();
   const { userId, displayName } = useUser();
   const lockTiles = useMemo(() => theme?.getLockTiles?.() || DEFAULT_LOCK_TILES, [theme]);
+  const CONFIG_SCHEMA = useMemo(() => theme?.getConfigSchema?.() || {}, [theme]);
   const [grid, setGrid] = useState(() => {
     if (editLevel) {
       return editLevel.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } })));
@@ -123,6 +131,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [showRandomGenerator, setShowRandomGenerator] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateSeed, setGenerateSeed] = useState('');
+  const [pathBuilderMode, setPathBuilderMode] = useState(false);
 
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -214,6 +223,48 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   }, []);
 
   const handleGridClick = (x, y, e) => {
+    // Handle path builder mode
+    if (pathBuilderMode && selectedCell) {
+      const cell = grid[selectedCell.y][selectedCell.x];
+      const tileType = cell.object?.type;
+      if (tileType && hasPathField(tileType, CONFIG_SCHEMA)) {
+        // Parse current sequence
+        let sequence = [];
+        try {
+          const currentSeq = cell.object.config?.sequence || '[]';
+          sequence = JSON.parse(currentSeq);
+        } catch (err) {
+          sequence = [];
+        }
+
+        // Validate: only allow adjacent tiles
+        if (sequence.length > 0) {
+          const lastPos = sequence[sequence.length - 1];
+          const dx = Math.abs(x - lastPos.x);
+          const dy = Math.abs(y - lastPos.y);
+
+          // Must be exactly 1 step away (not diagonal)
+          if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+            // Valid - add to sequence
+            sequence.push({ x, y });
+          } else {
+            showPlacementError('Path tiles must be adjacent (no diagonals)');
+            return;
+          }
+        } else {
+          // First tile - can be anywhere
+          sequence.push({ x, y });
+        }
+
+        // Update the tile config with new path sequence
+        handleConfigChange(selectedCell.x, selectedCell.y, {
+          ...cell.object.config,
+          sequence: JSON.stringify(sequence)
+        });
+        return;
+      }
+    }
+
     if (subMode === 'edit' || (e && e.shiftKey)) {
       setSelectedCell({ x, y });
       return;
@@ -744,6 +795,18 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             showTooltips={showTooltips}
             theme={theme}
             viewportBounds={viewportBounds}
+            pathSequence={pathBuilderMode && selectedCell ? (() => {
+              const cell = grid[selectedCell.y]?.[selectedCell.x];
+              const tileType = cell?.object?.type;
+              if (tileType && hasPathField(tileType, CONFIG_SCHEMA)) {
+                try {
+                  return JSON.parse(cell.object.config?.sequence || '[]');
+                } catch (e) {
+                  return [];
+                }
+              }
+              return [];
+            })() : null}
           />
           {/* Placement error message */}
           {placementError && (
@@ -778,6 +841,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           onFixedOrderChange={f => { setFixedOrder(f); setSaved(false); }}
           inventoryCapacity={inventoryCapacity}
           onInventoryCapacityChange={c => { setInventoryCapacity(c); setSaved(false); }}
+          pathBuilderMode={pathBuilderMode}
+          onPathBuilderModeChange={setPathBuilderMode}
         />
       </div>
 
