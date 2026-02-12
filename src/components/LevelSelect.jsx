@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { loadLevels, deleteLevel } from '../utils/storage';
 import { getThemeById } from '../utils/themeRegistry';
 import { useUser } from '../contexts/UserContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getTopScoresByTime, getTopScoresBySteps, formatTime } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
+import MapPreview from './MapPreview.jsx';
 
 // Mini leaderboard preview showing top 3 for time and steps
 function LeaderboardPreview({ mapId }) {
@@ -31,35 +32,41 @@ function LeaderboardPreview({ mapId }) {
   }
 
   if (timeScores.length === 0 && stepsScores.length === 0) {
-    return <div style={{ color: '#666', fontSize: 11, fontStyle: 'italic' }}>{t('leaderboard.noScores')}</div>;
+    return (
+      <div style={{ color: '#777', fontSize: 14, fontStyle: 'italic', textAlign: 'center', padding: '4px 0' }}>
+        {t('leaderboard.noScores')}
+      </div>
+    );
   }
 
   const medals = ['🥇', '🥈', '🥉'];
 
   return (
-    <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#aaa' }}>
+    <div style={{ display: 'flex', gap: 28, justifyContent: 'center', padding: '2px 0' }}>
       {/* Fastest times */}
-      <div>
-        <div style={{ color: '#888', marginBottom: 4, fontWeight: '600' }}>⏱ {t('leaderboard.fastestLabel')}</div>
-        {timeScores.slice(0, 3).map((s, i) => (
-          <div key={s.id} style={{ display: 'flex', gap: 4 }}>
-            <span>{medals[i]}</span>
-            <span style={{ color: '#ccc', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.userName}</span>
-            <span style={{ color: '#8f8' }}>{formatTime(s.time)}</span>
-          </div>
-        ))}
-      </div>
+      {timeScores.length > 0 && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ color: '#aaa', marginBottom: 6, fontWeight: '600', fontSize: 13 }}>⏱ Time</div>
+          {timeScores.slice(0, 2).map((s, i) => (
+            <div key={s.id} style={{ display: 'flex', gap: 6, fontSize: 14, marginBottom: 2, justifyContent: 'center' }}>
+              <span>{medals[i]}</span>
+              <span style={{ color: '#7d7', fontWeight: '500' }}>{formatTime(s.time)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Least steps */}
-      <div>
-        <div style={{ color: '#888', marginBottom: 4, fontWeight: '600' }}>👣 {t('leaderboard.fewestLabel')}</div>
-        {stepsScores.slice(0, 3).map((s, i) => (
-          <div key={s.id} style={{ display: 'flex', gap: 4 }}>
-            <span>{medals[i]}</span>
-            <span style={{ color: '#ccc', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.userName}</span>
-            <span style={{ color: '#88f' }}>{s.steps}</span>
-          </div>
-        ))}
-      </div>
+      {stepsScores.length > 0 && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ color: '#aaa', marginBottom: 6, fontWeight: '600', fontSize: 13 }}>👣 Steps</div>
+          {stepsScores.slice(0, 2).map((s, i) => (
+            <div key={s.id} style={{ display: 'flex', gap: 6, fontSize: 14, marginBottom: 2, justifyContent: 'center' }}>
+              <span>{medals[i]}</span>
+              <span style={{ color: '#99f', fontWeight: '500' }}>{s.steps}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -71,7 +78,7 @@ function LeaderboardModal({ mapId, levelName, onClose }) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
+        background: 'rgba(0, 0, 0, 0.85)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -114,19 +121,78 @@ function LeaderboardModal({ mapId, levelName, onClose }) {
   );
 }
 
+// Sort options
+const SORT_OPTIONS = [
+  { id: 'random', labelKey: 'levelSelect.sortRandom', icon: '🎲' },
+  { id: 'easy', labelKey: 'levelSelect.sortEasyFirst', icon: '🟢' },
+  { id: 'hard', labelKey: 'levelSelect.sortHardFirst', icon: '🔴' },
+  { id: 'newest', labelKey: 'levelSelect.sortNewest', icon: '🆕' },
+];
+
+// Get difficulty score for a level based on theme and missions
+function getDifficultyScore(level) {
+  const theme = getThemeById(level.themeId);
+  let score = 0;
+
+  // Theme difficulty
+  const themeDifficulty = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+  score += themeDifficulty[theme?.difficulty] || 2;
+
+  // Mission count adds difficulty
+  score += (level.missions?.length || 0) * 0.5;
+
+  // Less lives = harder
+  const lives = level.lives || 3;
+  if (lives <= 1) score += 2;
+  else if (lives <= 2) score += 1;
+
+  return score;
+}
+
+// Shuffle array (Fisher-Yates)
+function shuffleArray(array) {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export default function LevelSelect({ onSelect, onEdit, onBack }) {
   const { t, isRTL, getLocalizedThemeName } = useLanguage();
   const [levels, setLevels] = useState([]);
   const { userId } = useUser();
   const [modalLevel, setModalLevel] = useState(null);
+  const [sortBy, setSortBy] = useState('random');
+  const [hoveredCard, setHoveredCard] = useState(null);
 
   useEffect(() => {
-    console.log('LevelSelect: useEffect triggered');
     loadLevels().then(loaded => {
-      console.log('LevelSelect: setting levels, count:', loaded.length);
       setLevels(loaded);
     });
   }, []);
+
+  // Sort levels based on selection
+  const sortedLevels = useMemo(() => {
+    if (levels.length === 0) return [];
+
+    switch (sortBy) {
+      case 'easy':
+        return [...levels].sort((a, b) => getDifficultyScore(a) - getDifficultyScore(b));
+      case 'hard':
+        return [...levels].sort((a, b) => getDifficultyScore(b) - getDifficultyScore(a));
+      case 'newest':
+        return [...levels].sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || new Date(0);
+          return dateB - dateA;
+        });
+      case 'random':
+      default:
+        return shuffleArray(levels);
+    }
+  }, [levels, sortBy]);
 
   const handleDelete = (id, name) => {
     if (confirm(t('levelSelect.deleteConfirm', { name }))) {
@@ -153,224 +219,311 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
       overflowY: 'auto',
       background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 50%, #0a0a0a 100%)',
     }}>
-    <div style={{
-      padding: '60px 50px 100px',
-      maxWidth: 900,
-      margin: '0 auto',
-      minHeight: '100vh',
-      position: 'relative',
-    }}>
-      {/* Background pattern */}
       <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: `
-          radial-gradient(circle at 20% 30%, rgba(100, 150, 200, 0.03) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(100, 150, 200, 0.02) 0%, transparent 50%)
-        `,
-        pointerEvents: 'none',
-      }} />
-
-      <button
-        onClick={onBack}
-        style={{ ...btnStyle, marginBottom: 40, zIndex: 10, position: 'relative' }}
-        onMouseEnter={(e) => {
-          e.target.style.background = 'linear-gradient(145deg, #4a4a4a 0%, #3a3a3a 100%)';
-          e.target.style.transform = 'translateY(-2px)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.background = 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)';
-          e.target.style.transform = 'translateY(0)';
-        }}
-      >
-        {isRTL ? `${t('levelSelect.backToMenu')} →` : `← ${t('levelSelect.backToMenu')}`}
-      </button>
-
-      <h2 style={{
-        color: '#ffffff',
-        marginBottom: 40,
-        fontSize: 42,
-        fontWeight: '900',
-        textShadow: '0 4px 16px rgba(0, 0, 0, 0.8)',
-        letterSpacing: 3,
-        textTransform: 'uppercase',
-        zIndex: 10,
+        padding: '40px 30px 100px',
+        maxWidth: 1200,
+        margin: '0 auto',
+        minHeight: '100vh',
         position: 'relative',
-        direction: isRTL ? 'rtl' : 'ltr',
       }}>
-        {t('levelSelect.title')}
-      </h2>
+        {/* Background pattern */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `
+            radial-gradient(circle at 20% 30%, rgba(100, 150, 200, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 80% 70%, rgba(100, 150, 200, 0.02) 0%, transparent 50%)
+          `,
+          pointerEvents: 'none',
+        }} />
 
-      {levels.length === 0 ? (
-        <p style={{
-          color: '#cccccc',
-          fontSize: 18,
-          padding: '40px',
-          background: 'rgba(30, 30, 30, 0.7)',
-          borderRadius: 16,
-          border: 'none',
-          textAlign: 'center',
-          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(10px)',
-          fontWeight: '600',
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 30,
+          flexWrap: 'wrap',
+          gap: 16,
           zIndex: 10,
           position: 'relative',
-          direction: isRTL ? 'rtl' : 'ltr',
         }}>
-          {t('levelSelect.noLevels')}
-        </p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, zIndex: 10, position: 'relative' }}>
-          {console.log('RENDERING levels:', levels.length, levels.map(l => l.name))}
-          {levels.map(level => {
-            console.log('Rendering level:', level.id, level.name, level.themeId);
-            const theme = getThemeById(level.themeId || 'forest');
-            const isCreator = userId && level.creatorId === userId;
-            return (
-              <div key={level.id} style={{
-                padding: '20px 24px',
-                background: 'rgba(30, 30, 30, 0.8)',
-                borderRadius: 14,
-                border: `2px solid ${theme?.primaryColor || '#666'}33`,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
-                backdropFilter: 'blur(10px)',
+          <button
+            onClick={onBack}
+            style={btnStyle}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'linear-gradient(145deg, #4a4a4a 0%, #3a3a3a 100%)';
+              e.target.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)';
+              e.target.style.transform = 'translateY(0)';
+            }}
+          >
+            {isRTL ? `${t('levelSelect.backToMenu')} →` : `← ${t('levelSelect.backToMenu')}`}
+          </button>
+
+          <h2 style={{
+            color: '#ffffff',
+            fontSize: 32,
+            fontWeight: '900',
+            textShadow: '0 4px 16px rgba(0, 0, 0, 0.8)',
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+            margin: 0,
+            flex: 1,
+            textAlign: 'center',
+            direction: isRTL ? 'rtl' : 'ltr',
+          }}>
+            {t('levelSelect.title')}
+          </h2>
+
+          {/* Sort dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: '#888', fontSize: 13 }}>{t('levelSelect.sortBy')}:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                background: '#2a2a2a',
+                border: '1px solid #444',
+                borderRadius: 8,
+                color: '#fff',
+                fontSize: 13,
+                cursor: 'pointer',
+                outline: 'none',
               }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = `0 8px 28px rgba(0, 0, 0, 0.5), 0 0 0 2px ${theme?.primaryColor || '#666'}66`;
-                  e.currentTarget.style.borderColor = `${theme?.primaryColor || '#666'}66`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.4)';
-                  e.currentTarget.style.borderColor = `${theme?.primaryColor || '#666'}33`;
-                }}
-              >
-                {/* Top row: level info + buttons */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div>
+            >
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.icon} {t(opt.labelKey)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {levels.length === 0 ? (
+          <p style={{
+            color: '#cccccc',
+            fontSize: 18,
+            padding: '60px 40px',
+            background: 'rgba(30, 30, 30, 0.7)',
+            borderRadius: 16,
+            textAlign: 'center',
+            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(10px)',
+            fontWeight: '600',
+            zIndex: 10,
+            position: 'relative',
+            direction: isRTL ? 'rtl' : 'ltr',
+          }}>
+            {t('levelSelect.noLevels')}
+          </p>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 20,
+            zIndex: 10,
+            position: 'relative',
+          }}>
+            {sortedLevels.map(level => {
+              const theme = getThemeById(level.themeId || 'forest');
+              const isCreator = userId && level.creatorId === userId;
+              const isHovered = hoveredCard === level.id;
+
+              return (
+                <div
+                  key={level.id}
+                  style={{
+                    background: 'rgba(25, 25, 25, 0.9)',
+                    borderRadius: 16,
+                    border: `2px solid ${isHovered ? theme?.primaryColor || '#666' : 'rgba(80, 80, 80, 0.3)'}`,
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: isHovered
+                      ? `0 12px 40px rgba(0, 0, 0, 0.6), 0 0 20px ${theme?.primaryColor || '#666'}33`
+                      : '0 4px 16px rgba(0, 0, 0, 0.4)',
+                    transform: isHovered ? 'translateY(-6px) scale(1.02)' : 'translateY(0)',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    position: 'relative',
+                  }}
+                  onMouseEnter={() => setHoveredCard(level.id)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  onClick={() => onSelect(level)}
+                >
+                  {/* Map Preview */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    padding: '14px 14px 10px',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                  }}>
+                    <MapPreview grid={level.grid} size={110} />
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ padding: '14px 18px 18px' }}>
                     {/* Theme badge */}
                     {theme && (
                       <div style={{
                         display: 'inline-block',
                         padding: '4px 12px',
                         background: `${theme.primaryColor}22`,
-                        borderRadius: '12px',
+                        borderRadius: '10px',
                         fontSize: '12px',
                         fontWeight: '600',
                         color: theme.primaryColor,
-                        marginBottom: '8px',
-                        border: `1px solid ${theme.primaryColor}44`
+                        marginBottom: '10px',
+                        border: `1px solid ${theme.primaryColor}33`
                       }}>
                         {theme.emoji} {getLocalizedThemeName(theme.id, theme.name)}
                       </div>
                     )}
 
+                    {/* Level name */}
                     <div style={{
                       color: '#ffffff',
                       fontSize: 20,
                       fontWeight: '700',
-                      marginBottom: 6,
+                      marginBottom: 8,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}>
                       {level.name}
                     </div>
 
+                    {/* Stats */}
                     <div style={{
-                      color: '#aaaaaa',
+                      color: '#999999',
                       fontSize: 13,
-                      fontFamily: 'monospace',
-                      fontWeight: '500',
+                      marginBottom: 12,
                       direction: isRTL ? 'rtl' : 'ltr',
                     }}>
                       {t('levelSelect.levelStats', { missions: level.missions?.length || 0, lives: level.lives || 3 })}
-                      {level.creatorName && ` • ${t('levelSelect.byCreator', { name: level.creatorName })}`}
+                      {level.creatorName && (
+                        <span style={{ color: '#777' }}> • {level.creatorName}</span>
+                      )}
+                    </div>
+
+                    {/* Leaderboard preview */}
+                    <div style={{
+                      borderTop: '1px solid rgba(255,255,255,0.08)',
+                      paddingTop: 12,
+                      marginBottom: 14,
+                    }}>
+                      <LeaderboardPreview mapId={level.id} />
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{
+                      display: 'flex',
+                      gap: 10,
+                      justifyContent: 'center',
+                    }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => onSelect(level)}
+                        style={{
+                          ...btnStyle,
+                          flex: 1,
+                          padding: '12px 18px',
+                          background: 'linear-gradient(145deg, #2a5a3a 0%, #1a4a2a 100%)',
+                          fontSize: 15,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = 'linear-gradient(145deg, #3a6a4a 0%, #2a5a3a 100%)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'linear-gradient(145deg, #2a5a3a 0%, #1a4a2a 100%)';
+                        }}
+                      >
+                        ▶ {t('levelSelect.play')}
+                      </button>
+
+                      <button
+                        onClick={() => setModalLevel(level)}
+                        style={{
+                          ...btnStyle,
+                          padding: '12px 14px',
+                          background: 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)',
+                          fontSize: 15,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = 'linear-gradient(145deg, #4a4a5a 0%, #3a3a4a 100%)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)';
+                        }}
+                        title={t('levelSelect.viewLeaderboard')}
+                      >
+                        🏆
+                      </button>
+
+                      {/* Edit/Delete - only visible on hover for creators */}
+                      {isCreator && isHovered && (
+                        <>
+                          {onEdit && (
+                            <button
+                              onClick={() => onEdit(level)}
+                              style={{
+                                ...btnStyle,
+                                padding: '12px 14px',
+                                background: 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)',
+                                fontSize: 15,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.background = 'linear-gradient(145deg, #5a5a3a 0%, #4a4a2a 100%)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.background = 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)';
+                              }}
+                              title={t('levelSelect.edit')}
+                            >
+                              ✏
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(level.id, level.name)}
+                            style={{
+                              ...btnStyle,
+                              padding: '12px 14px',
+                              background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)',
+                              fontSize: 15,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = 'linear-gradient(145deg, #6a3a3a 0%, #5a2a2a 100%)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background = 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)';
+                            }}
+                            title={t('levelSelect.delete')}
+                          >
+                            🗑
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
-
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={() => onSelect(level)}
-                      style={{ ...btnStyle, background: 'linear-gradient(145deg, #2a4a3a 0%, #1a3a2a 100%)' }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = 'linear-gradient(145deg, #3a5a4a 0%, #2a4a3a 100%)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = 'linear-gradient(145deg, #2a4a3a 0%, #1a3a2a 100%)';
-                      }}
-                    >
-                      ▶ {t('levelSelect.play')}
-                    </button>
-
-                    <button
-                      onClick={() => setModalLevel(level)}
-                      style={{ ...btnStyle, background: 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)', padding: '10px 14px' }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = 'linear-gradient(145deg, #4a4a5a 0%, #3a3a4a 100%)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)';
-                      }}
-                      title={t('levelSelect.viewLeaderboard')}
-                    >
-                      🏆
-                    </button>
-
-                    {onEdit && isCreator && (
-                      <button
-                        onClick={() => onEdit(level)}
-                        style={{ ...btnStyle, background: 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)' }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #5a5a3a 0%, #4a4a2a 100%)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)';
-                        }}
-                      >
-                        ✏ {t('levelSelect.edit')}
-                      </button>
-                    )}
-
-                    {isCreator && (
-                      <button
-                        onClick={() => handleDelete(level.id, level.name)}
-                        style={{ ...btnStyle, background: 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)' }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #6a3a3a 0%, #5a2a2a 100%)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)';
-                        }}
-                      >
-                        🗑
-                      </button>
-                    )}
-                  </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
 
-                {/* Leaderboard preview */}
-                <div style={{
-                  borderTop: '1px solid #333',
-                  paddingTop: 12,
-                  marginTop: 4,
-                }}>
-                  <LeaderboardPreview mapId={level.id} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Leaderboard modal */}
-      {modalLevel && (
-        <LeaderboardModal
-          mapId={modalLevel.id}
-          levelName={modalLevel.name}
-          onClose={() => setModalLevel(null)}
-        />
-      )}
-    </div>
+        {/* Leaderboard modal */}
+        {modalLevel && (
+          <LeaderboardModal
+            mapId={modalLevel.id}
+            levelName={modalLevel.name}
+            onClose={() => setModalLevel(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }

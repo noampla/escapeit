@@ -143,7 +143,12 @@
     "deleteConfirm": "למחוק את השלב \"{name}\"?",
     "levelStats": "{missions} משימות - {lives} חיים",
     "byCreator": "מאת {name}",
-    "viewLeaderboard": "צפה בטבלת המובילים המלאה"
+    "viewLeaderboard": "צפה בטבלת המובילים המלאה",
+    "sortBy": "מיון",
+    "sortRandom": "אקראי",
+    "sortEasyFirst": "קל קודם",
+    "sortHardFirst": "קשה קודם",
+    "sortNewest": "החדש ביותר"
   },
   "leaderboard": {
     "title": "טבלת מובילים",

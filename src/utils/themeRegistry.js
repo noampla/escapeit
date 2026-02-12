@@ -6,7 +6,8 @@ export const AVAILABLE_THEMES = [
     description: 'Escape the mystical forest',
     emoji: '🌲',
     difficulty: 'Medium',
-    author: 'Original'
+    author: 'Original',
+    primaryColor: '#4a9f4a'
   },
   {
     id: 'bank-robbery',
@@ -14,7 +15,8 @@ export const AVAILABLE_THEMES = [
     description: 'Break into the vault and escape with the loot',
     emoji: '🏦',
     difficulty: 'Hard',
-    author: 'Claude'
+    author: 'Claude',
+    primaryColor: '#c9a227'
   },
   {
     id: 'mad-science-lab',
@@ -22,7 +24,8 @@ export const AVAILABLE_THEMES = [
     description: 'Escape the lab before the experiment goes wrong',
     emoji: '🧪',
     difficulty: 'Medium',
-    author: 'Claude'
+    author: 'Claude',
+    primaryColor: '#8a4fff'
   }
 ];
 

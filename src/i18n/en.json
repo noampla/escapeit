@@ -143,7 +143,12 @@
     "deleteConfirm": "Delete level \"{name}\"?",
     "levelStats": "{missions} missions - {lives} lives",
     "byCreator": "by {name}",
-    "viewLeaderboard": "View full leaderboard"
+    "viewLeaderboard": "View full leaderboard",
+    "sortBy": "Sort",
+    "sortRandom": "Random",
+    "sortEasyFirst": "Easy First",
+    "sortHardFirst": "Hard First",
+    "sortNewest": "Newest"
   },
   "leaderboard": {
     "title": "Leaderboard",
