@@ -55,6 +55,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     // Get dark zone tiles once (theme-agnostic)
     const darkZoneTiles = playerPos ? (theme?.getDarkZoneTiles?.(grid) || new Set()) : new Set();
     const playerInDarkZone = playerPos ? (theme?.isPlayerInDarkZone?.(playerPos, grid, gameState) || false) : false;
+    const playerOnDarkTile = playerPos ? (theme?.isPlayerOnDarkTile?.(playerPos, grid, gameState) || false) : false;
     const hasLight = playerPos ? (theme?.hasLightInDarkZone?.(gameState) || false) : false;
 
     // Calculate temporary visibility for dark zone (5 tiles: current + 4 cardinal)
@@ -414,8 +415,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Dark overlay on player when inside dark zone (unless they have light)
-      if (playerInDarkZone && !hasLight) {
+      // Dark overlay on player when on actual dark tile (cave interior, not entry)
+      if (playerOnDarkTile && !hasLight) {
         ctx.fillStyle = 'rgba(0, 0, 10, 0.6)';
         ctx.fillRect(ppx, ppy, TILE_SIZE, TILE_SIZE);
       }

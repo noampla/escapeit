@@ -380,6 +380,18 @@ export class ThemeLoader {
   }
 
   /**
+   * Check if the player is standing on an actual dark tile (not just near it)
+   * Used for fog of war blocking and player dark overlay
+   * @param {Object} playerPos - Player position { x, y }
+   * @param {Array} grid - The game grid
+   * @param {Object} gameState - Current game state
+   * @returns {boolean} - True if player is on a dark tile
+   */
+  isPlayerOnDarkTile(playerPos, grid, gameState) {
+    return this.tiles?.isPlayerOnDarkTile?.(playerPos, grid, gameState) || false;
+  }
+
+  /**
    * Get all dark zone tile positions in the grid
    * @param {Array} grid - The game grid
    * @returns {Set} - Set of position strings "x,y" for dark zone tiles

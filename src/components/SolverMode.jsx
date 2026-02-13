@@ -1010,29 +1010,28 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     // Helper to reveal tiles when moving/attempting to move
     // Dark zone tiles have their own visibility system - never use revealedTiles
-    // When inside dark zone, don't reveal any tiles (keeps inside/outside separate)
+    // When TARGET is a dark tile, don't reveal (going deeper into cave)
+    // When TARGET is not dark (cave-entry or outside), reveal it and adjacent non-dark tiles
     const revealTargetTile = () => {
-      // Check if player is currently in a dark zone (theme-defined)
-      const isInDarkZone = theme?.isPlayerInDarkZone?.(prev, currentGrid, currentGS) || false;
-
-      // If player is in dark zone, don't reveal anything
-      if (isInDarkZone) {
-        return; // No revealing from inside dark zone
-      }
-
       // Get dark zone tiles from theme
       const darkZoneTiles = theme?.getDarkZoneTiles?.(currentGrid) || new Set();
 
-      // Normal reveal for regular tiles (skip dark zone tiles)
+      // Check if TARGET position is a dark zone tile
+      const targetIsDarkZone = darkZoneTiles.has(`${nx},${ny}`);
+
+      // If moving into a dark zone tile, don't reveal anything
+      if (targetIsDarkZone) {
+        return; // No revealing when entering cave interior
+      }
+
+      // Normal reveal for regular tiles (including cave-entry)
       setRevealedTiles(prevRevealed => {
         const newRevealed = new Set(prevRevealed);
-        // Reveal target if it's not a dark zone tile
-        if (!darkZoneTiles.has(`${nx},${ny}`)) {
-          newRevealed.add(`${nx},${ny}`);
-        }
+        // Reveal target tile
+        newRevealed.add(`${nx},${ny}`);
+        // Reveal adjacent tiles (skip dark zone tiles)
         const adjacent = getAdjacentPositions(nx, ny, currentGrid);
         adjacent.forEach(pos => {
-          // Skip dark zone tiles
           if (!darkZoneTiles.has(pos.key)) {
             newRevealed.add(pos.key);
           }

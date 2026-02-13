@@ -1790,11 +1790,11 @@ export function renderPlayer(ctx, x, y, size, _direction, gameState = {}) {
 
 /**
  * Check if the player is currently in a cave area (cave or cave-entry)
- * When in cave area, player can see "?" hints on dark tiles
+ * When in cave area, player can see into the dark zone (5-tile visibility)
  * @param {Object} playerPos - Player position { x, y }
  * @param {Array} grid - The game grid
  * @param {Object} gameState - Current game state
- * @returns {boolean} - True if player is in cave area
+ * @returns {boolean} - True if player is in cave area (can see into dark zone)
  */
 export function isPlayerInDarkZone(playerPos, grid, gameState = {}) {
   if (!playerPos || !grid) return false;
@@ -1805,6 +1805,27 @@ export function isPlayerInDarkZone(playerPos, grid, gameState = {}) {
   // Check if player is on cave or cave-entry tiles
   const floorType = cell.floor?.type;
   return floorType === 'cave' || floorType === 'cave-entry';
+}
+
+/**
+ * Check if the player is standing on an actual dark tile (not just near it)
+ * This is used for fog of war blocking and player dark overlay
+ * Cave-entry is NOT a dark tile - it's the transition point
+ * @param {Object} playerPos - Player position { x, y }
+ * @param {Array} grid - The game grid
+ * @param {Object} gameState - Current game state
+ * @returns {boolean} - True if player is on a dark tile (cave interior)
+ */
+export function isPlayerOnDarkTile(playerPos, grid, gameState = {}) {
+  if (!playerPos || !grid) return false;
+
+  const cell = grid[playerPos.y]?.[playerPos.x];
+  if (!cell) return false;
+
+  // Only return true if the tile itself has isDarkZone property
+  const floorType = cell.floor?.type;
+  const tileDef = TILE_TYPES[floorType];
+  return tileDef?.isDarkZone === true;
 }
 
 /**
