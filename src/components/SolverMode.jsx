@@ -854,6 +854,15 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       maxInventory: maxInventory,
       playerPos: { x: playerPos.x, y: playerPos.y }
     };
+
+    // Check if in dark zone without light - can't interact (always show message to not reveal what's there)
+    if (theme?.canInteractInDarkZone && !theme.canInteractInDarkZone(playerPos, currentGrid, currentGS)) {
+      soundManager.play('blocked');
+      const msg = getMessage(themeId, 'cantInteractInDark', {});
+      showMessage(msg || "Too dark to interact!", 2000, 'warning');
+      return;
+    }
+
     const targets = getInteractTargets();
     const playerDir = playerDirectionRef.current;
 

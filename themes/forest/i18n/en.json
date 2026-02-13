@@ -44,7 +44,8 @@
     "pathLeft": "❌ You left the path. Start again from the beginning.",
     "caveBlocked": "You can't enter the cave from here. Find the cave entrance!",
     "caveExitBlocked": "You can't exit the cave here. Find the cave entrance to leave!",
-    "cantPickupInDark": "Too dark to find items! You need a torch."
+    "cantPickupInDark": "Too dark to find items! You need a torch.",
+    "cantInteractInDark": "Too dark to interact! You need a torch."
   },
   "tiles": {
     "empty": "Empty",

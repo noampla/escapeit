@@ -1640,3 +1640,20 @@ export function canPickupInDarkZone(playerPos, grid, gameState = {}) {
   // In dark zone - can only pick up if has light
   return hasLightInDarkZone(gameState);
 }
+
+/**
+ * Check if the player can interact with objects in a dark zone
+ * Returns false if player is in dark zone without a light source
+ * @param {Object} playerPos - Player position { x, y }
+ * @param {Array} grid - The game grid
+ * @param {Object} gameState - Current game state
+ * @returns {boolean} - True if player can interact
+ */
+export function canInteractInDarkZone(playerPos, grid, gameState = {}) {
+  // If not in dark zone, can always interact
+  if (!isPlayerInDarkZone(playerPos, grid, gameState)) {
+    return true;
+  }
+  // In dark zone - can only interact if has light
+  return hasLightInDarkZone(gameState);
+}

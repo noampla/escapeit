@@ -413,6 +413,22 @@ export class ThemeLoader {
     return this.tiles.canPickupInDarkZone(playerPos, grid, gameState);
   }
 
+  /**
+   * Check if the player can interact with objects in a dark zone
+   * Returns true by default (no restrictions), but theme can override
+   * @param {Object} playerPos - Player position { x, y }
+   * @param {Array} grid - The game grid
+   * @param {Object} gameState - Current game state
+   * @returns {boolean} - True if player can interact
+   */
+  canInteractInDarkZone(playerPos, grid, gameState) {
+    // If theme doesn't define this, allow interaction (default behavior)
+    if (!this.tiles?.canInteractInDarkZone) {
+      return true;
+    }
+    return this.tiles.canInteractInDarkZone(playerPos, grid, gameState);
+  }
+
   // === NEW: UI Theming ===
 
   // Get UI color scheme
