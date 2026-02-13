@@ -55,6 +55,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     // Get dark zone tiles once (theme-agnostic)
     const darkZoneTiles = playerPos ? (theme?.getDarkZoneTiles?.(grid) || new Set()) : new Set();
     const playerInDarkZone = playerPos ? (theme?.isPlayerInDarkZone?.(playerPos, grid, gameState) || false) : false;
+    const hasLight = playerPos ? (theme?.hasLightInDarkZone?.(gameState) || false) : false;
 
     // Calculate temporary visibility for dark zone (5 tiles: current + 4 cardinal)
     const darkZoneVisible = new Set();
@@ -82,12 +83,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
             continue;
           }
-          // Visible: render floor only (no objects!), then apply dark overlay
+
           const cell = grid[y][x];
           const TILE_TYPES = theme?.getTileTypes() || {};
           const cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
 
-          // Draw floor only
+          // Draw floor
           const floorDef = TILE_TYPES[cell.floor?.type] || TILE_TYPES.empty || { color: '#333' };
           ctx.fillStyle = cell.floor?.config?.floorColor || floorDef.color;
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -104,10 +105,44 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
               ctx.fillText(floorEmoji, cx, cy);
             }
           }
-          // NO objects rendered - darkness hides them
-          // Apply dark overlay
-          ctx.fillStyle = 'rgba(0, 0, 10, 0.6)';
-          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
+          // If player has light: render objects, no dark overlay
+          // Otherwise: no objects, apply dark overlay
+          if (hasLight) {
+            // Render objects when lit
+            if (cell.object) {
+              if (cell.object.type.startsWith('item-')) {
+                const itemType = cell.object.type.replace('item-', '');
+                const rendered = theme?.renderItem?.(ctx, itemType, px, py, TILE_SIZE, cell.object.config);
+                if (!rendered) {
+                  const emoji = theme?.getItemEmoji?.(itemType) || DEFAULT_TILE_EMOJIS[cell.object.type];
+                  if (emoji) {
+                    ctx.font = '22px serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(emoji, cx, cy);
+                  }
+                }
+              } else {
+                const rendered = theme?.renderTile?.(ctx, cell.object, cx, cy, TILE_SIZE);
+                if (!rendered) {
+                  const emoji = theme?.getTileEmoji?.(cell.object.type) || DEFAULT_TILE_EMOJIS[cell.object.type];
+                  if (emoji) {
+                    ctx.font = '22px serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(emoji, cx, cy);
+                  }
+                }
+              }
+            }
+            // No dark overlay when lit
+          } else {
+            // No objects rendered - darkness hides them
+            // Apply dark overlay
+            ctx.fillStyle = 'rgba(0, 0, 10, 0.6)';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
           continue;
         }
 
@@ -379,8 +414,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Dark overlay on player when inside dark zone
-      if (playerInDarkZone) {
+      // Dark overlay on player when inside dark zone (unless they have light)
+      if (playerInDarkZone && !hasLight) {
         ctx.fillStyle = 'rgba(0, 0, 10, 0.6)';
         ctx.fillRect(ppx, ppy, TILE_SIZE, TILE_SIZE);
       }

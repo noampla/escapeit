@@ -388,6 +388,15 @@ export class ThemeLoader {
     return this.tiles?.getDarkZoneTiles?.(grid) || new Set();
   }
 
+  /**
+   * Check if the player has a light source in dark zones
+   * @param {Object} gameState - Current game state
+   * @returns {boolean} - True if player has light (e.g., torch)
+   */
+  hasLightInDarkZone(gameState) {
+    return this.tiles?.hasLightInDarkZone?.(gameState) || false;
+  }
+
   // === NEW: UI Theming ===
 
   // Get UI color scheme

@@ -1611,3 +1611,15 @@ export function getDarkZoneTiles(grid) {
 
   return tiles;
 }
+
+/**
+ * Check if the player has a light source in their inventory
+ * When true, dark zone tiles are lit up (no dark overlay, objects visible)
+ * @param {Object} gameState - Current game state with inventory
+ * @returns {boolean} - True if player has a light source (torch)
+ */
+export function hasLightInDarkZone(gameState = {}) {
+  const inventory = gameState.inventory || [];
+  // Torch provides light in dark zones
+  return inventory.some(item => item.itemType === 'torch');
+}
