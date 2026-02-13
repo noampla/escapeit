@@ -4,7 +4,7 @@ import { findTile, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
 import { getAllHazardZones } from '../engine/hazards';
 import { checkAllMissions, checkMissionComplete } from '../engine/missions';
-import { DIRECTIONS, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
+import { DIRECTIONS, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE_PLAY } from '../utils/constants';
 import { ThemeContext } from '../App';
 import { InteractionEngine } from '../engine/interactionEngine';
 import { useUser } from '../contexts/UserContext.jsx';
@@ -1665,8 +1665,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
   // Calculate viewport centered on player, sized to fill container
   const viewportBounds = useMemo(() => {
-    const tilesX = Math.max(10, Math.floor(containerSize.width / TILE_SIZE));
-    const tilesY = Math.max(8, Math.floor(containerSize.height / TILE_SIZE));
+    const tilesX = Math.max(10, Math.floor(containerSize.width / TILE_SIZE_PLAY));
+    const tilesY = Math.max(8, Math.floor(containerSize.height / TILE_SIZE_PLAY));
     return calculatePlayerViewport(playerPos, grid, tilesX, tilesY);
   }, [playerPos, grid, containerSize]);
 
@@ -1989,14 +1989,16 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             interactionProgressColor={(interactionState || mouseHoldState)?.progressColor}
             theme={theme}
             gameState={gameState}
+            tileSize={TILE_SIZE_PLAY}
+            showGridLines={false}
           />
 
           {/* Inline interaction menu next to player */}
           {inlineMenu && !gameOver && (
             <div style={{
               position: 'absolute',
-              left: `${(playerPos.x - viewportBounds.minX + 1) * 40 + 10}px`,
-              top: `${(playerPos.y - viewportBounds.minY) * 40}px`,
+              left: `${(playerPos.x - viewportBounds.minX + 1) * TILE_SIZE_PLAY + 10}px`,
+              top: `${(playerPos.y - viewportBounds.minY) * TILE_SIZE_PLAY}px`,
               background: 'linear-gradient(145deg, rgba(30, 45, 30, 0.98), rgba(20, 35, 20, 0.98))',
               borderRadius: 12,
               padding: '10px',

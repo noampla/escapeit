@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } from '../utils/constants';
+import { TILE_SIZE as DEFAULT_TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } from '../utils/constants';
 import { getAllHazardZones } from '../engine/hazards';
 import soundManager from '../engine/soundManager';
 
@@ -18,7 +18,8 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, tileSize = DEFAULT_TILE_SIZE, showGridLines = true }) {
+  const TILE_SIZE = tileSize;
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -92,14 +93,16 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
           const floorDef = TILE_TYPES[cell.floor?.type] || TILE_TYPES.empty || { color: '#333' };
           ctx.fillStyle = cell.floor?.config?.floorColor || floorDef.color;
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          ctx.strokeStyle = '#2a3a2a';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+          if (showGridLines) {
+            ctx.strokeStyle = '#2a3a2a';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
           const floorRendered = theme?.renderTile?.(ctx, cell.floor, cx, cy, TILE_SIZE);
           if (!floorRendered) {
             const floorEmoji = theme?.getTileEmoji?.(cell.floor?.type) || DEFAULT_TILE_EMOJIS[cell.floor?.type];
             if (floorEmoji) {
-              ctx.font = '22px serif';
+              ctx.font = `${Math.floor(TILE_SIZE * 0.55)}px serif`;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText(floorEmoji, cx, cy);
@@ -117,7 +120,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
                 if (!rendered) {
                   const emoji = theme?.getItemEmoji?.(itemType) || DEFAULT_TILE_EMOJIS[cell.object.type];
                   if (emoji) {
-                    ctx.font = '22px serif';
+                    ctx.font = `${Math.floor(TILE_SIZE * 0.55)}px serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(emoji, cx, cy);
@@ -128,7 +131,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
                 if (!rendered) {
                   const emoji = theme?.getTileEmoji?.(cell.object.type) || DEFAULT_TILE_EMOJIS[cell.object.type];
                   if (emoji) {
-                    ctx.font = '22px serif';
+                    ctx.font = `${Math.floor(TILE_SIZE * 0.55)}px serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(emoji, cx, cy);
@@ -164,17 +167,19 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         ctx.fillStyle = cell.floor?.config?.floorColor || floorDef.color;
         ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
-        // Draw grid border
-        ctx.strokeStyle = '#2a3a2a';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+        // Draw grid border (only in builder mode)
+        if (showGridLines) {
+          ctx.strokeStyle = '#2a3a2a';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+        }
 
         // Draw floor custom rendering or emoji
         const floorRendered = theme?.renderTile?.(ctx, cell.floor, cx, cy, TILE_SIZE);
         if (!floorRendered) {
           const floorEmoji = theme?.getTileEmoji?.(cell.floor?.type) || DEFAULT_TILE_EMOJIS[cell.floor?.type];
           if (floorEmoji) {
-            ctx.font = '22px serif';
+            ctx.font = `${Math.floor(TILE_SIZE * 0.55)}px serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(floorEmoji, cx, cy);
@@ -192,7 +197,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
               // Fallback to emoji (use center coordinates)
               const emoji = theme?.getItemEmoji?.(itemType) || DEFAULT_TILE_EMOJIS[cell.object.type];
               if (emoji) {
-                ctx.font = '22px serif';
+                ctx.font = `${Math.floor(TILE_SIZE * 0.55)}px serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(emoji, cx, cy);
@@ -204,7 +209,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
             if (!rendered) {
               const emoji = theme?.getTileEmoji?.(cell.object.type) || DEFAULT_TILE_EMOJIS[cell.object.type];
               if (emoji) {
-                ctx.font = '22px serif';
+                ctx.font = `${Math.floor(TILE_SIZE * 0.55)}px serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(emoji, cx, cy);
@@ -369,19 +374,23 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       const themeRendered = theme?.renderPlayer?.(ctx, centerX, centerY, TILE_SIZE, playerDirection, gameState);
 
       if (!themeRendered) {
-        // Default player rendering (emoji)
-        ctx.font = '26px serif';
+        // Default player rendering (emoji) - scale up for larger tiles
+        const fontSize = Math.max(26, Math.floor(TILE_SIZE * 0.65));
+        ctx.font = `${fontSize}px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🧑', centerX, centerY);
       }
 
-      // Direction indicator (always show for both default and theme-rendered players)
+      // Direction indicator (scales with tile size)
+      const arrowScale = TILE_SIZE / 40; // Base scale factor
+      const arrowOffset = 8 * arrowScale;
+      const arrowSize = 3 * arrowScale;
       const dirOffsets = {
-        up: { x: 0, y: -8 },
-        down: { x: 0, y: 8 },
-        left: { x: -8, y: 0 },
-        right: { x: 8, y: 0 },
+        up: { x: 0, y: -arrowOffset },
+        down: { x: 0, y: arrowOffset },
+        left: { x: -arrowOffset, y: 0 },
+        right: { x: arrowOffset, y: 0 },
       };
       const offset = dirOffsets[playerDirection] || dirOffsets.down;
       const arrowX = centerX + offset.x;
@@ -390,28 +399,28 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.fillStyle = 'rgba(255, 255, 100, 0.9)';
       ctx.beginPath();
       if (playerDirection === 'up') {
-        ctx.moveTo(arrowX, arrowY - 3);
-        ctx.lineTo(arrowX - 3, arrowY + 2);
-        ctx.lineTo(arrowX + 3, arrowY + 2);
+        ctx.moveTo(arrowX, arrowY - arrowSize);
+        ctx.lineTo(arrowX - arrowSize, arrowY + arrowSize * 0.66);
+        ctx.lineTo(arrowX + arrowSize, arrowY + arrowSize * 0.66);
       } else if (playerDirection === 'down') {
-        ctx.moveTo(arrowX, arrowY + 3);
-        ctx.lineTo(arrowX - 3, arrowY - 2);
-        ctx.lineTo(arrowX + 3, arrowY - 2);
+        ctx.moveTo(arrowX, arrowY + arrowSize);
+        ctx.lineTo(arrowX - arrowSize, arrowY - arrowSize * 0.66);
+        ctx.lineTo(arrowX + arrowSize, arrowY - arrowSize * 0.66);
       } else if (playerDirection === 'left') {
-        ctx.moveTo(arrowX - 3, arrowY);
-        ctx.lineTo(arrowX + 2, arrowY - 3);
-        ctx.lineTo(arrowX + 2, arrowY + 3);
+        ctx.moveTo(arrowX - arrowSize, arrowY);
+        ctx.lineTo(arrowX + arrowSize * 0.66, arrowY - arrowSize);
+        ctx.lineTo(arrowX + arrowSize * 0.66, arrowY + arrowSize);
       } else if (playerDirection === 'right') {
-        ctx.moveTo(arrowX + 3, arrowY);
-        ctx.lineTo(arrowX - 2, arrowY - 3);
-        ctx.lineTo(arrowX - 2, arrowY + 3);
+        ctx.moveTo(arrowX + arrowSize, arrowY);
+        ctx.lineTo(arrowX - arrowSize * 0.66, arrowY - arrowSize);
+        ctx.lineTo(arrowX - arrowSize * 0.66, arrowY + arrowSize);
       }
       ctx.closePath();
       ctx.fill();
 
       // Arrow outline
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = arrowScale;
       ctx.stroke();
 
       // Dark overlay on player when inside dark zone (unless they have light)
@@ -420,7 +429,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         ctx.fillRect(ppx, ppy, TILE_SIZE, TILE_SIZE);
       }
     }
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths, showGridLines, TILE_SIZE]);
 
   useEffect(() => {
     draw();
