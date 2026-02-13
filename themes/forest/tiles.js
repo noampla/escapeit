@@ -33,7 +33,17 @@ export const TILE_TYPES = {
     layer: 'object',
     configurable: false,
     defaultConfig: {},
-    tooltip: 'Large rock. Blocks movement.',
+    tooltip: 'Large rock. Blocks movement. Carve with pickaxe (hold E) to break.',
+    walkable: false
+  },
+  'rock-wall': {
+    label: 'Rock Wall',
+    color: '#4a4a5a',
+    category: 'basic',
+    layer: 'object',
+    configurable: false,
+    defaultConfig: {},
+    tooltip: 'Vertical cliff face. Blocks movement permanently.',
     walkable: false
   },
   'thorny-bush': {
@@ -158,6 +168,16 @@ export const TILE_TYPES = {
     isItemTile: true,
     itemType: 'knife',
     tooltip: 'Collectible knife. Press F to pick up. Defeat bears.',
+    walkable: true
+  },
+  'item-pickaxe': {
+    label: 'Pickaxe',
+    color: '#777777',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'pickaxe',
+    tooltip: 'Collectible pickaxe. Press F to pick up. Carve boulders.',
     walkable: true
   },
   'item-machete': {
@@ -310,6 +330,14 @@ export const TILE_TYPES = {
     category: null,
     layer: 'object',
     tooltip: 'Footprints from rescued friend.',
+    walkable: true
+  },
+  'carved-boulder': {
+    label: 'Carved Boulder',
+    color: '#6a6a6a',
+    category: null,
+    layer: 'object',
+    tooltip: 'Broken rock pieces from carved boulder.',
     walkable: true
   },
 };
@@ -474,6 +502,57 @@ function drawBoulder(ctx, cx, cy, size) {
   ctx.moveTo(cx + size * 0.1, cy - size * 0.15);
   ctx.lineTo(cx + size * 0.25, cy + size * 0.05);
   ctx.stroke();
+}
+
+// Draw a rock wall (vertical cliff face)
+function drawRockWall(ctx, cx, cy, size) {
+  const wallColor = '#5a5a6a';
+  const darkWall = '#3a3a4a';
+  const lightWall = '#7a7a8a';
+  const crackColor = '#2a2a3a';
+
+  // Main wall face (tall vertical rectangle)
+  ctx.fillStyle = wallColor;
+  ctx.fillRect(cx - size * 0.45, cy - size * 0.5, size * 0.9, size);
+
+  // Stratification layers (horizontal lines to show rock layers)
+  ctx.fillStyle = darkWall;
+  ctx.fillRect(cx - size * 0.45, cy - size * 0.3, size * 0.9, size * 0.08);
+  ctx.fillRect(cx - size * 0.45, cy + size * 0.1, size * 0.9, size * 0.06);
+  ctx.fillRect(cx - size * 0.45, cy + size * 0.35, size * 0.9, size * 0.07);
+
+  // Light highlights on top layers
+  ctx.fillStyle = lightWall;
+  ctx.fillRect(cx - size * 0.45, cy - size * 0.5, size * 0.9, size * 0.05);
+  ctx.fillRect(cx - size * 0.45, cy - size * 0.22, size * 0.9, size * 0.03);
+
+  // Vertical cracks
+  ctx.strokeStyle = crackColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - size * 0.2, cy - size * 0.4);
+  ctx.lineTo(cx - size * 0.15, cy + size * 0.3);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx + size * 0.15, cy - size * 0.25);
+  ctx.lineTo(cx + size * 0.2, cy + size * 0.4);
+  ctx.stroke();
+
+  // Small rock protrusions for texture
+  ctx.fillStyle = lightWall;
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.3, cy - size * 0.15, size * 0.08, size * 0.06, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.25, cy + size * 0.2, size * 0.07, size * 0.05, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = darkWall;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.06, size * 0.05, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // Draw a thorny bush
@@ -660,6 +739,77 @@ function drawMachete(ctx, cx, cy, size) {
   // Guard/hilt
   ctx.fillStyle = bladeDark;
   ctx.fillRect(-size * 0.24, -size * 0.10, size * 0.04, size * 0.17);
+
+  ctx.restore();
+}
+
+// Draw a pickaxe
+function drawPickaxe(ctx, cx, cy, size) {
+  const metalGray = '#888888';
+  const metalDark = '#666666';
+  const metalLight = '#aaaaaa';
+  const handleBrown = '#6b4423';
+  const handleDark = '#4a2f1a';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.4); // Angle the pickaxe
+
+  // Wooden handle
+  ctx.fillStyle = handleBrown;
+  ctx.fillRect(-size * 0.4, -size * 0.05, size * 0.8, size * 0.1);
+
+  // Handle texture
+  ctx.fillStyle = handleDark;
+  ctx.fillRect(-size * 0.35, -size * 0.05, size * 0.03, size * 0.1);
+  ctx.fillRect(-size * 0.15, -size * 0.05, size * 0.03, size * 0.1);
+  ctx.fillRect(size * 0.05, -size * 0.05, size * 0.03, size * 0.1);
+
+  // Metal head base (center block where pick points attach)
+  ctx.fillStyle = metalGray;
+  ctx.fillRect(size * 0.2, -size * 0.1, size * 0.15, size * 0.2);
+
+  // Left pick point (angled down-left)
+  ctx.fillStyle = metalGray;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.2, -size * 0.05);
+  ctx.lineTo(size * 0.05, -size * 0.2);
+  ctx.lineTo(size * 0.1, -size * 0.15);
+  ctx.lineTo(size * 0.2, size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Right pick point (angled down-right)
+  ctx.fillStyle = metalGray;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.35, -size * 0.05);
+  ctx.lineTo(size * 0.45, -size * 0.2);
+  ctx.lineTo(size * 0.4, -size * 0.15);
+  ctx.lineTo(size * 0.35, size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Darker shading on pick points
+  ctx.fillStyle = metalDark;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.2, size * 0.05);
+  ctx.lineTo(size * 0.1, -size * 0.15);
+  ctx.lineTo(size * 0.12, -size * 0.13);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(size * 0.35, size * 0.05);
+  ctx.lineTo(size * 0.4, -size * 0.15);
+  ctx.lineTo(size * 0.38, -size * 0.13);
+  ctx.closePath();
+  ctx.fill();
+
+  // Metal highlights
+  ctx.fillStyle = metalLight;
+  ctx.beginPath();
+  ctx.arc(size * 0.275, -size * 0.05, size * 0.04, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }
@@ -1075,6 +1225,64 @@ function drawRescuedFriend(ctx, cx, cy, size) {
   drawFootprint(cx - size * 0.05, cy - size * 0.15, size * 0.8, -0.15);
 }
 
+// Draw carved boulder (broken rock pieces)
+function drawCarvedBoulder(ctx, cx, cy, size) {
+  const rockGray = '#6a6a6a';
+  const darkGray = '#4a4a4a';
+  const lightGray = '#8a8a8a';
+
+  // Scattered broken rock pieces
+  const pieces = [
+    { x: -0.2, y: -0.15, w: 0.15, h: 0.12, angle: -0.3 },
+    { x: 0.15, y: -0.1, w: 0.12, h: 0.1, angle: 0.4 },
+    { x: -0.1, y: 0.15, w: 0.18, h: 0.14, angle: 0.2 },
+    { x: 0.2, y: 0.1, w: 0.13, h: 0.11, angle: -0.5 },
+    { x: 0, y: -0.05, w: 0.1, h: 0.08, angle: 0.1 },
+  ];
+
+  pieces.forEach(piece => {
+    ctx.save();
+    ctx.translate(cx + piece.x * size, cy + piece.y * size);
+    ctx.rotate(piece.angle);
+
+    // Main rock piece (irregular shape)
+    ctx.fillStyle = rockGray;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, piece.w * size, piece.h * size, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dark shadow on one side
+    ctx.fillStyle = darkGray;
+    ctx.beginPath();
+    ctx.ellipse(piece.w * size * 0.3, piece.h * size * 0.2, piece.w * size * 0.5, piece.h * size * 0.4, 0.5, 0, Math.PI);
+    ctx.fill();
+
+    // Light highlight
+    ctx.fillStyle = lightGray;
+    ctx.beginPath();
+    ctx.ellipse(-piece.w * size * 0.2, -piece.h * size * 0.15, piece.w * size * 0.3, piece.h * size * 0.25, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  });
+
+  // Small rock dust/debris (tiny dots)
+  ctx.fillStyle = 'rgba(106, 106, 106, 0.4)';
+  const debris = [
+    { x: -0.25, y: 0.05 },
+    { x: 0.1, y: 0.2 },
+    { x: -0.05, y: -0.2 },
+    { x: 0.25, y: -0.05 },
+    { x: 0.05, y: 0.1 },
+  ];
+
+  debris.forEach(dot => {
+    ctx.beginPath();
+    ctx.arc(cx + dot.x * size, cy + dot.y * size, size * 0.02, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
 // Custom rendering for tiles (optional - most use emoji/color)
 export function renderTile(ctx, tile, cx, cy, size) {
   // Guard against undefined tile
@@ -1089,6 +1297,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
   // Boulder gets custom rendering
   if (tile.type === 'boulder') {
     drawBoulder(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Rock wall gets custom rendering
+  if (tile.type === 'rock-wall') {
+    drawRockWall(ctx, cx, cy, size);
     return true;
   }
 
@@ -1154,6 +1368,11 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  if (tile.type === 'carved-boulder') {
+    drawCarvedBoulder(ctx, cx, cy, size);
+    return true;
+  }
+
   // Cave entry gets custom rendering
   if (tile.type === 'cave-entry') {
     drawCaveEntry(ctx, cx, cy, size);
@@ -1176,6 +1395,7 @@ export function getTileEmoji(tileType) {
     ground: null,  // No emoji for ground (just color)
     tree: '🌲',
     boulder: null,  // Custom draw
+    'rock-wall': null,  // Custom draw
     'thorny-bush': null,  // Custom draw
     water: '🌊',
     snow: '❄️',
@@ -1187,6 +1407,7 @@ export function getTileEmoji(tileType) {
     'item-bucket': null,  // Custom draw
     'item-rope': '🧵',
     'item-knife': '🔪',
+    'item-pickaxe': '⛏️',
     'item-machete': null,  // Custom draw
     'item-stick': null,  // Custom draw
     'item-torch': null,  // Custom draw
@@ -1214,7 +1435,7 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start', 'cave', 'cave-entry'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['tree', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign'];
+export const INTERACTABLE_TILES = ['tree', 'boulder', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign'];
 
 // Tiles to ignore for floor color detection when picking up items
 export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'thorny-bush', 'water', 'snow', 'bear'];

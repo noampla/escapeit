@@ -36,6 +36,12 @@ export const ITEM_TYPES = {
     color: '#cccccc',
     description: 'Defeat bears to get sweater'
   },
+  pickaxe: {
+    label: 'Pickaxe',
+    emoji: '⛏️',
+    color: '#777777',
+    description: 'Carve boulders to clear paths'
+  },
   machete: {
     label: 'Machete',
     emoji: null,  // Custom draw
@@ -203,6 +209,77 @@ function drawMachete(ctx, cx, cy, size) {
   // Guard/hilt
   ctx.fillStyle = bladeDark;
   ctx.fillRect(-size * 0.24, -size * 0.10, size * 0.04, size * 0.17);
+
+  ctx.restore();
+}
+
+// Custom rendering for pickaxe
+function drawPickaxe(ctx, cx, cy, size) {
+  const metalGray = '#888888';
+  const metalDark = '#666666';
+  const metalLight = '#aaaaaa';
+  const handleBrown = '#6b4423';
+  const handleDark = '#4a2f1a';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.4); // Angle the pickaxe
+
+  // Wooden handle
+  ctx.fillStyle = handleBrown;
+  ctx.fillRect(-size * 0.4, -size * 0.05, size * 0.8, size * 0.1);
+
+  // Handle texture
+  ctx.fillStyle = handleDark;
+  ctx.fillRect(-size * 0.35, -size * 0.05, size * 0.03, size * 0.1);
+  ctx.fillRect(-size * 0.15, -size * 0.05, size * 0.03, size * 0.1);
+  ctx.fillRect(size * 0.05, -size * 0.05, size * 0.03, size * 0.1);
+
+  // Metal head base (center block where pick points attach)
+  ctx.fillStyle = metalGray;
+  ctx.fillRect(size * 0.2, -size * 0.1, size * 0.15, size * 0.2);
+
+  // Left pick point (angled down-left)
+  ctx.fillStyle = metalGray;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.2, -size * 0.05);
+  ctx.lineTo(size * 0.05, -size * 0.2);
+  ctx.lineTo(size * 0.1, -size * 0.15);
+  ctx.lineTo(size * 0.2, size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Right pick point (angled down-right)
+  ctx.fillStyle = metalGray;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.35, -size * 0.05);
+  ctx.lineTo(size * 0.45, -size * 0.2);
+  ctx.lineTo(size * 0.4, -size * 0.15);
+  ctx.lineTo(size * 0.35, size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Darker shading on pick points
+  ctx.fillStyle = metalDark;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.2, size * 0.05);
+  ctx.lineTo(size * 0.1, -size * 0.15);
+  ctx.lineTo(size * 0.12, -size * 0.13);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(size * 0.35, size * 0.05);
+  ctx.lineTo(size * 0.4, -size * 0.15);
+  ctx.lineTo(size * 0.38, -size * 0.13);
+  ctx.closePath();
+  ctx.fill();
+
+  // Metal highlights
+  ctx.fillStyle = metalLight;
+  ctx.beginPath();
+  ctx.arc(size * 0.275, -size * 0.05, size * 0.04, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }

@@ -68,6 +68,21 @@ export const INTERACTIONS = {
     }
   },
 
+  'carve-boulder': {
+    label: 'Carve Boulder',
+    duration: 2000,
+    requirements: { inventory: ['pickaxe'], tile: 'boulder' },
+    execute: (gameState, grid, x, y) => {
+      // Replace boulder with carved boulder visual (broken rock pieces)
+      grid[y][x].object = { type: 'carved-boulder', config: {} };
+      return {
+        success: true,
+        messageKey: 'boulderCarved',
+        modifyGrid: true
+      };
+    }
+  },
+
   'fill-bucket': {
     label: 'Fill Bucket',
     duration: 1500,
