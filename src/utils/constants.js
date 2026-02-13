@@ -1,14 +1,9 @@
 // Universal constants - theme-independent
 export const GRID_COLS = 100;
 export const GRID_ROWS = 100;
-export const TILE_SIZE = 40; // Builder mode tile size
-export const TILE_SIZE_PLAY = 56; // Play mode tile size (larger for better visuals)
+export const TILE_SIZE = 40;
 export const CANVAS_WIDTH = GRID_COLS * TILE_SIZE;
 export const CANVAS_HEIGHT = GRID_ROWS * TILE_SIZE;
-
-// Smooth movement constants
-export const PLAYER_MOVE_DURATION = 120; // ms for player to move between tiles
-export const CAMERA_LERP_SPEED = 0.12; // Camera smoothing factor (0-1, lower = smoother)
 
 // Directions for movement
 export const DIRECTIONS = {
