@@ -43,7 +43,8 @@
     "pathBroken": "❌ You broke the path sequence. Start again from the beginning.",
     "pathLeft": "❌ You left the path. Start again from the beginning.",
     "caveBlocked": "You can't enter the cave from here. Find the cave entrance!",
-    "caveExitBlocked": "You can't exit the cave here. Find the cave entrance to leave!"
+    "caveExitBlocked": "You can't exit the cave here. Find the cave entrance to leave!",
+    "cantPickupInDark": "Too dark to find items! You need a torch."
   },
   "tiles": {
     "empty": "Empty",

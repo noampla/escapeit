@@ -741,6 +741,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const playerDir = playerDirectionRef.current;
     const currentCell = currentGrid[pos.y][pos.x];
 
+    // Check if in dark zone without light - can't pick up items (always show message to not reveal item locations)
+    if (theme?.canPickupInDarkZone && !theme.canPickupInDarkZone(pos, currentGrid, currentGS)) {
+      soundManager.play('blocked');
+      const msg = getMessage(themeId, 'cantPickupInDark', {});
+      showMessage(msg || "Too dark to find items!", 2000, 'warning');
+      return;
+    }
+
     // Check if theme has custom pickup handler
     const customResult = theme?.customPickup?.(currentGS, currentGrid, pos, playerDir, maxInventory);
     if (customResult?.handled) {

@@ -1623,3 +1623,20 @@ export function hasLightInDarkZone(gameState = {}) {
   // Torch provides light in dark zones
   return inventory.some(item => item.itemType === 'torch');
 }
+
+/**
+ * Check if the player can pick up items in a dark zone
+ * Returns false if player is in dark zone without a light source
+ * @param {Object} playerPos - Player position { x, y }
+ * @param {Array} grid - The game grid
+ * @param {Object} gameState - Current game state
+ * @returns {boolean} - True if player can pick up items
+ */
+export function canPickupInDarkZone(playerPos, grid, gameState = {}) {
+  // If not in dark zone, can always pick up
+  if (!isPlayerInDarkZone(playerPos, grid, gameState)) {
+    return true;
+  }
+  // In dark zone - can only pick up if has light
+  return hasLightInDarkZone(gameState);
+}
