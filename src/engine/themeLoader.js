@@ -365,6 +365,29 @@ export class ThemeLoader {
     return false; // Return false to use default player rendering
   }
 
+  // === Dark Zone Methods (for caves, dark areas, etc.) ===
+
+  /**
+   * Check if the player is currently in a dark zone
+   * When in a dark zone, certain tiles may have their contents hidden
+   * @param {Object} playerPos - Player position { x, y }
+   * @param {Array} grid - The game grid
+   * @param {Object} gameState - Current game state
+   * @returns {boolean} - True if player is in a dark zone
+   */
+  isPlayerInDarkZone(playerPos, grid, gameState) {
+    return this.tiles?.isPlayerInDarkZone?.(playerPos, grid, gameState) || false;
+  }
+
+  /**
+   * Get all dark zone tile positions in the grid
+   * @param {Array} grid - The game grid
+   * @returns {Set} - Set of position strings "x,y" for dark zone tiles
+   */
+  getDarkZoneTiles(grid) {
+    return this.tiles?.getDarkZoneTiles?.(grid) || new Set();
+  }
+
   // === NEW: UI Theming ===
 
   // Get UI color scheme

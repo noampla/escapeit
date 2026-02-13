@@ -109,11 +109,25 @@ function getAdjacentPositions(x, y, grid) {
   return adjacent;
 }
 
-function initializeRevealedTiles(startX, startY, grid) {
+function initializeRevealedTiles(startX, startY, grid, darkZoneTiles, isInDarkZone) {
   const revealed = new Set();
+
+  // If starting in a dark zone, don't reveal anything (dark zone has its own visibility)
+  if (isInDarkZone) {
+    return revealed;
+  }
+
+  // Reveal start position
   revealed.add(`${startX},${startY}`);
+
+  // Reveal adjacent tiles (skip dark zone tiles)
   const adjacent = getAdjacentPositions(startX, startY, grid);
-  adjacent.forEach(pos => revealed.add(pos.key));
+  adjacent.forEach(pos => {
+    if (!darkZoneTiles?.has?.(pos.key)) {
+      revealed.add(pos.key);
+    }
+  });
+
   return revealed;
 }
 
@@ -185,7 +199,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     worn: {}, // Wearable items (e.g., uniform)
     containers: {}, // Container items (e.g., bag)
   });
-  const [revealedTiles, setRevealedTiles] = useState(() => initializeRevealedTiles(startPos.x, startPos.y, level.grid));
+  const [revealedTiles, setRevealedTiles] = useState(() => {
+    const darkZoneTiles = theme?.getDarkZoneTiles?.(level.grid) || new Set();
+    const isInDarkZone = theme?.isPlayerInDarkZone?.(startPos, level.grid, {}) || false;
+    return initializeRevealedTiles(startPos.x, startPos.y, level.grid, darkZoneTiles, isInDarkZone);
+  });
   const [tick, setTick] = useState(0);
   const [message, setMessage] = useState(null);
   const [gameOver, setGameOver] = useState(null);
@@ -298,7 +316,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       worn: {},
       containers: {},
     });
-    setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y, level.grid));
+    const darkZoneTiles = theme?.getDarkZoneTiles?.(level.grid) || new Set();
+    const isInDarkZone = theme?.isPlayerInDarkZone?.(startPos, level.grid, {}) || false;
+    setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y, level.grid, darkZoneTiles, isInDarkZone));
     setTick(0);
     setGameOver(null);
     setMessage(null);
@@ -972,12 +992,34 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const currentGS = gameStateRef.current;
 
     // Helper to reveal tiles when moving/attempting to move
+    // Dark zone tiles have their own visibility system - never use revealedTiles
+    // When inside dark zone, don't reveal any tiles (keeps inside/outside separate)
     const revealTargetTile = () => {
-      setRevealedTiles(prev => {
-        const newRevealed = new Set(prev);
-        newRevealed.add(`${nx},${ny}`);
+      // Check if player is currently in a dark zone (theme-defined)
+      const isInDarkZone = theme?.isPlayerInDarkZone?.(prev, currentGrid, currentGS) || false;
+
+      // If player is in dark zone, don't reveal anything
+      if (isInDarkZone) {
+        return; // No revealing from inside dark zone
+      }
+
+      // Get dark zone tiles from theme
+      const darkZoneTiles = theme?.getDarkZoneTiles?.(currentGrid) || new Set();
+
+      // Normal reveal for regular tiles (skip dark zone tiles)
+      setRevealedTiles(prevRevealed => {
+        const newRevealed = new Set(prevRevealed);
+        // Reveal target if it's not a dark zone tile
+        if (!darkZoneTiles.has(`${nx},${ny}`)) {
+          newRevealed.add(`${nx},${ny}`);
+        }
         const adjacent = getAdjacentPositions(nx, ny, currentGrid);
-        adjacent.forEach(pos => newRevealed.add(pos.key));
+        adjacent.forEach(pos => {
+          // Skip dark zone tiles
+          if (!darkZoneTiles.has(pos.key)) {
+            newRevealed.add(pos.key);
+          }
+        });
         return newRevealed;
       });
     };
@@ -986,11 +1028,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Check object layer first (for doors, hazards, etc.), then floor layer
     const targetType = targetCell.object?.type || targetCell.floor?.type;
     const currentType = currentCell.object?.type || currentCell.floor?.type;
+    const currentFloorType = currentCell.floor?.type;
     const targetConfig = targetCell.object?.config || targetCell.floor?.config;
 
     const moveResult = theme?.checkMovementInto?.(targetType, {
       ...currentGS,
-      currentTileType: currentType
+      currentTileType: currentType,
+      currentFloorType: currentFloorType
     }, targetConfig, currentGrid, nx, ny);
 
     if (moveResult) {

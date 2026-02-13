@@ -1,0 +1,3 @@
+# Adding Theme Specific Logic
+in this puzzle game where you can build different escape rooms with different themes we have an agnostic engine to any theme and theme specific code mechanism. you can read the md files to be updated.
+now i want to add osmething to the forest theme, the addition is a bit unique maybe it will require changes to the engine - but if you do do it only in a generic way- not theme specific. 

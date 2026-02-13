@@ -41,7 +41,9 @@
     "inventoryFull": "Inventory full! ({max} items max) Press Q to drop items.",
     "ancientGateOpened": "🌟 The ancient gate opens with a mystical glow!",
     "pathBroken": "❌ You broke the path sequence. Start again from the beginning.",
-    "pathLeft": "❌ You left the path. Start again from the beginning."
+    "pathLeft": "❌ You left the path. Start again from the beginning.",
+    "caveBlocked": "You can't enter the cave from here. Find the cave entrance!",
+    "caveExitBlocked": "You can't exit the cave here. Find the cave entrance to leave!"
   },
   "tiles": {
     "empty": "Empty",
@@ -72,7 +74,9 @@
     "item-wood": "Wood",
     "item-raft": "Raft",
     "ancient-gate": "Ancient Gate",
-    "sign": "Sign"
+    "sign": "Sign",
+    "cave-entry": "Cave Entry",
+    "cave": "Cave Floor"
   },
   "items": {
     "key": "Key",

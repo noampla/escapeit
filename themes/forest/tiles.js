@@ -62,6 +62,24 @@ export const TILE_TYPES = {
     tooltip: 'Blocks movement unless wearing a Sweater (press T). Can place items here.',
     walkable: true  // Base walkable so objects can be placed in builder; conditional in gameplay
   },
+  'cave-entry': {
+    label: 'Cave Entry',
+    color: '#4a4a5a',
+    category: 'basic',
+    layer: 'floor',
+    tooltip: 'Entrance to a dark cave. The only way in or out of the cave interior.',
+    walkable: true
+    // Note: cave-entry is NOT a dark zone - it's always visible as the entrance
+  },
+  cave: {
+    label: 'Cave Floor',
+    color: '#2a2a3a',
+    category: 'basic',
+    layer: 'floor',
+    tooltip: 'Dark cave interior. Can only enter through cave entry. Contents are hidden in darkness.',
+    walkable: true,  // Walkable but with directional restrictions
+    isDarkZone: true  // Part of the cave dark zone
+  },
   raft: {
     label: 'Raft',
     color: '#6699aa',
@@ -771,6 +789,93 @@ function drawSign(ctx, cx, cy, size) {
   ctx.strokeRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.35);
 }
 
+// Draw a cave entry (dark opening with rocky arch)
+function drawCaveEntry(ctx, cx, cy, size) {
+  const darkColor = '#1a1a2a';
+  const rockColor = '#5a5a6a';
+  const darkRock = '#3a3a4a';
+
+  // Background darkness (the cave opening)
+  ctx.fillStyle = darkColor;
+  ctx.beginPath();
+  ctx.arc(cx, cy + size * 0.1, size * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rocky arch at top
+  ctx.fillStyle = rockColor;
+  ctx.beginPath();
+  ctx.moveTo(cx - size * 0.45, cy + size * 0.2);
+  ctx.quadraticCurveTo(cx - size * 0.4, cy - size * 0.35, cx, cy - size * 0.4);
+  ctx.quadraticCurveTo(cx + size * 0.4, cy - size * 0.35, cx + size * 0.45, cy + size * 0.2);
+  ctx.lineTo(cx + size * 0.35, cy + size * 0.15);
+  ctx.quadraticCurveTo(cx + size * 0.3, cy - size * 0.2, cx, cy - size * 0.25);
+  ctx.quadraticCurveTo(cx - size * 0.3, cy - size * 0.2, cx - size * 0.35, cy + size * 0.15);
+  ctx.closePath();
+  ctx.fill();
+
+  // Rock texture
+  ctx.fillStyle = darkRock;
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.25, cy - size * 0.2, size * 0.08, size * 0.06, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.2, cy - size * 0.15, size * 0.06, size * 0.05, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Side rocks
+  ctx.fillStyle = rockColor;
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.4, cy + size * 0.1, size * 0.12, size * 0.2, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.4, cy + size * 0.1, size * 0.12, size * 0.2, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Darker inner void for depth
+  ctx.fillStyle = '#0a0a15';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + size * 0.1, size * 0.25, size * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Draw cave floor (dark rocky surface)
+function drawCaveFloor(ctx, cx, cy, size) {
+  const darkColor = '#1a1a2a';
+  const rockyColor = '#2a2a3a';
+  const accentColor = '#3a3a4a';
+
+  // Dark base
+  ctx.fillStyle = darkColor;
+  ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+
+  // Rocky texture (small stones)
+  const stones = [
+    { x: -0.25, y: -0.2, r: 0.08 },
+    { x: 0.15, y: -0.15, r: 0.06 },
+    { x: -0.1, y: 0.2, r: 0.07 },
+    { x: 0.25, y: 0.15, r: 0.05 },
+    { x: 0.05, y: -0.3, r: 0.04 },
+    { x: -0.3, y: 0.1, r: 0.05 },
+    { x: 0.3, y: -0.05, r: 0.06 },
+  ];
+
+  stones.forEach(stone => {
+    ctx.fillStyle = rockyColor;
+    ctx.beginPath();
+    ctx.arc(cx + stone.x * size, cy + stone.y * size, stone.r * size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Subtle highlights
+  ctx.fillStyle = accentColor;
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.15, cy - size * 0.1, size * 0.04, size * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.2, cy + size * 0.15, size * 0.03, size * 0.02, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // Draw a tree stump (removed tree)
 function drawTreeStump(ctx, cx, cy, size) {
   const stumpColor = '#6b4423';
@@ -1049,6 +1154,18 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Cave entry gets custom rendering
+  if (tile.type === 'cave-entry') {
+    drawCaveEntry(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Cave floor gets custom rendering
+  if (tile.type === 'cave') {
+    drawCaveFloor(ctx, cx, cy, size);
+    return true;
+  }
+
   // All other tiles use emoji or color
   return false;
 }
@@ -1082,6 +1199,8 @@ export function getTileEmoji(tileType) {
     empty: null,  // No emoji for empty (just color)
     'ancient-gate': null,  // Custom draw
     sign: null,  // Custom draw
+    'cave-entry': null,  // Custom draw
+    cave: null,  // Custom draw (just dark color)
   };
 
   return emojiMap[tileType] !== undefined ? emojiMap[tileType] : null;
@@ -1091,7 +1210,8 @@ export function getTileEmoji(tileType) {
 
 // Tiles that items can be dropped on (raft excluded - can't drop items while on water)
 // Snow excluded - it's a floor but you can't drop items on it (too cold!)
-export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start'];
+// Cave tiles included - can place items in caves (they'll be hidden in darkness)
+export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start', 'cave', 'cave-entry'];
 
 // Tiles player can interact with (E key)
 export const INTERACTABLE_TILES = ['tree', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign'];
@@ -1128,6 +1248,33 @@ function hasItemType(inventory, itemType) {
 export function checkMovementInto(tileType, gameState, tileConfig, grid, x, y) {
   const inventory = gameState?.inventory || [];
   const currentTileType = gameState?.currentTileType;
+
+  // Get floor types for cave movement restrictions
+  const destFloorType = grid?.[y]?.[x]?.floor?.type;
+  const sourceFloorType = gameState?.currentFloorType;
+
+  // Cave movement restrictions
+  // Cave tiles can only be entered from cave-entry or other cave tiles
+  if (destFloorType === 'cave') {
+    const validSource = ['cave', 'cave-entry'].includes(sourceFloorType);
+    if (!validSource) {
+      return {
+        allowed: false,
+        messageKey: 'caveBlocked'
+      };
+    }
+  }
+
+  // Can only exit cave tiles through cave-entry (not directly to regular ground)
+  if (sourceFloorType === 'cave') {
+    const validDest = ['cave', 'cave-entry'].includes(destFloorType);
+    if (!validDest) {
+      return {
+        allowed: false,
+        messageKey: 'caveExitBlocked'
+      };
+    }
+  }
 
   // First check if the FLOOR is snow (regardless of what's on top)
   // This ensures snow rules apply even when there's an object on the snow
@@ -1416,4 +1563,51 @@ export function renderPlayer(ctx, x, y, size, _direction, gameState = {}) {
   }
 
   return true;
+}
+
+// === DARK ZONE FUNCTIONS (Caves) ===
+
+/**
+ * Check if the player is currently in a cave area (cave or cave-entry)
+ * When in cave area, player can see "?" hints on dark tiles
+ * @param {Object} playerPos - Player position { x, y }
+ * @param {Array} grid - The game grid
+ * @param {Object} gameState - Current game state
+ * @returns {boolean} - True if player is in cave area
+ */
+export function isPlayerInDarkZone(playerPos, grid, gameState = {}) {
+  if (!playerPos || !grid) return false;
+
+  const cell = grid[playerPos.y]?.[playerPos.x];
+  if (!cell) return false;
+
+  // Check if player is on cave or cave-entry tiles
+  const floorType = cell.floor?.type;
+  return floorType === 'cave' || floorType === 'cave-entry';
+}
+
+/**
+ * Get all dark zone tile positions in the grid
+ * These tiles will be blacked out when the player is in a dark zone
+ * @param {Array} grid - The game grid
+ * @returns {Set} - Set of position strings "x,y" for dark zone tiles
+ */
+export function getDarkZoneTiles(grid) {
+  const tiles = new Set();
+
+  if (!grid || !Array.isArray(grid)) return tiles;
+
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[y].length; x++) {
+      const cell = grid[y][x];
+      const floorType = cell?.floor?.type;
+      const tileDef = TILE_TYPES[floorType];
+
+      if (tileDef?.isDarkZone === true) {
+        tiles.add(`${x},${y}`);
+      }
+    }
+  }
+
+  return tiles;
 }

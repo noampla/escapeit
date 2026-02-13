@@ -52,18 +52,74 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     const endX = viewportBounds ? viewportBounds.maxX : grid[0].length - 1;
     const endY = viewportBounds ? viewportBounds.maxY : grid.length - 1;
 
+    // Get dark zone tiles once (theme-agnostic)
+    const darkZoneTiles = playerPos ? (theme?.getDarkZoneTiles?.(grid) || new Set()) : new Set();
+    const playerInDarkZone = playerPos ? (theme?.isPlayerInDarkZone?.(playerPos, grid, gameState) || false) : false;
+
+    // Calculate temporary visibility for dark zone (5 tiles: current + 4 cardinal)
+    const darkZoneVisible = new Set();
+    if (playerInDarkZone && playerPos) {
+      darkZoneVisible.add(`${playerPos.x},${playerPos.y}`);
+      darkZoneVisible.add(`${playerPos.x},${playerPos.y - 1}`);
+      darkZoneVisible.add(`${playerPos.x},${playerPos.y + 1}`);
+      darkZoneVisible.add(`${playerPos.x - 1},${playerPos.y}`);
+      darkZoneVisible.add(`${playerPos.x + 1},${playerPos.y}`);
+    }
+
     for (let y = startY; y <= endY; y++) {
       for (let x = startX; x <= endX; x++) {
-        // Fog of war in solve mode
-        if (revealedTiles && !revealedTiles.has(`${x},${y}`)) {
+        const key = `${x},${y}`;
+        const isDarkZoneTile = darkZoneTiles.has(key);
+        const px = (x - offsetX) * TILE_SIZE, py = (y - offsetY) * TILE_SIZE;
+
+        // === DARK ZONE TILES - separate visibility system (theme-defined) ===
+        if (isDarkZoneTile) {
+          // Dark zone tiles are NEVER in revealedTiles
+          // They only show when player is inside dark zone AND within 5-tile range
+          if (!playerInDarkZone || !darkZoneVisible.has(key)) {
+            // Not visible - black fog
+            ctx.fillStyle = '#000';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            continue;
+          }
+          // Visible: render floor only (no objects!), then apply dark overlay
+          const cell = grid[y][x];
+          const TILE_TYPES = theme?.getTileTypes() || {};
+          const cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
+
+          // Draw floor only
+          const floorDef = TILE_TYPES[cell.floor?.type] || TILE_TYPES.empty || { color: '#333' };
+          ctx.fillStyle = cell.floor?.config?.floorColor || floorDef.color;
+          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          ctx.strokeStyle = '#2a3a2a';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+          const floorRendered = theme?.renderTile?.(ctx, cell.floor, cx, cy, TILE_SIZE);
+          if (!floorRendered) {
+            const floorEmoji = theme?.getTileEmoji?.(cell.floor?.type) || DEFAULT_TILE_EMOJIS[cell.floor?.type];
+            if (floorEmoji) {
+              ctx.font = '22px serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(floorEmoji, cx, cy);
+            }
+          }
+          // NO objects rendered - darkness hides them
+          // Apply dark overlay
+          ctx.fillStyle = 'rgba(0, 0, 10, 0.6)';
+          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          continue;
+        }
+
+        // === REGULAR TILES - use revealedTiles fog of war ===
+        if (revealedTiles && !revealedTiles.has(key)) {
           ctx.fillStyle = '#000';
-          ctx.fillRect((x - offsetX) * TILE_SIZE, (y - offsetY) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           continue;
         }
 
         const cell = grid[y][x];
         const TILE_TYPES = theme?.getTileTypes() || {};
-        const px = (x - offsetX) * TILE_SIZE, py = (y - offsetY) * TILE_SIZE;
         const cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
 
         // === LAYER 1: FLOOR ===
@@ -322,6 +378,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      // Dark overlay on player when inside dark zone
+      if (playerInDarkZone) {
+        ctx.fillStyle = 'rgba(0, 0, 10, 0.6)';
+        ctx.fillRect(ppx, ppy, TILE_SIZE, TILE_SIZE);
+      }
     }
   }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths]);
 
