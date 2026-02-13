@@ -58,8 +58,8 @@ export const INTERACTIONS = {
     duration: 1500,
     requirements: { inventory: ['knife'], tile: 'thorny-bush' },
     execute: (gameState, grid, x, y) => {
-      // Remove thorny bush from object layer
-      grid[y][x].object = null;
+      // Replace thorny bush with cleared bush visual
+      grid[y][x].object = { type: 'cleared-bush', config: {} };
       return {
         success: true,
         messageKey: 'thornyBushCleared',
@@ -224,8 +224,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needFilledBucket' };
       }
 
-      // Remove fire from object layer
-      grid[y][x].object = null;
+      // Replace fire with extinguished fire visual
+      grid[y][x].object = { type: 'extinguished-fire', config: {} };
 
       // Empty the bucket
       gameState.inventory[filledBucketIdx] = {
@@ -250,8 +250,8 @@ export const INTERACTIONS = {
       const friend = grid[y][x];
       const friendName = friend.object?.config?.name || 'Friend';
 
-      // Remove friend from object layer
-      grid[y][x].object = null;
+      // Replace friend with rescued friend visual (footprints)
+      grid[y][x].object = { type: 'rescued-friend', config: {} };
 
       // Update game state
       gameState.rescuedFriends = (gameState.rescuedFriends || 0) + 1;
@@ -281,8 +281,8 @@ export const INTERACTIONS = {
         return { success: false, messageKey: 'needKnife' };
       }
 
-      // Remove bear from object layer
-      grid[y][x].object = null;
+      // Replace bear with defeated bear visual (paw prints)
+      grid[y][x].object = { type: 'defeated-bear', config: {} };
 
       // Remove knife and add sweater
       gameState.inventory = gameState.inventory.filter((_, i) => i !== knifeIdx);

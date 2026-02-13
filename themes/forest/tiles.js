@@ -222,6 +222,48 @@ export const TILE_TYPES = {
     tooltip: 'A sign with a message. Press E to read.',
     walkable: true
   },
+
+  // Removed/defeated object states (visual only, walkable)
+  'tree-stump': {
+    label: 'Tree Stump',
+    color: '#6b4423',
+    category: null,  // Not placeable in builder
+    layer: 'object',
+    tooltip: 'Remains of a cut tree.',
+    walkable: true
+  },
+  'cleared-bush': {
+    label: 'Cleared Bush',
+    color: '#5a7b4a',
+    category: null,
+    layer: 'object',
+    tooltip: 'Cleared thorny bush area.',
+    walkable: true
+  },
+  'extinguished-fire': {
+    label: 'Extinguished Fire',
+    color: '#4a4a4a',
+    category: null,
+    layer: 'object',
+    tooltip: 'Remains of extinguished fire.',
+    walkable: true
+  },
+  'defeated-bear': {
+    label: 'Defeated Bear',
+    color: '#6b4423',
+    category: null,
+    layer: 'object',
+    tooltip: 'Paw prints from defeated bear.',
+    walkable: true
+  },
+  'rescued-friend': {
+    label: 'Rescued Friend',
+    color: '#aaaaaa',
+    category: null,
+    layer: 'object',
+    tooltip: 'Footprints from rescued friend.',
+    walkable: true
+  },
 };
 
 export const CONFIG_HELP = {
@@ -544,6 +586,205 @@ function drawSign(ctx, cx, cy, size) {
   ctx.strokeRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.35);
 }
 
+// Draw a tree stump (removed tree)
+function drawTreeStump(ctx, cx, cy, size) {
+  const stumpColor = '#6b4423';
+  const darkBrown = '#4a2f1a';
+  const lightBrown = '#8b6434';
+
+  // Main stump (oval shape)
+  ctx.fillStyle = stumpColor;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.35, size * 0.25, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Annual rings (tree rings)
+  ctx.strokeStyle = darkBrown;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.25, size * 0.18, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.15, size * 0.11, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Highlights
+  ctx.fillStyle = lightBrown;
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.1, cy - size * 0.05, size * 0.08, size * 0.06, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wood grain cracks
+  ctx.strokeStyle = darkBrown;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + size * 0.2, cy - size * 0.1);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx - size * 0.15, cy + size * 0.12);
+  ctx.stroke();
+}
+
+// Draw cleared bush area (grass/ground)
+function drawClearedBush(ctx, cx, cy, size) {
+  // Light patches of grass to show something was cleared
+  const grassColor = '#4a6b3a';
+  const lightGrass = '#5a7b4a';
+
+  // Small grass tufts scattered around
+  const tufts = [
+    { x: -0.15, y: -0.1, w: 0.1, h: 0.08 },
+    { x: 0.1, y: 0.05, w: 0.12, h: 0.09 },
+    { x: -0.05, y: 0.12, w: 0.08, h: 0.07 },
+    { x: 0.15, y: -0.08, w: 0.09, h: 0.08 }
+  ];
+
+  tufts.forEach(tuft => {
+    ctx.fillStyle = grassColor;
+    ctx.beginPath();
+    ctx.ellipse(
+      cx + tuft.x * size,
+      cy + tuft.y * size,
+      tuft.w * size,
+      tuft.h * size,
+      0, 0, Math.PI * 2
+    );
+    ctx.fill();
+  });
+
+  // Add lighter highlights
+  ctx.fillStyle = lightGrass;
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.12, cy - size * 0.08, size * 0.05, size * 0.04, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Draw extinguished fire (burnt logs in X pattern with ash)
+function drawExtinguishedFire(ctx, cx, cy, size) {
+  const charcoal = '#2a2a2a';
+  const ashGray = '#5a5a5a';
+  const logBrown = '#3a2a1a';
+
+  // Draw burnt logs in X pattern
+  const logWidth = size * 0.12;
+  const logLength = size * 0.5;
+
+  // Log 1: diagonal from top-left to bottom-right (\)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(Math.PI / 4); // 45 degrees
+  ctx.fillStyle = charcoal;
+  ctx.fillRect(-logLength / 2, -logWidth / 2, logLength, logWidth);
+
+  // Add texture to log
+  ctx.fillStyle = logBrown;
+  ctx.fillRect(-logLength / 2 + logWidth * 0.2, -logWidth / 2, logWidth * 0.15, logWidth);
+  ctx.fillRect(-logLength / 2 + logLength * 0.4, -logWidth / 2, logWidth * 0.15, logWidth);
+  ctx.fillRect(-logLength / 2 + logLength * 0.7, -logWidth / 2, logWidth * 0.15, logWidth);
+  ctx.restore();
+
+  // Log 2: diagonal from top-right to bottom-left (/)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 4); // -45 degrees
+  ctx.fillStyle = charcoal;
+  ctx.fillRect(-logLength / 2, -logWidth / 2, logLength, logWidth);
+
+  // Add texture to log
+  ctx.fillStyle = logBrown;
+  ctx.fillRect(-logLength / 2 + logWidth * 0.3, -logWidth / 2, logWidth * 0.15, logWidth);
+  ctx.fillRect(-logLength / 2 + logLength * 0.5, -logWidth / 2, logWidth * 0.15, logWidth);
+  ctx.fillRect(-logLength / 2 + logLength * 0.8, -logWidth / 2, logWidth * 0.15, logWidth);
+  ctx.restore();
+
+  // Ash pile in center (where logs cross)
+  ctx.fillStyle = ashGray;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Darker ash in center
+  ctx.fillStyle = '#4a4a4a';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Draw defeated bear remains (paw prints)
+function drawDefeatedBear(ctx, cx, cy, size) {
+  const pawColor = '#6b4423';
+  const padColor = '#5a3a20';
+
+  // Draw two paw prints side by side
+  const drawPaw = (x, y, scale) => {
+    // Main pad
+    ctx.fillStyle = pawColor;
+    ctx.beginPath();
+    ctx.ellipse(x, y + scale * 0.08, scale * 0.12, scale * 0.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Toe pads (4 toes)
+    const toePositions = [
+      { dx: -0.1, dy: -0.08 },
+      { dx: -0.03, dy: -0.12 },
+      { dx: 0.04, dy: -0.12 },
+      { dx: 0.11, dy: -0.08 }
+    ];
+
+    ctx.fillStyle = padColor;
+    toePositions.forEach(toe => {
+      ctx.beginPath();
+      ctx.arc(x + toe.dx * scale, y + toe.dy * scale, scale * 0.045, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  };
+
+  // Left paw print
+  drawPaw(cx - size * 0.15, cy, size);
+
+  // Right paw print (slightly offset)
+  drawPaw(cx + size * 0.15, cy + size * 0.1, size);
+}
+
+// Draw rescued friend spot (fading footprints)
+function drawRescuedFriend(ctx, cx, cy, size) {
+  const footColor = 'rgba(100, 100, 100, 0.3)';
+
+  // Draw simple footprints fading away
+  const drawFootprint = (x, y, scale, rotation) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.fillStyle = footColor;
+
+    // Foot sole
+    ctx.beginPath();
+    ctx.ellipse(0, 0, scale * 0.08, scale * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Toes (5 small circles)
+    for (let i = 0; i < 5; i++) {
+      const angle = (i - 2) * 0.3;
+      const tx = Math.sin(angle) * scale * 0.08;
+      const ty = -scale * 0.14;
+      ctx.beginPath();
+      ctx.arc(tx, ty, scale * 0.025, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  };
+
+  // Walking away footprints (left, right, left)
+  drawFootprint(cx - size * 0.1, cy + size * 0.15, size, -0.2);
+  drawFootprint(cx + size * 0.08, cy, size, 0.2);
+  drawFootprint(cx - size * 0.05, cy - size * 0.15, size * 0.8, -0.15);
+}
+
 // Custom rendering for tiles (optional - most use emoji/color)
 export function renderTile(ctx, tile, cx, cy, size) {
   // Guard against undefined tile
@@ -576,6 +817,32 @@ export function renderTile(ctx, tile, cx, cy, size) {
   // Sign gets custom rendering
   if (tile.type === 'sign') {
     drawSign(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Removed/defeated object states get custom rendering
+  if (tile.type === 'tree-stump') {
+    drawTreeStump(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (tile.type === 'cleared-bush') {
+    drawClearedBush(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (tile.type === 'extinguished-fire') {
+    drawExtinguishedFire(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (tile.type === 'defeated-bear') {
+    drawDefeatedBear(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (tile.type === 'rescued-friend') {
+    drawRescuedFriend(ctx, cx, cy, size);
     return true;
   }
 
