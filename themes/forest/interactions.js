@@ -56,7 +56,7 @@ export const INTERACTIONS = {
   'clear-thorny-bush': {
     label: 'Clear Bush',
     duration: 1500,
-    requirements: { inventory: ['knife'], tile: 'thorny-bush' },
+    requirements: { inventory: ['machete'], tile: 'thorny-bush' },
     execute: (gameState, grid, x, y) => {
       // Replace thorny bush with cleared bush visual
       grid[y][x].object = { type: 'cleared-bush', config: {} };

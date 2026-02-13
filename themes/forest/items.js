@@ -36,6 +36,13 @@ export const ITEM_TYPES = {
     color: '#cccccc',
     description: 'Defeat bears to get sweater'
   },
+  machete: {
+    label: 'Machete',
+    emoji: null,  // Custom draw
+    color: '#888888',
+    draw: 'machete',
+    description: 'Cut thorny bushes'
+  },
   sweater: {
     label: 'Sweater',
     emoji: '🧥',
@@ -123,6 +130,69 @@ function drawBucket(ctx, cx, cy, size, filled = false) {
   ctx.fill();
 }
 
+// Custom rendering for machete
+function drawMachete(ctx, cx, cy, size) {
+  const bladeGray = '#c0c0c0';
+  const bladeDark = '#808080';
+  const handleBrown = '#6b4423';
+  const handleDark = '#4a2f1a';
+
+  // Blade (angled, wide cutting tool)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.5); // Angle the machete
+
+  // Main blade
+  ctx.fillStyle = bladeGray;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.3, -size * 0.08);
+  ctx.lineTo(size * 0.35, -size * 0.05);
+  ctx.lineTo(size * 0.38, size * 0.02);
+  ctx.lineTo(-size * 0.3, size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Blade edge (darker)
+  ctx.fillStyle = bladeDark;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.25, -size * 0.04);
+  ctx.lineTo(size * 0.38, size * 0.02);
+  ctx.lineTo(size * 0.35, -size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Blade shine/highlight
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.2, -size * 0.05);
+  ctx.lineTo(size * 0.25, -size * 0.03);
+  ctx.stroke();
+
+  // Handle (wood grip)
+  ctx.fillStyle = handleBrown;
+  ctx.fillRect(-size * 0.35, -size * 0.08, size * 0.12, size * 0.13);
+
+  // Handle texture lines
+  ctx.strokeStyle = handleDark;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.35, -size * 0.03);
+  ctx.lineTo(-size * 0.23, -size * 0.03);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.35, size * 0.02);
+  ctx.lineTo(-size * 0.23, size * 0.02);
+  ctx.stroke();
+
+  // Guard/hilt
+  ctx.fillStyle = bladeDark;
+  ctx.fillRect(-size * 0.24, -size * 0.10, size * 0.04, size * 0.17);
+
+  ctx.restore();
+}
+
 // Custom rendering for wood
 function drawWood(ctx, cx, cy, size) {
   const s = size * 0.32;
@@ -200,6 +270,11 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
 
   if (item.draw === 'wood') {
     drawWood(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'machete') {
+    drawMachete(ctx, cx, cy, size);
     return true;
   }
 
@@ -306,6 +381,11 @@ export function renderInventoryItem(ctx, itemType, x, y, size, state = null) {
 
   if (item.draw === 'wood') {
     drawWood(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'machete') {
+    drawMachete(ctx, cx, cy, size);
     return true;
   }
 

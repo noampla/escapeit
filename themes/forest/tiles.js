@@ -142,6 +142,16 @@ export const TILE_TYPES = {
     tooltip: 'Collectible knife. Press F to pick up. Defeat bears.',
     walkable: true
   },
+  'item-machete': {
+    label: 'Machete',
+    color: '#888888',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'machete',
+    tooltip: 'Collectible machete. Press F to pick up. Cut thorny bushes.',
+    walkable: true
+  },
   'item-sweater': {
     label: 'Sweater',
     color: '#cc4466',
@@ -553,6 +563,69 @@ function drawAncientGate(ctx, cx, cy, size, config = {}) {
   }
 }
 
+// Draw a machete
+function drawMachete(ctx, cx, cy, size) {
+  const bladeGray = '#c0c0c0';
+  const bladeDark = '#808080';
+  const handleBrown = '#6b4423';
+  const handleDark = '#4a2f1a';
+
+  // Blade (angled, wide cutting tool)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.5); // Angle the machete
+
+  // Main blade
+  ctx.fillStyle = bladeGray;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.3, -size * 0.08);
+  ctx.lineTo(size * 0.35, -size * 0.05);
+  ctx.lineTo(size * 0.38, size * 0.02);
+  ctx.lineTo(-size * 0.3, size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Blade edge (darker)
+  ctx.fillStyle = bladeDark;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.25, -size * 0.04);
+  ctx.lineTo(size * 0.38, size * 0.02);
+  ctx.lineTo(size * 0.35, -size * 0.05);
+  ctx.closePath();
+  ctx.fill();
+
+  // Blade shine/highlight
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.2, -size * 0.05);
+  ctx.lineTo(size * 0.25, -size * 0.03);
+  ctx.stroke();
+
+  // Handle (wood grip)
+  ctx.fillStyle = handleBrown;
+  ctx.fillRect(-size * 0.35, -size * 0.08, size * 0.12, size * 0.13);
+
+  // Handle texture lines
+  ctx.strokeStyle = handleDark;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.35, -size * 0.03);
+  ctx.lineTo(-size * 0.23, -size * 0.03);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.35, size * 0.02);
+  ctx.lineTo(-size * 0.23, size * 0.02);
+  ctx.stroke();
+
+  // Guard/hilt
+  ctx.fillStyle = bladeDark;
+  ctx.fillRect(-size * 0.24, -size * 0.10, size * 0.04, size * 0.17);
+
+  ctx.restore();
+}
+
 // Draw a wooden sign
 function drawSign(ctx, cx, cy, size) {
   const woodColor = '#8b7355';
@@ -820,6 +893,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Machete gets custom rendering
+  if (tile.type === 'item-machete') {
+    drawMachete(ctx, cx, cy, size);
+    return true;
+  }
+
   // Removed/defeated object states get custom rendering
   if (tile.type === 'tree-stump') {
     drawTreeStump(ctx, cx, cy, size);
@@ -867,6 +946,7 @@ export function getTileEmoji(tileType) {
     'item-bucket': null,  // Custom draw
     'item-rope': '🧵',
     'item-knife': '🔪',
+    'item-machete': null,  // Custom draw
     'item-sweater': '🧥',
     'item-wood': null,  // Custom draw
     'item-raft': '🛶',  // Raft item uses boat emoji
