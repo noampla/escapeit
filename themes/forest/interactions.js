@@ -58,8 +58,8 @@ export const INTERACTIONS = {
     duration: 1500,
     requirements: { inventory: ['machete'], tile: 'thorny-bush' },
     execute: (gameState, grid, x, y) => {
-      // Replace thorny bush with cleared bush visual
-      grid[y][x].object = { type: 'cleared-bush', config: {} };
+      // Replace thorny bush with stick item
+      grid[y][x].object = { type: 'item-stick', config: {} };
       return {
         success: true,
         messageKey: 'thornyBushCleared',
@@ -203,6 +203,32 @@ export const INTERACTIONS = {
         success: true,
         messageKey: 'raftPickedUp',
         modifyGrid: true,
+        modifyInventory: true
+      };
+    }
+  },
+
+  'light-stick': {
+    label: 'Light Stick',
+    duration: 1000,
+    requirements: {
+      tile: 'fire',
+      inventory: ['stick']
+    },
+    execute: (gameState, grid, x, y) => {
+      const stickIdx = findItemIndex(gameState.inventory, 'stick');
+
+      if (stickIdx === -1) {
+        return { success: false, messageKey: 'needStick' };
+      }
+
+      // Remove stick and add torch
+      gameState.inventory = gameState.inventory.filter((_, i) => i !== stickIdx);
+      gameState.inventory.push({ itemType: 'torch' });
+
+      return {
+        success: true,
+        messageKey: 'stickLit',
         modifyInventory: true
       };
     }

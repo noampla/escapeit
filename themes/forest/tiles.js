@@ -152,6 +152,26 @@ export const TILE_TYPES = {
     tooltip: 'Collectible machete. Press F to pick up. Cut thorny bushes.',
     walkable: true
   },
+  'item-stick': {
+    label: 'Stick',
+    color: '#8b6914',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'stick',
+    tooltip: 'Collectible stick. Press F to pick up. Light at fire to make torch.',
+    walkable: true
+  },
+  'item-torch': {
+    label: 'Torch',
+    color: '#ff8800',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'torch',
+    tooltip: 'Collectible lit torch. Press F to pick up. Provides light.',
+    walkable: true
+  },
   'item-sweater': {
     label: 'Sweater',
     color: '#cc4466',
@@ -626,6 +646,98 @@ function drawMachete(ctx, cx, cy, size) {
   ctx.restore();
 }
 
+// Draw a stick (simple wooden stick)
+function drawStick(ctx, cx, cy, size) {
+  const stickBrown = '#8b6914';
+  const stickDark = '#6b4910';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.3); // Slight angle
+
+  // Main stick body
+  ctx.fillStyle = stickBrown;
+  ctx.fillRect(-size * 0.35, -size * 0.05, size * 0.7, size * 0.1);
+
+  // Dark side for depth
+  ctx.fillStyle = stickDark;
+  ctx.fillRect(-size * 0.35, size * 0.02, size * 0.7, size * 0.03);
+
+  // Wood texture lines
+  ctx.strokeStyle = stickDark;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const x = -size * 0.3 + i * size * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(x, -size * 0.05);
+    ctx.lineTo(x, size * 0.05);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Draw a lit torch (flaming torch)
+function drawTorch(ctx, cx, cy, size) {
+  const stickBrown = '#6b4910';
+  const stickDark = '#4a2f1a';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Wooden handle
+  ctx.fillStyle = stickBrown;
+  ctx.fillRect(-size * 0.06, size * 0.05, size * 0.12, size * 0.4);
+
+  // Handle texture
+  ctx.fillStyle = stickDark;
+  ctx.fillRect(-size * 0.06, size * 0.1, size * 0.12, size * 0.03);
+  ctx.fillRect(-size * 0.06, size * 0.2, size * 0.12, size * 0.03);
+  ctx.fillRect(-size * 0.06, size * 0.3, size * 0.12, size * 0.03);
+
+  // Wrapped cloth at top
+  ctx.fillStyle = '#8b7355';
+  ctx.fillRect(-size * 0.1, -size * 0.05, size * 0.2, size * 0.12);
+
+  // Flames - outer orange
+  ctx.fillStyle = '#ff6600';
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.35);
+  ctx.bezierCurveTo(-size * 0.15, -size * 0.25, -size * 0.12, -size * 0.1, -size * 0.08, -size * 0.05);
+  ctx.lineTo(size * 0.08, -size * 0.05);
+  ctx.bezierCurveTo(size * 0.12, -size * 0.1, size * 0.15, -size * 0.25, 0, -size * 0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flames - middle yellow-orange
+  ctx.fillStyle = '#ff9933';
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.3);
+  ctx.bezierCurveTo(-size * 0.1, -size * 0.22, -size * 0.08, -size * 0.12, -size * 0.05, -size * 0.05);
+  ctx.lineTo(size * 0.05, -size * 0.05);
+  ctx.bezierCurveTo(size * 0.08, -size * 0.12, size * 0.1, -size * 0.22, 0, -size * 0.3);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flames - inner yellow
+  ctx.fillStyle = '#ffcc00';
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.25);
+  ctx.bezierCurveTo(-size * 0.06, -size * 0.18, -size * 0.04, -size * 0.1, -size * 0.03, -size * 0.05);
+  ctx.lineTo(size * 0.03, -size * 0.05);
+  ctx.bezierCurveTo(size * 0.04, -size * 0.1, size * 0.06, -size * 0.18, 0, -size * 0.25);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flame highlights (bright center)
+  ctx.fillStyle = '#ffff66';
+  ctx.beginPath();
+  ctx.ellipse(0, -size * 0.12, size * 0.025, size * 0.04, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 // Draw a wooden sign
 function drawSign(ctx, cx, cy, size) {
   const woodColor = '#8b7355';
@@ -899,6 +1011,18 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Stick gets custom rendering
+  if (tile.type === 'item-stick') {
+    drawStick(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Torch gets custom rendering
+  if (tile.type === 'item-torch') {
+    drawTorch(ctx, cx, cy, size);
+    return true;
+  }
+
   // Removed/defeated object states get custom rendering
   if (tile.type === 'tree-stump') {
     drawTreeStump(ctx, cx, cy, size);
@@ -947,6 +1071,8 @@ export function getTileEmoji(tileType) {
     'item-rope': '🧵',
     'item-knife': '🔪',
     'item-machete': null,  // Custom draw
+    'item-stick': null,  // Custom draw
+    'item-torch': null,  // Custom draw
     'item-sweater': '🧥',
     'item-wood': null,  // Custom draw
     'item-raft': '🛶',  // Raft item uses boat emoji

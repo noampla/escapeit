@@ -43,6 +43,20 @@ export const ITEM_TYPES = {
     draw: 'machete',
     description: 'Cut thorny bushes'
   },
+  stick: {
+    label: 'Stick',
+    emoji: null,  // Custom draw
+    color: '#8b6914',
+    draw: 'stick',
+    description: 'Light at fire to make torch'
+  },
+  torch: {
+    label: 'Torch',
+    emoji: null,  // Custom draw
+    color: '#ff8800',
+    draw: 'torch',
+    description: 'Provides light in dark areas'
+  },
   sweater: {
     label: 'Sweater',
     emoji: '🧥',
@@ -193,6 +207,98 @@ function drawMachete(ctx, cx, cy, size) {
   ctx.restore();
 }
 
+// Custom rendering for stick
+function drawStick(ctx, cx, cy, size) {
+  const stickBrown = '#8b6914';
+  const stickDark = '#6b4910';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.3); // Slight angle
+
+  // Main stick body
+  ctx.fillStyle = stickBrown;
+  ctx.fillRect(-size * 0.35, -size * 0.05, size * 0.7, size * 0.1);
+
+  // Dark side for depth
+  ctx.fillStyle = stickDark;
+  ctx.fillRect(-size * 0.35, size * 0.02, size * 0.7, size * 0.03);
+
+  // Wood texture lines
+  ctx.strokeStyle = stickDark;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const x = -size * 0.3 + i * size * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(x, -size * 0.05);
+    ctx.lineTo(x, size * 0.05);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Custom rendering for torch
+function drawTorch(ctx, cx, cy, size) {
+  const stickBrown = '#6b4910';
+  const stickDark = '#4a2f1a';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Wooden handle
+  ctx.fillStyle = stickBrown;
+  ctx.fillRect(-size * 0.06, size * 0.05, size * 0.12, size * 0.4);
+
+  // Handle texture
+  ctx.fillStyle = stickDark;
+  ctx.fillRect(-size * 0.06, size * 0.1, size * 0.12, size * 0.03);
+  ctx.fillRect(-size * 0.06, size * 0.2, size * 0.12, size * 0.03);
+  ctx.fillRect(-size * 0.06, size * 0.3, size * 0.12, size * 0.03);
+
+  // Wrapped cloth at top
+  ctx.fillStyle = '#8b7355';
+  ctx.fillRect(-size * 0.1, -size * 0.05, size * 0.2, size * 0.12);
+
+  // Flames - outer orange
+  ctx.fillStyle = '#ff6600';
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.35);
+  ctx.bezierCurveTo(-size * 0.15, -size * 0.25, -size * 0.12, -size * 0.1, -size * 0.08, -size * 0.05);
+  ctx.lineTo(size * 0.08, -size * 0.05);
+  ctx.bezierCurveTo(size * 0.12, -size * 0.1, size * 0.15, -size * 0.25, 0, -size * 0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flames - middle yellow-orange
+  ctx.fillStyle = '#ff9933';
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.3);
+  ctx.bezierCurveTo(-size * 0.1, -size * 0.22, -size * 0.08, -size * 0.12, -size * 0.05, -size * 0.05);
+  ctx.lineTo(size * 0.05, -size * 0.05);
+  ctx.bezierCurveTo(size * 0.08, -size * 0.12, size * 0.1, -size * 0.22, 0, -size * 0.3);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flames - inner yellow
+  ctx.fillStyle = '#ffcc00';
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.25);
+  ctx.bezierCurveTo(-size * 0.06, -size * 0.18, -size * 0.04, -size * 0.1, -size * 0.03, -size * 0.05);
+  ctx.lineTo(size * 0.03, -size * 0.05);
+  ctx.bezierCurveTo(size * 0.04, -size * 0.1, size * 0.06, -size * 0.18, 0, -size * 0.25);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flame highlights (bright center)
+  ctx.fillStyle = '#ffff66';
+  ctx.beginPath();
+  ctx.ellipse(0, -size * 0.12, size * 0.025, size * 0.04, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 // Custom rendering for wood
 function drawWood(ctx, cx, cy, size) {
   const s = size * 0.32;
@@ -275,6 +381,16 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
 
   if (item.draw === 'machete') {
     drawMachete(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'stick') {
+    drawStick(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'torch') {
+    drawTorch(ctx, cx, cy, size);
     return true;
   }
 
@@ -386,6 +502,16 @@ export function renderInventoryItem(ctx, itemType, x, y, size, state = null) {
 
   if (item.draw === 'machete') {
     drawMachete(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'stick') {
+    drawStick(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'torch') {
+    drawTorch(ctx, cx, cy, size);
     return true;
   }
 
