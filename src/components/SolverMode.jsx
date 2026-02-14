@@ -1009,27 +1009,41 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const currentGS = gameStateRef.current;
 
     // Helper to reveal tiles when moving/attempting to move
-    // Dark zone tiles have their own visibility system - never use revealedTiles
-    // When TARGET is a dark tile, don't reveal (going deeper into cave)
-    // When TARGET is not dark (cave-entry or outside), reveal it and adjacent non-dark tiles
+    // Dark zone tiles: with torch = permanent reveal, without torch = temporary 5-tile visibility
+    // Regular tiles: normal fog of war reveal
     const revealTargetTile = () => {
       // Get dark zone tiles from theme
       const darkZoneTiles = theme?.getDarkZoneTiles?.(currentGrid) || new Set();
-
-      // Check if TARGET position is a dark zone tile
       const targetIsDarkZone = darkZoneTiles.has(`${nx},${ny}`);
+      const playerHasLight = theme?.hasLightInDarkZone?.(currentGS) || false;
 
-      // If moving into a dark zone tile, don't reveal anything
+      // If moving into a dark zone tile WITH torch, reveal it permanently
+      if (targetIsDarkZone && playerHasLight) {
+        setRevealedTiles(prevRevealed => {
+          const newRevealed = new Set(prevRevealed);
+          newRevealed.add(`${nx},${ny}`);
+          // Also reveal adjacent dark zone tiles (but not outside tiles)
+          const adjacent = getAdjacentPositions(nx, ny, currentGrid);
+          adjacent.forEach(pos => {
+            if (darkZoneTiles.has(pos.key)) {
+              newRevealed.add(pos.key);
+            }
+          });
+          return newRevealed;
+        });
+        return;
+      }
+
+      // If moving into a dark zone tile WITHOUT torch, don't reveal (temporary visibility only)
       if (targetIsDarkZone) {
-        return; // No revealing when entering cave interior
+        return;
       }
 
       // Normal reveal for regular tiles (including cave-entry)
       setRevealedTiles(prevRevealed => {
         const newRevealed = new Set(prevRevealed);
-        // Reveal target tile
         newRevealed.add(`${nx},${ny}`);
-        // Reveal adjacent tiles (skip dark zone tiles)
+        // Reveal adjacent tiles (skip dark zone tiles - they need torch)
         const adjacent = getAdjacentPositions(nx, ny, currentGrid);
         adjacent.forEach(pos => {
           if (!darkZoneTiles.has(pos.key)) {

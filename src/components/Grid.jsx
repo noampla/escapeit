@@ -76,9 +76,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
 
         // === DARK ZONE TILES - separate visibility system (theme-defined) ===
         if (isDarkZoneTile) {
-          // Dark zone tiles are NEVER in revealedTiles
-          // They only show when player is inside dark zone AND within 5-tile range
-          if (!playerInDarkZone || !darkZoneVisible.has(key)) {
+          // With torch: tiles can be permanently revealed (stored in revealedTiles)
+          // Without torch: only temporary 5-tile visibility
+          const isPermanentlyRevealed = hasLight && revealedTiles?.has(key);
+          const isTemporarilyVisible = playerInDarkZone && darkZoneVisible.has(key);
+
+          if (!isPermanentlyRevealed && !isTemporarilyVisible) {
             // Not visible - black fog
             ctx.fillStyle = '#000';
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
