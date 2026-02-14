@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, isBuilder = false }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -27,6 +27,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
   const holdStartPos = useRef(null);
   const lastHoverPos = useRef(null);
   const hoverTimerRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const hasVoidTilesRef = useRef(false);
 
   // Calculate canvas dimensions based on viewport bounds
   const canvasWidth = viewportBounds
@@ -45,6 +47,10 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Fill with plain dark background (tiles will render on top)
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     // Determine the range of tiles to render
     const startX = viewportBounds ? viewportBounds.minX : 0;
@@ -76,9 +82,11 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
 
         // === DARK ZONE TILES - separate visibility system (theme-defined) ===
         if (isDarkZoneTile) {
+          // Dark zone tiles are ONLY visible when player is inside the dark zone
           // With torch: tiles can be permanently revealed (stored in revealedTiles)
           // Without torch: only temporary 5-tile visibility
-          const isPermanentlyRevealed = hasLight && revealedTiles?.has(key);
+          // When outside: always black (even with torch)
+          const isPermanentlyRevealed = playerInDarkZone && hasLight && revealedTiles?.has(key);
           const isTemporarilyVisible = playerInDarkZone && darkZoneVisible.has(key);
 
           if (!isPermanentlyRevealed && !isTemporarilyVisible) {
@@ -161,8 +169,70 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         const TILE_TYPES = theme?.getTileTypes() || {};
         const cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
 
+        // === EMPTY/VOID TILES - cloud-like fog ===
+        const floorType = cell.floor?.type;
+        if (!floorType || floorType === 'empty' || floorType === 'void') {
+          // In builder mode, just show static dark tile
+          if (isBuilder) {
+            ctx.fillStyle = '#1a1520';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = 'rgba(130, 100, 170, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px + 0.5, py + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+            continue;
+          }
+
+          hasVoidTilesRef.current = true;
+
+          // Base: dark purple
+          ctx.fillStyle = '#1a1520';
+          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
+          // Smooth time for animation
+          const time = Date.now() * 0.001;
+
+          // Draw multiple soft cloud blobs
+          ctx.globalAlpha = 1;
+
+          // Cloud 1 - drifts slowly
+          const c1x = cx + Math.sin(time * 0.8 + x) * 8;
+          const c1y = cy + Math.cos(time * 0.6 + y) * 6;
+          const grad1 = ctx.createRadialGradient(c1x, c1y, 0, c1x, c1y, 18);
+          grad1.addColorStop(0, 'rgba(180, 150, 210, 0.35)');
+          grad1.addColorStop(0.5, 'rgba(140, 110, 180, 0.2)');
+          grad1.addColorStop(1, 'rgba(100, 80, 140, 0)');
+          ctx.fillStyle = grad1;
+          ctx.fillRect(px - 10, py - 10, TILE_SIZE + 20, TILE_SIZE + 20);
+
+          // Cloud 2 - different speed/direction
+          const c2x = cx + Math.cos(time * 1.1 + x * 0.7) * 10;
+          const c2y = cy + Math.sin(time * 0.9 - y * 0.5) * 8;
+          const grad2 = ctx.createRadialGradient(c2x, c2y, 0, c2x, c2y, 15);
+          grad2.addColorStop(0, 'rgba(160, 130, 200, 0.3)');
+          grad2.addColorStop(0.6, 'rgba(120, 95, 160, 0.15)');
+          grad2.addColorStop(1, 'rgba(90, 70, 130, 0)');
+          ctx.fillStyle = grad2;
+          ctx.fillRect(px - 10, py - 10, TILE_SIZE + 20, TILE_SIZE + 20);
+
+          // Cloud 3 - small wisp
+          const c3x = cx + Math.sin(time * 1.5 - x * 0.3) * 6;
+          const c3y = cy + Math.cos(time * 1.2 + y * 0.4) * 5;
+          const grad3 = ctx.createRadialGradient(c3x, c3y, 0, c3x, c3y, 10);
+          grad3.addColorStop(0, 'rgba(200, 170, 230, 0.25)');
+          grad3.addColorStop(1, 'rgba(150, 120, 180, 0)');
+          ctx.fillStyle = grad3;
+          ctx.fillRect(px - 5, py - 5, TILE_SIZE + 10, TILE_SIZE + 10);
+
+          // Subtle edge glow
+          ctx.strokeStyle = 'rgba(130, 100, 170, 0.4)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px + 0.5, py + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+
+          continue;
+        }
+
         // === LAYER 1: FLOOR ===
-        const floorDef = TILE_TYPES[cell.floor?.type] || TILE_TYPES.empty || { color: '#333' };
+        const floorDef = TILE_TYPES[floorType] || TILE_TYPES.empty || { color: '#333' };
 
         // Draw floor background color (use config floorColor if available)
         ctx.fillStyle = cell.floor?.config?.floorColor || floorDef.color;
@@ -231,6 +301,18 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         // Skip zones outside viewport
         if (viewportBounds && (z.x < startX || z.x > endX || z.y < startY || z.y > endY)) continue;
         if (revealedTiles && !revealedTiles.has(`${z.x},${z.y}`)) continue;
+
+        // Skip hazard zones in dark zone tiles that aren't visible
+        // In dark zones, hazards are ONLY visible when player has light (torch)
+        const zKey = `${z.x},${z.y}`;
+        if (darkZoneTiles.has(zKey)) {
+          if (!hasLight) continue; // No hazard indicators without torch
+          const zVisible = playerInDarkZone && (
+            revealedTiles?.has(zKey) || darkZoneVisible.has(zKey)
+          );
+          if (!zVisible) continue;
+        }
+
         const zpx = (z.x - offsetX) * TILE_SIZE, zpy = (z.y - offsetY) * TILE_SIZE;
         ctx.fillStyle = z.renderColor || '#ff4400';
         ctx.fillRect(zpx, zpy, TILE_SIZE, TILE_SIZE);
@@ -424,10 +506,33 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         ctx.fillRect(ppx, ppy, TILE_SIZE, TILE_SIZE);
       }
     }
+
   }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths]);
 
   useEffect(() => {
     draw();
+  }, [draw]);
+
+  // Smooth 60fps animation loop for void tiles
+  useEffect(() => {
+    let running = true;
+
+    const animate = () => {
+      if (!running) return;
+      if (hasVoidTilesRef.current) {
+        draw();
+      }
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      running = false;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, [draw]);
 
   const getTileAt = (e) => {

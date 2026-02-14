@@ -1899,3 +1899,40 @@ export function canInteractInDarkZone(playerPos, grid, gameState = {}) {
   // In dark zone - can only interact if has light
   return hasLightInDarkZone(gameState);
 }
+
+/**
+ * Check if interaction between two tiles is allowed
+ * Blocks interaction across zone boundaries (e.g., from inside cave to outside)
+ * @param {Object} fromPos - Source position { x, y }
+ * @param {Object} toPos - Target position { x, y }
+ * @param {Array} grid - The game grid
+ * @param {Object} gameState - Current game state
+ * @returns {boolean} - True if interaction is allowed
+ */
+export function canInteractBetweenTiles(fromPos, toPos, grid, gameState = {}) {
+  if (!fromPos || !toPos || !grid) return true;
+
+  const fromCell = grid[fromPos.y]?.[fromPos.x];
+  const toCell = grid[toPos.y]?.[toPos.x];
+  if (!fromCell || !toCell) return true;
+
+  const fromFloor = fromCell.floor?.type;
+  const toFloor = toCell.floor?.type;
+
+  // Cave zone includes 'cave' and 'cave-entry' tiles
+  const fromInCave = fromFloor === 'cave' || fromFloor === 'cave-entry';
+  const toInCave = toFloor === 'cave' || toFloor === 'cave-entry';
+
+  // If both are in cave zone or both are outside, allow interaction
+  if (fromInCave === toInCave) {
+    return true;
+  }
+
+  // Cave-entry is the threshold - it can interact with both sides
+  if (fromFloor === 'cave-entry' || toFloor === 'cave-entry') {
+    return true;
+  }
+
+  // Crossing zone boundary without going through entry - block
+  return false;
+}

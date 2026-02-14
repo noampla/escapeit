@@ -486,6 +486,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const pos = playerPosRef.current;
     const currentGrid = gridRef.current;
     const lastDir = lastDirRef.current;
+    const currentGS = gameStateRef.current;
 
     // Use theme's interactable tiles
     const itemTilePattern = /^item-/;
@@ -505,7 +506,10 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       const c = currentGrid[adj.y][adj.x];
       // Check both object and floor layers for interactable tiles
       if (interactableTiles.includes(c.object?.type) || interactableTiles.includes(c.floor?.type)) {
-        targets.push(adj);
+        // Check if interaction across zone boundary is allowed
+        if (theme?.canInteractBetweenTiles?.(pos, adj, currentGrid, currentGS) !== false) {
+          targets.push(adj);
+        }
       }
     }
 
@@ -521,7 +525,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     });
 
     return valid;
-  }, [interactableTiles]);
+  }, [interactableTiles, theme]);
 
   const startInteraction = useCallback((type, targetPos, progressColor = null, duration = null, visualTargetPos = null) => {
     soundManager.play('interact');

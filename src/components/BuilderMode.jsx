@@ -928,6 +928,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             viewportBounds={viewportBounds}
             pathTiles={pathEditMode ? pathTiles : undefined}
             allTilePaths={allTilePaths}
+            isBuilder
           />
           {/* Placement error message */}
           {placementError && (

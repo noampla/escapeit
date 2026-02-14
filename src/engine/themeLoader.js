@@ -441,6 +441,24 @@ export class ThemeLoader {
     return this.tiles.canInteractInDarkZone(playerPos, grid, gameState);
   }
 
+  /**
+   * Check if interaction between two tiles is allowed
+   * Used to block interaction across zone boundaries (e.g., cave to outside)
+   * Returns true by default (no restrictions), but theme can override
+   * @param {Object} fromPos - Source position { x, y }
+   * @param {Object} toPos - Target position { x, y }
+   * @param {Array} grid - The game grid
+   * @param {Object} gameState - Current game state
+   * @returns {boolean} - True if interaction is allowed
+   */
+  canInteractBetweenTiles(fromPos, toPos, grid, gameState) {
+    // If theme doesn't define this, allow all interactions (default behavior)
+    if (!this.tiles?.canInteractBetweenTiles) {
+      return true;
+    }
+    return this.tiles.canInteractBetweenTiles(fromPos, toPos, grid, gameState);
+  }
+
   // === NEW: UI Theming ===
 
   // Get UI color scheme
