@@ -24,7 +24,9 @@ export default function PropertiesPanel({
   missions = [], onMissionsChange, lives, onLivesChange, fixedOrder, onFixedOrderChange,
   inventoryCapacity, onInventoryCapacityChange,
   // Path editing
-  onStartPathEdit
+  onStartPathEdit,
+  // Canvas editing (for drawing tiles)
+  onStartCanvasEdit
 }) {
   const theme = useContext(ThemeContext);
   const { t, isRTL, getTileLabel } = useLanguage();
@@ -281,6 +283,54 @@ export default function PropertiesPanel({
                       </span>
                     ))}
                   </div>
+                )}
+              </div>
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
+
+        case 'canvas':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <div
+                style={{
+                  ...inputStyle,
+                  background: '#1a1a1a',
+                  minHeight: 60,
+                  padding: 8,
+                  borderRadius: 4,
+                  color: '#aaa',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onClick={() => {
+                  if (onStartCanvasEdit) {
+                    onStartCanvasEdit(x, y, fieldKey, fieldDef);
+                  }
+                }}
+              >
+                {currentValue ? (
+                  <>
+                    <img
+                      src={currentValue}
+                      alt="Drawing preview"
+                      style={{
+                        width: 64,
+                        height: 64,
+                        imageRendering: 'pixelated',
+                        border: '1px solid #444',
+                        borderRadius: 4
+                      }}
+                    />
+                    <p style={{ margin: '6px 0 0', color: '#888', fontSize: 10 }}>Click to edit</p>
+                  </>
+                ) : (
+                  <p style={{ margin: 0, color: '#bbb' }}>Click to create drawing</p>
                 )}
               </div>
               <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />

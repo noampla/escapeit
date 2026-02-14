@@ -511,6 +511,38 @@ export const INTERACTIONS = {
       };
     }
   },
+
+  'view-drawing': {
+    label: '🎨 View Drawing',
+    duration: 500,
+    requirements: { tile: 'item-drawing-board' },
+    execute: (_gameState, grid, x, y) => {
+      const tile = grid[y][x];
+      const drawingData = tile.object?.config?.drawingData;
+      const description = tile.object?.config?.description || 'Drawing';
+
+      if (!drawingData) {
+        return {
+          success: true,
+          message: 'The board is empty.',
+          showModal: true,
+          modalTitle: description,
+          modifyGrid: false,
+          modifyInventory: false
+        };
+      }
+
+      // Return the image data to display in the modal
+      return {
+        success: true,
+        showModal: true,
+        modalTitle: description,
+        modalImage: drawingData,
+        modifyGrid: false,
+        modifyInventory: false
+      };
+    }
+  },
 };
 
 // Get all available interactions at a position

@@ -63,6 +63,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     const playerInDarkZone = playerPos ? (theme?.isPlayerInDarkZone?.(playerPos, grid, gameState) || false) : false;
     const playerOnDarkTile = playerPos ? (theme?.isPlayerOnDarkTile?.(playerPos, grid, gameState) || false) : false;
     const hasLight = playerPos ? (theme?.hasLightInDarkZone?.(gameState) || false) : false;
+    // Get tiles illuminated by dropped torches (these are always visible with objects)
+    const torchLitTiles = theme?.getDroppedTorchLitTiles?.(grid) || new Set();
 
     // Calculate temporary visibility for dark zone (5 tiles: current + 4 cardinal)
     const darkZoneVisible = new Set();
@@ -86,10 +88,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
           // With torch: tiles can be permanently revealed (stored in revealedTiles)
           // Without torch: only temporary 5-tile visibility
           // When outside: always black (even with torch)
+          // Exception: tiles lit by dropped torches are always visible
+          const isTorchLit = torchLitTiles.has(key);
           const isPermanentlyRevealed = playerInDarkZone && hasLight && revealedTiles?.has(key);
           const isTemporarilyVisible = playerInDarkZone && darkZoneVisible.has(key);
 
-          if (!isPermanentlyRevealed && !isTemporarilyVisible) {
+          if (!isPermanentlyRevealed && !isTemporarilyVisible && !isTorchLit) {
             // Not visible - black fog
             ctx.fillStyle = '#000';
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -118,9 +122,9 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
             }
           }
 
-          // If player has light: render objects, no dark overlay
+          // If player has light OR tile is torch-lit: render objects, no dark overlay
           // Otherwise: no objects, apply dark overlay
-          if (hasLight) {
+          if (hasLight || isTorchLit) {
             // Render objects when lit
             if (cell.object) {
               if (cell.object.type.startsWith('item-')) {
@@ -303,13 +307,14 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         if (revealedTiles && !revealedTiles.has(`${z.x},${z.y}`)) continue;
 
         // Skip hazard zones in dark zone tiles that aren't visible
-        // In dark zones, hazards are ONLY visible when player has light (torch)
+        // In dark zones, hazards are ONLY visible when player has light (torch) or tile is torch-lit
         const zKey = `${z.x},${z.y}`;
         if (darkZoneTiles.has(zKey)) {
-          if (!hasLight) continue; // No hazard indicators without torch
-          const zVisible = playerInDarkZone && (
+          const zTorchLit = torchLitTiles.has(zKey);
+          if (!hasLight && !zTorchLit) continue; // No hazard indicators without light
+          const zVisible = zTorchLit || (playerInDarkZone && (
             revealedTiles?.has(zKey) || darkZoneVisible.has(zKey)
-          );
+          ));
           if (!zVisible) continue;
         }
 

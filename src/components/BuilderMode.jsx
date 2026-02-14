@@ -13,6 +13,7 @@ import { ThemeContext } from '../App';
 import { useUser } from '../contexts/UserContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import StoryModal from './StoryModal';
+import CanvasEditorModal from './CanvasEditorModal';
 
 // Default fallback
 const DEFAULT_LOCK_TILES = ['door-key', 'door-card', 'item-key', 'item-card'];
@@ -138,6 +139,9 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   // Path editing state
   const [pathEditMode, setPathEditMode] = useState(null); // { x, y, fieldKey } when editing path
   const [pathTiles, setPathTiles] = useState([]); // Current path being edited
+
+  // Canvas editing state (for drawing tiles)
+  const [canvasEditMode, setCanvasEditMode] = useState(null); // { x, y, fieldKey, fieldDef, initialData }
 
   // Collect all tile paths from the grid for display (theme-agnostic)
   // Looks for any tile that has a 'path' type field in its CONFIG_SCHEMA
@@ -479,6 +483,55 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const handleCancelPathEdit = () => {
     setPathEditMode(null);
     setPathTiles([]);
+  };
+
+  // Start canvas editing mode (for drawing tiles)
+  const handleStartCanvasEdit = (x, y, fieldKey, fieldDef) => {
+    const cell = grid[y][x];
+    const config = cell.object?.config || cell.floor?.config || {};
+    const currentData = config[fieldKey] || null;
+
+    setCanvasEditMode({ x, y, fieldKey, fieldDef, initialData: currentData });
+  };
+
+  // Save canvas edit
+  const handleSaveCanvasEdit = (imageData) => {
+    if (!canvasEditMode) return;
+
+    const { x, y, fieldKey } = canvasEditMode;
+
+    // Function to update the grid
+    const updateGrid = () => {
+      const newGrid = cloneGrid(grid);
+      const cell = newGrid[y][x];
+      const config = cell.object?.config || cell.floor?.config || {};
+
+      const newConfig = { ...config, [fieldKey]: imageData };
+
+      if (cell.object) {
+        cell.object.config = newConfig;
+      } else if (cell.floor) {
+        cell.floor.config = newConfig;
+      }
+
+      setGrid(newGrid);
+      setSaved(false);
+      setCanvasEditMode(null);
+    };
+
+    // If there's image data, preload it before updating to ensure render shows it
+    if (imageData) {
+      const img = new Image();
+      img.onload = () => {
+        updateGrid();
+      };
+      img.onerror = () => {
+        updateGrid(); // Still update even if image fails
+      };
+      img.src = imageData;
+    } else {
+      updateGrid();
+    }
   };
 
   const handleSave = () => {
@@ -964,6 +1017,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           inventoryCapacity={inventoryCapacity}
           onInventoryCapacityChange={c => { setInventoryCapacity(c); setSaved(false); }}
           onStartPathEdit={handleStartPathEdit}
+          onStartCanvasEdit={handleStartCanvasEdit}
         />
       </div>
 
@@ -1217,6 +1271,18 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         <RandomMapGeneratorPanel
           onGenerate={handleGenerateRandom}
           onClose={() => setShowRandomGenerator(false)}
+        />
+      )}
+
+      {/* Canvas Editor Modal (for drawing tiles) */}
+      {canvasEditMode && (
+        <CanvasEditorModal
+          width={canvasEditMode.fieldDef?.width || 16}
+          height={canvasEditMode.fieldDef?.height || 16}
+          palette={canvasEditMode.fieldDef?.palette}
+          initialData={canvasEditMode.initialData}
+          onSave={handleSaveCanvasEdit}
+          onCancel={() => setCanvasEditMode(null)}
         />
       )}
     </div>

@@ -720,13 +720,19 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       if (result.messageKey) {
         const msg = getMessage(themeId, result.messageKey, result.messageParams || {});
         showMessage(msg, 1500, 'success');
-      } else if (result.message) {
-        // Check if this should be shown as a modal (for sign reading, etc.)
+      } else if (result.message || result.showModal) {
+        // Check if this should be shown as a modal (for sign reading, drawing viewing, etc.)
         if (result.showModal) {
-          setMessageModal({ title: result.modalTitle || '', message: result.message });
+          setMessageModal({
+            title: result.modalTitle || '',
+            message: result.message || '',
+            image: result.modalImage || null
+          });
         }
-        // Always also show in the notification system (message log)
-        showMessage(result.message, 1500, 'success');
+        // Also show in the notification system (message log) if there's a message
+        if (result.message) {
+          showMessage(result.message, 1500, 'success');
+        }
       }
     } else if (result?.error) {
       soundManager.play('blocked');
@@ -2737,18 +2743,42 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
               </h3>
             )}
 
+            {/* Image content (for drawing viewing) */}
+            {messageModal.image && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                marginBottom: messageModal.message ? '16px' : '0',
+              }}>
+                <img
+                  src={messageModal.image}
+                  alt="Drawing"
+                  style={{
+                    imageRendering: 'pixelated',
+                    width: '256px',
+                    height: '256px',
+                    border: '2px solid #6a5a4a',
+                    borderRadius: '4px',
+                    backgroundColor: '#d4c4a8',
+                  }}
+                />
+              </div>
+            )}
+
             {/* Message content */}
-            <div
-              style={{
-                color: '#ddd',
-                fontSize: '16px',
-                lineHeight: '1.6',
-                whiteSpace: 'pre-wrap',
-                marginTop: messageModal.title ? '0' : '8px',
-              }}
-            >
-              {messageModal.message}
-            </div>
+            {messageModal.message && (
+              <div
+                style={{
+                  color: '#ddd',
+                  fontSize: '16px',
+                  lineHeight: '1.6',
+                  whiteSpace: 'pre-wrap',
+                  marginTop: messageModal.title ? '0' : '8px',
+                }}
+              >
+                {messageModal.message}
+              </div>
+            )}
           </div>
         </div>
       )}

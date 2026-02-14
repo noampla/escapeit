@@ -290,6 +290,18 @@ export const TILE_TYPES = {
     tooltip: 'A sign with a message. Press E to read.',
     walkable: true
   },
+  'item-drawing-board': {
+    label: 'Drawing Board',
+    color: '#5a4a3a',
+    category: 'interactive',
+    layer: 'object',
+    configurable: true,
+    defaultConfig: { drawingData: null, imageId: '', description: 'Drawing' },
+    isItemTile: true,
+    itemType: 'drawing-board',
+    tooltip: 'A board with a custom drawing. Press F to pick up, E to view.',
+    walkable: true
+  },
 
   // Removed/defeated object states (visual only, walkable)
   'tree-stump': {
@@ -355,6 +367,11 @@ export const CONFIG_HELP = {
   sign: {
     message: 'The message that appears when the player presses E to read the sign.',
   },
+  'item-drawing-board': {
+    description: 'What this drawing represents (shown as title when viewing).',
+    imageId: 'Unique ID for this drawing (used for puzzle logic later).',
+    drawingData: 'Click to open the drawing editor. Draw a simple image using the color palette.',
+  },
 };
 
 // Generic config schema - defines what config fields each tile type has
@@ -387,6 +404,28 @@ export const CONFIG_SCHEMA = {
       label: 'Sign Message',
       placeholder: 'Enter the message to display...',
       default: 'Press E to read this sign.'
+    }
+  },
+  'item-drawing-board': {
+    description: {
+      type: 'text',
+      label: 'Description',
+      placeholder: 'e.g. Old Map, Secret Note',
+      default: 'Drawing'
+    },
+    imageId: {
+      type: 'text',
+      label: 'Image ID',
+      placeholder: 'e.g. map1, clue-a',
+      default: ''
+    },
+    drawingData: {
+      type: 'canvas',
+      label: 'Drawing',
+      width: 16,
+      height: 16,
+      palette: ['#222222', '#ffffff', '#cc4444', '#4444cc'],
+      default: null
     }
   }
 };
@@ -939,6 +978,60 @@ function drawSign(ctx, cx, cy, size) {
   ctx.strokeRect(cx - size * 0.35, cy - size * 0.25, size * 0.7, size * 0.35);
 }
 
+// Image cache for drawing board tiles
+const drawingImageCache = new Map();
+
+// Get or create cached image from base64 data
+function getDrawingImage(dataUrl) {
+  if (!dataUrl) return null;
+  if (!drawingImageCache.has(dataUrl)) {
+    const img = new Image();
+    img.src = dataUrl;
+    drawingImageCache.set(dataUrl, img);
+  }
+  return drawingImageCache.get(dataUrl);
+}
+
+// Draw a drawing board with custom pixel art
+function drawDrawingBoard(ctx, cx, cy, size, config = {}) {
+  const woodColor = '#6b5335';
+  const darkWood = '#4a3a25';
+  const boardColor = '#8b7355';
+
+  // Wooden frame
+  ctx.fillStyle = woodColor;
+  ctx.fillRect(cx - size * 0.4, cy - size * 0.35, size * 0.8, size * 0.7);
+
+  // Inner board area (lighter)
+  ctx.fillStyle = boardColor;
+  ctx.fillRect(cx - size * 0.32, cy - size * 0.27, size * 0.64, size * 0.54);
+
+  // Frame border
+  ctx.strokeStyle = darkWood;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(cx - size * 0.4, cy - size * 0.35, size * 0.8, size * 0.7);
+
+  // Draw the custom image if it exists
+  const drawingData = config?.drawingData;
+  if (drawingData) {
+    const img = getDrawingImage(drawingData);
+    if (img && img.complete && img.naturalWidth > 0) {
+      // Draw the image scaled to fit the board area
+      const drawSize = size * 0.56;
+      ctx.imageSmoothingEnabled = false; // Pixel art - no smoothing
+      ctx.drawImage(img, cx - drawSize / 2, cy - drawSize / 2 + size * 0.02, drawSize, drawSize);
+      ctx.imageSmoothingEnabled = true;
+    }
+  } else {
+    // No drawing - show placeholder text
+    ctx.fillStyle = '#666';
+    ctx.font = `${size * 0.12}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Empty', cx, cy);
+  }
+}
+
 // Draw a cave entry (dark opening with rocky arch)
 function drawCaveEntry(ctx, cx, cy, size) {
   const darkColor = '#1a1a2a';
@@ -1324,6 +1417,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Drawing board gets custom rendering
+  if (tile.type === 'item-drawing-board') {
+    drawDrawingBoard(ctx, cx, cy, size, tile.config);
+    return true;
+  }
+
   // Machete gets custom rendering
   if (tile.type === 'item-machete') {
     drawMachete(ctx, cx, cy, size);
@@ -1435,7 +1534,7 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start', 'cave', 'cave-entry'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['tree', 'boulder', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign'];
+export const INTERACTABLE_TILES = ['tree', 'boulder', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign', 'item-drawing-board'];
 
 // Tiles to ignore for floor color detection when picking up items
 export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'thorny-bush', 'water', 'snow', 'bear'];
@@ -1867,6 +1966,52 @@ export function hasLightInDarkZone(gameState = {}) {
 }
 
 /**
+ * Get all tiles illuminated by dropped torches in dark zones
+ * Returns a Set of "x,y" position strings for tiles within 5-tile range of dropped torches
+ * @param {Array} grid - The game grid
+ * @returns {Set} - Set of position strings for torch-lit tiles
+ */
+export function getDroppedTorchLitTiles(grid) {
+  const lit = new Set();
+  if (!grid || !Array.isArray(grid)) return lit;
+
+  // Find all dropped torches in dark zone tiles
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[y].length; x++) {
+      const cell = grid[y][x];
+      // Check if this is a torch item on the ground
+      if (cell.object?.type === 'item-torch') {
+        // Check if it's in a dark zone tile
+        const floorType = cell.floor?.type;
+        const tileDef = TILE_TYPES[floorType];
+        if (tileDef?.isDarkZone === true) {
+          // Add the torch tile and 4 cardinal neighbors
+          lit.add(`${x},${y}`);
+          lit.add(`${x},${y - 1}`);
+          lit.add(`${x},${y + 1}`);
+          lit.add(`${x - 1},${y}`);
+          lit.add(`${x + 1},${y}`);
+        }
+      }
+    }
+  }
+
+  return lit;
+}
+
+/**
+ * Check if player is illuminated by a dropped torch in a dark zone
+ * @param {Object} playerPos - Player position { x, y }
+ * @param {Array} grid - The game grid
+ * @returns {boolean} - True if player is within torch light radius
+ */
+export function isPlayerNearDroppedTorch(playerPos, grid) {
+  if (!playerPos || !grid) return false;
+  const torchLitTiles = getDroppedTorchLitTiles(grid);
+  return torchLitTiles.has(`${playerPos.x},${playerPos.y}`);
+}
+
+/**
  * Check if the player can pick up items in a dark zone
  * Returns false if player is in dark zone without a light source
  * @param {Object} playerPos - Player position { x, y }
@@ -1879,8 +2024,8 @@ export function canPickupInDarkZone(playerPos, grid, gameState = {}) {
   if (!isPlayerInDarkZone(playerPos, grid, gameState)) {
     return true;
   }
-  // In dark zone - can only pick up if has light
-  return hasLightInDarkZone(gameState);
+  // In dark zone - can pick up if has light OR is near a dropped torch
+  return hasLightInDarkZone(gameState) || isPlayerNearDroppedTorch(playerPos, grid);
 }
 
 /**
@@ -1896,8 +2041,8 @@ export function canInteractInDarkZone(playerPos, grid, gameState = {}) {
   if (!isPlayerInDarkZone(playerPos, grid, gameState)) {
     return true;
   }
-  // In dark zone - can only interact if has light
-  return hasLightInDarkZone(gameState);
+  // In dark zone - can interact if has light OR is near a dropped torch
+  return hasLightInDarkZone(gameState) || isPlayerNearDroppedTorch(playerPos, grid);
 }
 
 /**

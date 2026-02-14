@@ -84,6 +84,14 @@ export const ITEM_TYPES = {
     color: '#8b6914',
     description: 'Place on water to travel across'
   },
+  'drawing-board': {
+    label: 'Drawing Board',
+    emoji: null,  // Custom draw
+    color: '#5a4a3a',
+    draw: 'drawing-board',
+    description: 'A board with a custom drawing',
+    // Drawing data is stored in item state
+  },
 };
 
 // Custom rendering for bucket
@@ -376,6 +384,59 @@ function drawTorch(ctx, cx, cy, size) {
   ctx.restore();
 }
 
+// Image cache for drawing board items
+const drawingItemImageCache = new Map();
+
+// Get or create cached image from base64 data
+function getDrawingItemImage(dataUrl) {
+  if (!dataUrl) return null;
+  if (!drawingItemImageCache.has(dataUrl)) {
+    const img = new Image();
+    img.src = dataUrl;
+    drawingItemImageCache.set(dataUrl, img);
+  }
+  return drawingItemImageCache.get(dataUrl);
+}
+
+// Custom rendering for drawing board (item version)
+function drawDrawingBoardItem(ctx, cx, cy, size, state = {}) {
+  const woodColor = '#6b5335';
+  const darkWood = '#4a3a25';
+  const boardColor = '#8b7355';
+
+  // Wooden frame
+  ctx.fillStyle = woodColor;
+  ctx.fillRect(cx - size * 0.4, cy - size * 0.35, size * 0.8, size * 0.7);
+
+  // Inner board area (lighter)
+  ctx.fillStyle = boardColor;
+  ctx.fillRect(cx - size * 0.32, cy - size * 0.27, size * 0.64, size * 0.54);
+
+  // Frame border
+  ctx.strokeStyle = darkWood;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(cx - size * 0.4, cy - size * 0.35, size * 0.8, size * 0.7);
+
+  // Draw the custom image if it exists in state
+  const drawingData = state?.drawingData;
+  if (drawingData) {
+    const img = getDrawingItemImage(drawingData);
+    if (img && img.complete && img.naturalWidth > 0) {
+      const drawSize = size * 0.56;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, cx - drawSize / 2, cy - drawSize / 2 + size * 0.02, drawSize, drawSize);
+      ctx.imageSmoothingEnabled = true;
+    }
+  } else {
+    // No drawing - show placeholder
+    ctx.fillStyle = '#666';
+    ctx.font = `${size * 0.1}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Empty', cx, cy);
+  }
+}
+
 // Custom rendering for wood
 function drawWood(ctx, cx, cy, size) {
   const s = size * 0.32;
@@ -468,6 +529,11 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
 
   if (item.draw === 'torch') {
     drawTorch(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'drawing-board') {
+    drawDrawingBoardItem(ctx, cx, cy, size, state);
     return true;
   }
 
@@ -589,6 +655,11 @@ export function renderInventoryItem(ctx, itemType, x, y, size, state = null) {
 
   if (item.draw === 'torch') {
     drawTorch(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'drawing-board') {
+    drawDrawingBoardItem(ctx, cx, cy, size, state);
     return true;
   }
 

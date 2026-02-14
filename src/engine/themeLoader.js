@@ -401,6 +401,15 @@ export class ThemeLoader {
   }
 
   /**
+   * Get tiles illuminated by dropped torches in dark zones
+   * @param {Array} grid - The game grid
+   * @returns {Set} - Set of position strings "x,y" for torch-lit tiles
+   */
+  getDroppedTorchLitTiles(grid) {
+    return this.tiles?.getDroppedTorchLitTiles?.(grid) || new Set();
+  }
+
+  /**
    * Check if the player has a light source in dark zones
    * @param {Object} gameState - Current game state
    * @returns {boolean} - True if player has light (e.g., torch)

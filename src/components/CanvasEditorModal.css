@@ -1,0 +1,193 @@
+.canvas-editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: canvasEditorFadeIn 0.2s ease;
+}
+
+@keyframes canvasEditorFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.canvas-editor-modal {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid #0f3460;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 15px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(78, 205, 196, 0.15);
+  animation: canvasEditorSlideUp 0.2s ease;
+}
+
+@keyframes canvasEditorSlideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.canvas-editor-header {
+  padding: 16px 20px;
+  border-bottom: 2px solid rgba(78, 205, 196, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(180deg, rgba(78, 205, 196, 0.1) 0%, transparent 100%);
+}
+
+.canvas-editor-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #4ecdc4;
+  text-shadow: 0 0 10px rgba(78, 205, 196, 0.4);
+}
+
+.canvas-editor-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.canvas-editor-close:hover {
+  color: #e94560;
+  transform: scale(1.2);
+}
+
+.canvas-editor-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.canvas-editor-palette {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.palette-color {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #444;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.palette-color:hover {
+  transform: scale(1.1);
+  border-color: #888;
+}
+
+.palette-color.selected {
+  border-color: #4ecdc4;
+  box-shadow: 0 0 8px rgba(78, 205, 196, 0.6);
+  transform: scale(1.1);
+}
+
+.palette-color.eraser {
+  background: linear-gradient(135deg, #444 25%, #333 25%, #333 50%, #444 50%, #444 75%, #333 75%);
+  background-size: 8px 8px;
+  color: #aaa;
+}
+
+.palette-color.eraser.selected {
+  border-color: #e94560;
+  box-shadow: 0 0 8px rgba(233, 69, 96, 0.6);
+}
+
+.canvas-editor-canvas-wrapper {
+  border: 2px solid #4ecdc4;
+  border-radius: 4px;
+  box-shadow: 0 0 20px rgba(78, 205, 196, 0.2);
+  background: #1a1a1a;
+  padding: 2px;
+}
+
+.canvas-editor-canvas-wrapper canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.canvas-editor-info {
+  color: #666;
+  font-size: 12px;
+}
+
+.canvas-editor-footer {
+  padding: 16px 20px;
+  border-top: 2px solid #0f3460;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.canvas-editor-footer-right {
+  display: flex;
+  gap: 10px;
+}
+
+.canvas-editor-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.canvas-editor-btn.primary {
+  background: linear-gradient(135deg, #4ecdc4 0%, #3db3aa 100%);
+  color: #1a1a2e;
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+}
+
+.canvas-editor-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(78, 205, 196, 0.6);
+}
+
+.canvas-editor-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.canvas-editor-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
