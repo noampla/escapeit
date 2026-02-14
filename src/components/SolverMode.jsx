@@ -392,7 +392,10 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Check if tile is pickable (some items like money must be collected via interaction)
     const TILE_TYPES = theme?.getTileTypes?.() || {};
     const tileDef = TILE_TYPES[cell.object?.type];
-    if (tileDef?.pickable === false) {
+    const config = cell.object?.config || {};
+    // Config pickable overrides tile definition default
+    const isPickable = config.pickable !== undefined ? config.pickable : (tileDef?.pickable !== false);
+    if (!isPickable) {
       showNotification('notifications.cantPickUp', 'error');
       return false;
     }

@@ -296,7 +296,7 @@ export const TILE_TYPES = {
     category: 'interactive',
     layer: 'object',
     configurable: true,
-    defaultConfig: { drawingData: null, imageId: '', description: 'Drawing' },
+    defaultConfig: { drawingData: null, imageId: '', description: 'Drawing', pickable: true },
     isItemTile: true,
     itemType: 'drawing-board',
     tooltip: 'A board with a custom drawing. Press F to pick up, E to view.',
@@ -370,6 +370,7 @@ export const CONFIG_HELP = {
   'item-drawing-board': {
     description: 'What this drawing represents (shown as title when viewing).',
     imageId: 'Unique ID for this drawing (used for puzzle logic later).',
+    pickable: 'If unchecked, the drawing cannot be picked up with F key.',
     drawingData: 'Click to open the drawing editor. Draw a simple image using the color palette.',
   },
 };
@@ -418,6 +419,11 @@ export const CONFIG_SCHEMA = {
       label: 'Image ID',
       placeholder: 'e.g. map1, clue-a',
       default: ''
+    },
+    pickable: {
+      type: 'checkbox',
+      label: 'Can be picked up',
+      default: true
     },
     drawingData: {
       type: 'canvas',
