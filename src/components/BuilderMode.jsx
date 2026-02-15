@@ -1543,7 +1543,6 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         <CanvasEditorModal
           width={canvasEditMode.fieldDef?.width || 16}
           height={canvasEditMode.fieldDef?.height || 16}
-          palette={canvasEditMode.fieldDef?.palette}
           initialData={canvasEditMode.initialData}
           onSave={handleSaveCanvasEdit}
           onCancel={() => setCanvasEditMode(null)}

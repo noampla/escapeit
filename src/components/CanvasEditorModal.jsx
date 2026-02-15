@@ -1,7 +1,20 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './CanvasEditorModal.css';
 
-const DEFAULT_PALETTE = ['#222222', '#ffffff', '#cc4444', '#4444cc'];
+// Rainbow palette with more colors
+// null represents transparent (eraser color)
+const DEFAULT_PALETTE = [
+  // Transparent (first for easy access)
+  null,
+  // Grayscale
+  '#000000', '#444444', '#888888', '#cccccc', '#ffffff',
+  // Rainbow
+  '#ff0000', '#ff8800', '#ffff00', '#88ff00', '#00ff00',
+  '#00ff88', '#00ffff', '#0088ff', '#0000ff', '#8800ff',
+  '#ff00ff', '#ff0088',
+  // Additional useful colors
+  '#884400', '#ff8888', '#88ff88', '#8888ff', '#ffff88',
+];
 
 export default function CanvasEditorModal({
   width = 16,
@@ -12,7 +25,9 @@ export default function CanvasEditorModal({
   onCancel
 }) {
   const canvasRef = useRef(null);
-  const [selectedColor, setSelectedColor] = useState(palette[0]);
+  // Default to first non-null color (black)
+  const [selectedColor, setSelectedColor] = useState(palette.find(c => c !== null) || '#000000');
+  const [selectedTool, setSelectedTool] = useState('pencil'); // 'pencil', 'fill', 'eraser'
   const [isDrawing, setIsDrawing] = useState(false);
   const [pixels, setPixels] = useState(() => Array(width * height).fill(null));
 
@@ -112,21 +127,72 @@ export default function CanvasEditorModal({
   }, [pixelSize]);
 
   // Draw a single pixel
-  const drawPixel = useCallback((x, y) => {
+  const drawPixel = useCallback((x, y, erase = false) => {
     if (x < 0 || x >= width || y < 0 || y >= height) return;
 
     setPixels(prev => {
       const newPixels = [...prev];
-      newPixels[y * width + x] = selectedColor === 'eraser' ? null : selectedColor;
+      if (erase || selectedTool === 'eraser' || selectedColor === null) {
+        newPixels[y * width + x] = null;
+      } else {
+        newPixels[y * width + x] = selectedColor;
+      }
       return newPixels;
     });
-  }, [selectedColor, width, height]);
+  }, [selectedColor, selectedTool, width, height]);
+
+  // Flood fill algorithm
+  const floodFill = useCallback((startX, startY) => {
+    if (startX < 0 || startX >= width || startY < 0 || startY >= height) return;
+
+    setPixels(prev => {
+      const newPixels = [...prev];
+      const targetColor = newPixels[startY * width + startX];
+      const fillColor = selectedTool === 'eraser' ? null : selectedColor;
+
+      // Don't fill if target is same as fill color
+      if (targetColor === fillColor) return prev;
+
+      const stack = [[startX, startY]];
+      const visited = new Set();
+
+      while (stack.length > 0) {
+        const [x, y] = stack.pop();
+        const key = `${x},${y}`;
+
+        if (visited.has(key)) continue;
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
+
+        const currentColor = newPixels[y * width + x];
+        if (currentColor !== targetColor) continue;
+
+        visited.add(key);
+        newPixels[y * width + x] = fillColor;
+
+        // Add neighbors to stack
+        stack.push([x + 1, y]);
+        stack.push([x - 1, y]);
+        stack.push([x, y + 1]);
+        stack.push([x, y - 1]);
+      }
+
+      return newPixels;
+    });
+  }, [selectedColor, selectedTool, width, height]);
 
   // Mouse event handlers
   const handleMouseDown = (e) => {
-    setIsDrawing(true);
+    // Prevent context menu on right click
+    if (e.button === 2) return;
+
     const { x, y } = getPixelCoords(e);
-    drawPixel(x, y);
+
+    if (selectedTool === 'fill') {
+      floodFill(x, y);
+    } else {
+      setIsDrawing(true);
+      drawPixel(x, y);
+    }
   };
 
   const handleMouseMove = (e) => {
@@ -141,6 +207,68 @@ export default function CanvasEditorModal({
 
   const handleMouseLeave = () => {
     setIsDrawing(false);
+  };
+
+  // Right-click to erase
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    const { x, y } = getPixelCoords(e);
+
+    if (selectedTool === 'fill') {
+      // Fill with eraser (null) on right-click when fill tool is selected
+      setPixels(prev => {
+        const newPixels = [...prev];
+        const targetColor = newPixels[y * width + x];
+
+        if (targetColor === null) return prev; // Already empty
+
+        const stack = [[x, y]];
+        const visited = new Set();
+
+        while (stack.length > 0) {
+          const [fx, fy] = stack.pop();
+          const key = `${fx},${fy}`;
+
+          if (visited.has(key)) continue;
+          if (fx < 0 || fx >= width || fy < 0 || fy >= height) continue;
+
+          const currentColor = newPixels[fy * width + fx];
+          if (currentColor !== targetColor) continue;
+
+          visited.add(key);
+          newPixels[fy * width + fx] = null;
+
+          stack.push([fx + 1, fy]);
+          stack.push([fx - 1, fy]);
+          stack.push([fx, fy + 1]);
+          stack.push([fx, fy - 1]);
+        }
+
+        return newPixels;
+      });
+    } else {
+      // Regular erase on right-click
+      drawPixel(x, y, true);
+    }
+  };
+
+  // Right-click drag to erase
+  const handleRightMouseDown = (e) => {
+    if (e.button === 2) {
+      e.preventDefault();
+      if (selectedTool !== 'fill') {
+        setIsDrawing(true);
+        const { x, y } = getPixelCoords(e);
+        drawPixel(x, y, true);
+      }
+    }
+  };
+
+  const handleRightMouseMove = (e) => {
+    if (!isDrawing || e.buttons !== 2) return;
+    if (selectedTool === 'fill') return;
+    const { x, y } = getPixelCoords(e);
+    drawPixel(x, y, true);
   };
 
   // Export to base64 PNG
@@ -187,6 +315,13 @@ export default function CanvasEditorModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
+  // Get cursor based on tool
+  const getCursor = () => {
+    if (selectedTool === 'fill') return 'cell';
+    if (selectedTool === 'eraser') return 'not-allowed';
+    return 'crosshair';
+  };
+
   return (
     <div className="canvas-editor-overlay" onClick={onCancel}>
       <div className="canvas-editor-modal" onClick={e => e.stopPropagation()}>
@@ -198,24 +333,45 @@ export default function CanvasEditorModal({
         </div>
 
         <div className="canvas-editor-body">
-          {/* Color palette */}
-          <div className="canvas-editor-palette">
-            {palette.map(color => (
-              <button
-                key={color}
-                className={`palette-color ${selectedColor === color ? 'selected' : ''}`}
-                style={{ backgroundColor: color }}
-                onClick={() => setSelectedColor(color)}
-                title={color}
-              />
-            ))}
+          {/* Tools */}
+          <div className="canvas-editor-tools">
             <button
-              className={`palette-color eraser ${selectedColor === 'eraser' ? 'selected' : ''}`}
-              onClick={() => setSelectedColor('eraser')}
+              className={`tool-btn ${selectedTool === 'pencil' ? 'selected' : ''}`}
+              onClick={() => setSelectedTool('pencil')}
+              title="Pencil (draw)"
+            >
+              &#x270F;
+            </button>
+            <button
+              className={`tool-btn ${selectedTool === 'fill' ? 'selected' : ''}`}
+              onClick={() => setSelectedTool('fill')}
+              title="Fill bucket"
+            >
+              &#x1F4A7;
+            </button>
+            <button
+              className={`tool-btn ${selectedTool === 'eraser' ? 'selected' : ''}`}
+              onClick={() => setSelectedTool('eraser')}
               title="Eraser"
             >
-              <span style={{ fontSize: '14px' }}>&#x2715;</span>
+              &#x2715;
             </button>
+          </div>
+
+          {/* Color palette */}
+          <div className="canvas-editor-palette">
+            {palette.map((color, idx) => (
+              <button
+                key={`${color}-${idx}`}
+                className={`palette-color ${selectedColor === color && selectedTool !== 'eraser' ? 'selected' : ''} ${color === null ? 'transparent-color' : ''}`}
+                style={color !== null ? { backgroundColor: color } : {}}
+                onClick={() => {
+                  setSelectedColor(color);
+                  if (selectedTool === 'eraser') setSelectedTool('pencil');
+                }}
+                title={color === null ? 'Transparent' : color}
+              />
+            ))}
           </div>
 
           {/* Canvas */}
@@ -224,16 +380,23 @@ export default function CanvasEditorModal({
               ref={canvasRef}
               width={canvasWidth}
               height={canvasHeight}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
+              onMouseDown={(e) => {
+                handleMouseDown(e);
+                handleRightMouseDown(e);
+              }}
+              onMouseMove={(e) => {
+                handleMouseMove(e);
+                handleRightMouseMove(e);
+              }}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseLeave}
-              style={{ cursor: 'crosshair' }}
+              onContextMenu={handleContextMenu}
+              style={{ cursor: getCursor() }}
             />
           </div>
 
           <div className="canvas-editor-info">
-            {width}x{height} pixels
+            {width}x{height} pixels | Left: draw | Right: erase
           </div>
         </div>
 
