@@ -196,24 +196,39 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
   const hasStory = useMemo(() => theme?.hasStoryContent?.() || false, [theme]);
 
-  // Compute activation markers for the selected cell (if it has activation requirements)
+  // Compute activation markers for ALL tiles with activation requirements
+  // Markers for the selected tile are shown at full opacity, others at reduced opacity
   const activationMarkers = useMemo(() => {
-    if (!selectedCell) return [];
-    const { x, y } = selectedCell;
-    const cell = grid[y]?.[x];
-    if (!cell) return [];
+    const markers = [];
+    const selectedKey = selectedCell ? `${selectedCell.x},${selectedCell.y}` : null;
 
-    const config = cell.object?.config || cell.floor?.config;
-    const activationReqs = config?.activationRequirements;
-    if (!activationReqs?.enabled || !activationReqs.requirements?.length) return [];
+    // Iterate all cells to find tiles with activation requirements
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[y].length; x++) {
+        const cell = grid[y][x];
+        const config = cell.object?.config || cell.floor?.config;
+        const activationReqs = config?.activationRequirements;
 
-    return activationReqs.requirements.map((req, idx) => ({
-      x: req.x,
-      y: req.y,
-      index: idx + 1,
-      itemId: req.itemId,
-      showNumbers: activationReqs.orderMatters
-    }));
+        if (!activationReqs?.enabled || !activationReqs.requirements?.length) continue;
+
+        const tileKey = `${x},${y}`;
+        const isSelected = tileKey === selectedKey;
+
+        activationReqs.requirements.forEach((req, idx) => {
+          markers.push({
+            x: req.x,
+            y: req.y,
+            index: idx + 1,
+            itemId: req.itemId,
+            showNumbers: activationReqs.orderMatters,
+            isSelected, // true for selected tile's markers (full opacity)
+            sourceTile: { x, y } // which tile this marker belongs to
+          });
+        });
+      }
+    }
+
+    return markers;
   }, [selectedCell, grid]);
 
   // Viewport state for infinite grid - center starts at middle of grid

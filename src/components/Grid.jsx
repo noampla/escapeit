@@ -471,8 +471,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     }
 
     // Activation markers overlay (for showing requirement positions)
+    // Draw unselected markers first (lower opacity), then selected markers on top
     if (activationMarkers && activationMarkers.length > 0) {
-      activationMarkers.forEach((marker) => {
+      // Sort so unselected markers are drawn first
+      const sortedMarkers = [...activationMarkers].sort((a, b) => (a.isSelected ? 1 : 0) - (b.isSelected ? 1 : 0));
+
+      sortedMarkers.forEach((marker) => {
         const px = (marker.x - offsetX) * TILE_SIZE;
         const py = (marker.y - offsetY) * TILE_SIZE;
 
@@ -484,25 +488,31 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
           }
         }
 
+        // Use different opacity for selected vs unselected markers
+        const isActive = marker.isSelected;
+        const fillAlpha = isActive ? 0.35 : 0.15;
+        const strokeAlpha = isActive ? 0.9 : 0.4;
+        const textAlpha = isActive ? 0.95 : 0.5;
+
         // Highlight tile with orange/gold color
-        ctx.fillStyle = 'rgba(255, 180, 50, 0.35)';
+        ctx.fillStyle = `rgba(255, 180, 50, ${fillAlpha})`;
         ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
         // Border
-        ctx.strokeStyle = 'rgba(255, 180, 50, 0.9)';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = `rgba(255, 180, 50, ${strokeAlpha})`;
+        ctx.lineWidth = isActive ? 3 : 2;
         ctx.strokeRect(px + 1.5, py + 1.5, TILE_SIZE - 3, TILE_SIZE - 3);
 
         // Show number if order matters, otherwise show a marker dot
         if (marker.showNumbers) {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.fillStyle = `rgba(255, 255, 255, ${textAlpha})`;
           ctx.font = 'bold 18px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(marker.index.toString(), px + TILE_SIZE / 2, py + TILE_SIZE / 2);
         } else {
           // Draw a small diamond marker
-          ctx.fillStyle = 'rgba(255, 220, 100, 0.9)';
+          ctx.fillStyle = `rgba(255, 220, 100, ${strokeAlpha})`;
           ctx.beginPath();
           const cx = px + TILE_SIZE / 2;
           const cy = py + TILE_SIZE / 2;
@@ -517,9 +527,11 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
 
         // Show itemId label at bottom
         if (marker.itemId) {
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          const bgAlpha = isActive ? 0.7 : 0.4;
+          const labelAlpha = isActive ? 0.9 : 0.6;
+          ctx.fillStyle = `rgba(0, 0, 0, ${bgAlpha})`;
           ctx.fillRect(px + 2, py + TILE_SIZE - 14, TILE_SIZE - 4, 12);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.fillStyle = `rgba(255, 255, 255, ${labelAlpha})`;
           ctx.font = '9px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
