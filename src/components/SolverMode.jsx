@@ -276,18 +276,24 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   showRestartConfirmRef.current = showRestartConfirm;
 
   // Notification helper using translation keys
-  const showNotification = useCallback((key, type = 'info', params = {}, duration = null) => {
+  // transient: if true, show notification but don't save to history (default for 'info' type)
+  const showNotification = useCallback((key, type = 'info', params = {}, duration = null, transient = null) => {
     if (!notification) return;
-    notification.notify(key, type, params, duration);
+    // Default: info and warning messages are transient (not saved to history)
+    const isTransient = transient ?? (type === 'info' || type === 'warning');
+    notification.notify(key, type, params, duration, isTransient);
   }, [notification]);
 
   // Raw message notification for dynamic/theme content
   // Attempts to translate theme messages using getMessage, falls back to raw text
-  const showMessage = useCallback((msg, duration = 1500, type = 'info') => {
+  // transient: if true, show notification but don't save to history (default for 'info' type)
+  const showMessage = useCallback((msg, duration = 1500, type = 'info', transient = null) => {
     if (!notification) return;
     // Try to translate via theme's translateMessage if available
     const translatedMsg = theme?.translateMessage?.(msg, {}, msg) || msg;
-    notification.notifyRaw(translatedMsg, type, duration);
+    // Default: info and warning messages are transient (not saved to history)
+    const isTransient = transient ?? (type === 'info' || type === 'warning');
+    notification.notifyRaw(translatedMsg, type, duration, isTransient);
   }, [notification, theme]);
 
   const respawn = useCallback(() => {

@@ -5,6 +5,7 @@ import soundManager from '../engine/soundManager';
 
 const getCategoryLabel = (t, catId) => {
   const labels = {
+    'entry-exit': t('toolbar.entryExit'),
     basic: t('toolbar.terrain'),
     interactive: t('toolbar.objects'),
     hazard: t('toolbar.hazards'),
@@ -13,6 +14,7 @@ const getCategoryLabel = (t, catId) => {
 };
 
 const categories = [
+  { id: 'entry-exit' },
   { id: 'basic' },
   { id: 'interactive' },
   { id: 'hazard' },

@@ -79,8 +79,9 @@ export function NotificationProvider({ children, themeColors = null }) {
    * @param {string} type - Notification type (success, info, warning, error, danger)
    * @param {object} params - Parameters for string interpolation
    * @param {number} duration - Optional custom duration in ms
+   * @param {boolean} transient - If true, show notification but don't save to history
    */
-  const notify = useCallback((messageKey, type = 'info', params = {}, duration = null) => {
+  const notify = useCallback((messageKey, type = 'info', params = {}, duration = null, transient = false) => {
     const text = t(messageKey, params);
     const typeConfig = NOTIFICATION_TYPES[type] || NOTIFICATION_TYPES.info;
     const colors = getColors(type);
@@ -103,8 +104,10 @@ export function NotificationProvider({ children, themeColors = null }) {
     // Set current notification
     setCurrent(notification);
 
-    // Add to history
-    addToHistory(notification);
+    // Add to history only if not transient
+    if (!transient) {
+      addToHistory(notification);
+    }
 
     // Auto-dismiss
     const dismissDuration = duration || typeConfig.duration;
@@ -122,8 +125,9 @@ export function NotificationProvider({ children, themeColors = null }) {
    * @param {string} text - The notification text
    * @param {string} type - Notification type
    * @param {number} duration - Optional custom duration in ms
+   * @param {boolean} transient - If true, show notification but don't save to history
    */
-  const notifyRaw = useCallback((text, type = 'info', duration = null) => {
+  const notifyRaw = useCallback((text, type = 'info', duration = null, transient = false) => {
     const typeConfig = NOTIFICATION_TYPES[type] || NOTIFICATION_TYPES.info;
     const colors = getColors(type);
     const id = ++idCounterRef.current;
@@ -145,8 +149,10 @@ export function NotificationProvider({ children, themeColors = null }) {
     // Set current notification
     setCurrent(notification);
 
-    // Add to history
-    addToHistory(notification);
+    // Add to history only if not transient
+    if (!transient) {
+      addToHistory(notification);
+    }
 
     // Auto-dismiss
     const dismissDuration = duration || typeConfig.duration;

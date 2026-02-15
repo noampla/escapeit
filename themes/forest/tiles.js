@@ -103,7 +103,7 @@ export const TILE_TYPES = {
   campfire: {
     label: 'Campfire (Start)',
     color: '#cc6600',
-    category: 'basic',
+    category: 'entry-exit',
     layer: 'floor',
     unique: true,
     tooltip: 'Player spawn point. Only one per level.',
@@ -112,7 +112,7 @@ export const TILE_TYPES = {
   car: {
     label: 'Car (Exit)',
     color: '#4488cc',
-    category: 'basic',
+    category: 'entry-exit',
     layer: 'floor',
     unique: true,
     configurable: true,

@@ -169,6 +169,7 @@
     "fewestLabel": "Fewest"
   },
   "toolbar": {
+    "entryExit": "Entry / Exit",
     "objects": "Objects",
     "terrain": "Terrain",
     "hazards": "Hazards",

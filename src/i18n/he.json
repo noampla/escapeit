@@ -169,6 +169,7 @@
     "fewestLabel": "הכי מעט"
   },
   "toolbar": {
+    "entryExit": "כניסה / יציאה",
     "objects": "אובייקטים",
     "terrain": "שטח",
     "hazards": "מכשולים",
