@@ -65,6 +65,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     const hasLight = playerPos ? (theme?.hasLightInDarkZone?.(gameState) || false) : false;
     // Get tiles illuminated by dropped torches (these are always visible with objects)
     const torchLitTiles = theme?.getDroppedTorchLitTiles?.(grid) || new Set();
+    // Get the current cave region (for independent caves - only show tiles in player's region)
+    const currentCaveRegion = playerInDarkZone ? (theme?.getCaveRegion?.(playerPos, grid) || new Set()) : new Set();
 
     // Calculate temporary visibility for dark zone (5 tiles: current + 4 cardinal)
     const darkZoneVisible = new Set();
@@ -88,10 +90,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
           // With torch: tiles can be permanently revealed (stored in revealedTiles)
           // Without torch: only temporary 5-tile visibility
           // When outside: always black (even with torch)
-          // Exception: tiles lit by dropped torches are always visible
-          const isTorchLit = torchLitTiles.has(key);
-          const isPermanentlyRevealed = playerInDarkZone && hasLight && revealedTiles?.has(key);
-          const isTemporarilyVisible = playerInDarkZone && darkZoneVisible.has(key);
+          // Exception: tiles lit by dropped torches are always visible (only in same region)
+          // Independent caves: only show tiles in the same cave region as player
+          const isInCurrentRegion = currentCaveRegion.has(key);
+          const isTorchLit = torchLitTiles.has(key) && isInCurrentRegion;
+          const isPermanentlyRevealed = playerInDarkZone && hasLight && revealedTiles?.has(key) && isInCurrentRegion;
+          const isTemporarilyVisible = playerInDarkZone && darkZoneVisible.has(key) && isInCurrentRegion;
 
           if (!isPermanentlyRevealed && !isTemporarilyVisible && !isTorchLit) {
             // Not visible - black fog
@@ -299,8 +303,8 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       }
     }
 
-    // === CAVE BORDER LINES - show explored boundaries (only visible when inside cave) ===
-    if (playerInDarkZone && caveBordersRevealed && caveBordersRevealed.size > 0) {
+    // === CAVE BORDER LINES - show explored boundaries (only visible when inside cave with torch) ===
+    if (playerInDarkZone && hasLight && caveBordersRevealed && caveBordersRevealed.size > 0) {
       ctx.strokeStyle = 'rgba(100, 120, 140, 0.8)';
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
@@ -308,6 +312,9 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       for (const border of caveBordersRevealed) {
         const [pos, dir] = border.split('-');
         const [bx, by] = pos.split(',').map(Number);
+
+        // Skip borders not in the current cave region (independent caves)
+        if (!currentCaveRegion.has(pos)) continue;
 
         // Skip if outside viewport
         if (viewportBounds && (bx < startX || bx > endX || by < startY || by > endY)) continue;
@@ -367,8 +374,11 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
 
         // Skip hazard zones in dark zone tiles that aren't visible
         // In dark zones, hazards are ONLY visible when player has light (torch) or tile is torch-lit
+        // Also check cave region - hazards in other caves shouldn't show
         const zKey = `${z.x},${z.y}`;
         if (darkZoneTiles.has(zKey)) {
+          // Must be in current cave region (independent caves)
+          if (!currentCaveRegion.has(zKey)) continue;
           const zTorchLit = torchLitTiles.has(zKey);
           if (!hasLight && !zTorchLit) continue; // No hazard indicators without light
           const zVisible = zTorchLit || (playerInDarkZone && (

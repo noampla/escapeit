@@ -468,6 +468,28 @@ export class ThemeLoader {
     return this.tiles.canInteractBetweenTiles(fromPos, toPos, grid, gameState);
   }
 
+  /**
+   * Get the cave region (connected component) containing the player position
+   * Returns empty set if theme doesn't define this or player not in cave
+   * @param {Object} playerPos - Player position { x, y }
+   * @param {Array} grid - The game grid
+   * @returns {Set} - Set of position strings "x,y" for tiles in this region
+   */
+  getCaveRegion(playerPos, grid) {
+    return this.tiles?.getCaveRegion?.(playerPos, grid) || new Set();
+  }
+
+  /**
+   * Get borders of a tile that lead to non-cave areas
+   * Used for auto-revealing borders when standing on edge tiles
+   * @param {Object} pos - Tile position { x, y }
+   * @param {Array} grid - The game grid
+   * @returns {Array} - Array of border strings like "x,y-direction"
+   */
+  getTileBorders(pos, grid) {
+    return this.tiles?.getTileBorders?.(pos, grid) || [];
+  }
+
   // === NEW: UI Theming ===
 
   // Get UI color scheme

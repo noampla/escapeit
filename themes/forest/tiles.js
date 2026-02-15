@@ -2097,3 +2097,100 @@ export function canInteractBetweenTiles(fromPos, toPos, grid, gameState = {}) {
   // Crossing zone boundary without going through entry - block
   return false;
 }
+
+/**
+ * Get the cave region (connected component) that contains the given position
+ * Uses flood-fill to find all cave/cave-entry tiles connected to the position
+ * @param {Object} playerPos - Player position { x, y }
+ * @param {Array} grid - The game grid
+ * @returns {Set} - Set of position strings "x,y" for all tiles in this cave region
+ */
+export function getCaveRegion(playerPos, grid) {
+  const region = new Set();
+  if (!playerPos || !grid) return region;
+
+  const startCell = grid[playerPos.y]?.[playerPos.x];
+  if (!startCell) return region;
+
+  // Check if player is in a cave area
+  const startFloor = startCell.floor?.type;
+  if (startFloor !== 'cave' && startFloor !== 'cave-entry') {
+    return region; // Not in a cave
+  }
+
+  // Flood-fill to find all connected cave tiles
+  const visited = new Set();
+  const queue = [{ x: playerPos.x, y: playerPos.y }];
+
+  while (queue.length > 0) {
+    const { x, y } = queue.shift();
+    const key = `${x},${y}`;
+
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    const cell = grid[y]?.[x];
+    if (!cell) continue;
+
+    const floorType = cell.floor?.type;
+    // Only include cave and cave-entry tiles
+    if (floorType !== 'cave' && floorType !== 'cave-entry') continue;
+
+    region.add(key);
+
+    // Add cardinal neighbors to queue
+    queue.push({ x: x - 1, y });
+    queue.push({ x: x + 1, y });
+    queue.push({ x, y: y - 1 });
+    queue.push({ x, y: y + 1 });
+  }
+
+  return region;
+}
+
+/**
+ * Get the borders of the current tile that lead to non-cave areas
+ * Used for auto-revealing borders when standing on edge tiles
+ * @param {Object} pos - Tile position { x, y }
+ * @param {Array} grid - The game grid
+ * @returns {Array} - Array of border strings like "x,y-direction"
+ */
+export function getTileBorders(pos, grid) {
+  const borders = [];
+  if (!pos || !grid) return borders;
+
+  const cell = grid[pos.y]?.[pos.x];
+  if (!cell) return borders;
+
+  // Only applies to dark zone tiles (caves)
+  const floorType = cell.floor?.type;
+  const tileDef = TILE_TYPES[floorType];
+  if (!tileDef?.isDarkZone) return borders;
+
+  const directions = [
+    { dir: 'up', dx: 0, dy: -1 },
+    { dir: 'down', dx: 0, dy: 1 },
+    { dir: 'left', dx: -1, dy: 0 },
+    { dir: 'right', dx: 1, dy: 0 }
+  ];
+
+  for (const { dir, dx, dy } of directions) {
+    const adjX = pos.x + dx;
+    const adjY = pos.y + dy;
+    const adjCell = grid[adjY]?.[adjX];
+
+    if (!adjCell) {
+      // Out of bounds - this is a border
+      borders.push(`${pos.x},${pos.y}-${dir}`);
+      continue;
+    }
+
+    const adjFloor = adjCell.floor?.type;
+    // If adjacent is not cave and not cave-entry, this is a border
+    if (adjFloor !== 'cave' && adjFloor !== 'cave-entry') {
+      borders.push(`${pos.x},${pos.y}-${dir}`);
+    }
+  }
+
+  return borders;
+}

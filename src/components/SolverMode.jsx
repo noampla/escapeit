@@ -1117,6 +1117,22 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       });
     };
 
+    // Auto-mark cave borders when standing on edge tiles (with torch)
+    // This marks all borders of the current tile that lead to non-cave areas
+    const autoMarkCaveBorders = (posX, posY) => {
+      const hasLight = theme?.hasLightInDarkZone?.(currentGS) || false;
+      if (!hasLight) return;
+
+      const borders = theme?.getTileBorders?.({ x: posX, y: posY }, currentGrid) || [];
+      if (borders.length > 0) {
+        setCaveBordersRevealed(prevBorders => {
+          const newBorders = new Set(prevBorders);
+          borders.forEach(border => newBorders.add(border));
+          return newBorders;
+        });
+      }
+    };
+
     // Use theme's movement rules
     // Check object layer first (for doors, hazards, etc.), then floor layer
     const targetType = targetCell.object?.type || targetCell.floor?.type;
@@ -1158,6 +1174,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         setPlayerPos({ x: nx, y: ny });
         setMoveCount(prev => prev + 1);
         revealTargetTile();
+        autoMarkCaveBorders(nx, ny);
         return;
       }
 
@@ -1178,6 +1195,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
       revealTargetTile();
+      autoMarkCaveBorders(nx, ny);
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
       const postMoveResult = theme?.onPlayerMove?.(currentGS, currentGrid, nx, ny);
@@ -1212,6 +1230,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
       revealTargetTile();
+      autoMarkCaveBorders(nx, ny);
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
       const postMoveResult = theme?.onPlayerMove?.(gameStateRef.current, currentGrid, nx, ny);
