@@ -399,6 +399,45 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     const tileDef = TILE_TYPES[selectedTool];
     const layer = tileDef?.layer || 'floor';
 
+    // Ctrl+click on object/item = bury in floor's hiddenObject
+    if (e?.ctrlKey && layer === 'object') {
+      const cell = grid[y][x];
+      const floorDef = TILE_TYPES[cell.floor?.type];
+
+      // Can only bury in walkable floor tiles
+      if (floorDef?.walkable) {
+        pushUndo(grid);
+        const newGrid = cloneGrid(grid);
+        if (!newGrid[y][x].floor.config) newGrid[y][x].floor.config = {};
+
+        // Create the hidden object
+        const hiddenObj = {
+          type: selectedTool,
+          config: tileDef.defaultConfig ? { ...tileDef.defaultConfig } : {}
+        };
+
+        // Store itemType for item tiles
+        if (tileDef.isItemTile) {
+          hiddenObj.config.itemType = tileDef.itemType;
+        }
+
+        // Apply lock color if applicable
+        if (lockTiles.includes(selectedTool)) {
+          hiddenObj.config.lockColor = selectedLockColor;
+        }
+
+        newGrid[y][x].floor.config.hiddenObject = hiddenObj;
+        setGrid(newGrid);
+        setSelectedCell({ x, y });
+        setSaved(false);
+        lastDragPos.current = `${x},${y}`;
+        return;
+      } else {
+        showPlacementError('Can only bury objects in walkable floor tiles!');
+        return;
+      }
+    }
+
     // Validate object placement on floor
     if (layer === 'object') {
       const cell = grid[y][x];
@@ -491,10 +530,26 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     if (subMode === 'edit') return;
     pushUndo(grid);
     const TILE_TYPES = theme?.getTileTypes() || {};
-    const newGrid = removeTile(grid, x, y);
-    // Clean up objects with attachToWall that are no longer valid
-    cleanupInvalidObjects(newGrid, TILE_TYPES);
-    setGrid(newGrid);
+    const cell = grid[y][x];
+
+    // Priority: remove object first, then buried object, then floor
+    if (cell.object) {
+      // Remove object layer
+      const newGrid = removeTile(grid, x, y);
+      cleanupInvalidObjects(newGrid, TILE_TYPES);
+      setGrid(newGrid);
+    } else if (cell.floor?.config?.hiddenObject) {
+      // Remove buried object (but keep floor)
+      const newGrid = cloneGrid(grid);
+      newGrid[y][x].floor.config.hiddenObject = null;
+      setGrid(newGrid);
+    } else {
+      // Remove floor
+      const newGrid = removeTile(grid, x, y);
+      cleanupInvalidObjects(newGrid, TILE_TYPES);
+      setGrid(newGrid);
+    }
+
     setSelectedCell(null);
     setSaved(false);
     lastDragPos.current = `${x},${y}`;

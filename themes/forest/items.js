@@ -84,6 +84,13 @@ export const ITEM_TYPES = {
     color: '#8b6914',
     description: 'Place on water to travel across'
   },
+  shovel: {
+    label: 'Shovel',
+    emoji: null,  // Custom draw
+    color: '#8b7355',
+    draw: 'shovel',
+    description: 'Dig ground to find buried items'
+  },
   'drawing-board': {
     label: 'Drawing Board',
     emoji: null,  // Custom draw
@@ -323,6 +330,54 @@ function drawStick(ctx, cx, cy, size) {
   ctx.restore();
 }
 
+// Custom rendering for shovel
+function drawShovel(ctx, cx, cy, size) {
+  const handleColor = '#6b4423';
+  const handleDark = '#4a2f1a';
+  const bladeColor = '#888888';
+  const bladeDark = '#666666';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.4); // Slight angle
+
+  // Wooden handle
+  ctx.fillStyle = handleColor;
+  ctx.fillRect(-size * 0.04, -size * 0.38, size * 0.08, size * 0.55);
+
+  // Handle texture
+  ctx.fillStyle = handleDark;
+  ctx.fillRect(-size * 0.04, -size * 0.32, size * 0.08, size * 0.03);
+  ctx.fillRect(-size * 0.04, -size * 0.18, size * 0.08, size * 0.03);
+  ctx.fillRect(-size * 0.04, -size * 0.04, size * 0.08, size * 0.03);
+
+  // Metal blade
+  ctx.fillStyle = bladeColor;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.15, size * 0.17);
+  ctx.lineTo(size * 0.15, size * 0.17);
+  ctx.lineTo(size * 0.12, size * 0.38);
+  ctx.quadraticCurveTo(0, size * 0.45, -size * 0.12, size * 0.38);
+  ctx.closePath();
+  ctx.fill();
+
+  // Blade edge highlight
+  ctx.fillStyle = bladeDark;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.1, size * 0.32);
+  ctx.quadraticCurveTo(0, size * 0.38, size * 0.1, size * 0.32);
+  ctx.lineTo(size * 0.12, size * 0.38);
+  ctx.quadraticCurveTo(0, size * 0.45, -size * 0.12, size * 0.38);
+  ctx.closePath();
+  ctx.fill();
+
+  // Handle top grip
+  ctx.fillStyle = handleDark;
+  ctx.fillRect(-size * 0.06, -size * 0.4, size * 0.12, size * 0.05);
+
+  ctx.restore();
+}
+
 // Custom rendering for torch
 function drawTorch(ctx, cx, cy, size) {
   const stickBrown = '#6b4910';
@@ -532,6 +587,11 @@ export function renderItem(ctx, itemType, x, y, size, state = null) {
     return true;
   }
 
+  if (item.draw === 'shovel') {
+    drawShovel(ctx, cx, cy, size);
+    return true;
+  }
+
   if (item.draw === 'drawing-board') {
     drawDrawingBoardItem(ctx, cx, cy, size, state);
     return true;
@@ -655,6 +715,11 @@ export function renderInventoryItem(ctx, itemType, x, y, size, state = null) {
 
   if (item.draw === 'torch') {
     drawTorch(ctx, cx, cy, size);
+    return true;
+  }
+
+  if (item.draw === 'shovel') {
+    drawShovel(ctx, cx, cy, size);
     return true;
   }
 

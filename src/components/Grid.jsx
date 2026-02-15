@@ -263,6 +263,50 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
           }
         }
 
+        // === BUILDER MODE: Show buried objects with opacity ===
+        if (isBuilder && cell.floor?.config?.hiddenObject && !cell.floor?.config?.dug) {
+          const hidden = cell.floor.config.hiddenObject;
+
+          // Draw dashed border to indicate buried object
+          ctx.strokeStyle = '#8b4513';
+          ctx.setLineDash([4, 4]);
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+          ctx.setLineDash([]);
+
+          // Draw the buried object with transparency
+          ctx.globalAlpha = 0.4;
+
+          // Render the hidden item
+          if (hidden.type.startsWith('item-')) {
+            const itemType = hidden.type.replace('item-', '');
+            const rendered = theme?.renderItem?.(ctx, itemType, px, py, TILE_SIZE, hidden.config);
+            if (!rendered) {
+              const emoji = theme?.getItemEmoji?.(itemType) || DEFAULT_TILE_EMOJIS[hidden.type];
+              if (emoji) {
+                ctx.font = '18px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(emoji, cx, cy);
+              }
+            }
+          } else {
+            // Non-item objects
+            const rendered = theme?.renderTile?.(ctx, hidden, cx, cy, TILE_SIZE);
+            if (!rendered) {
+              const emoji = theme?.getTileEmoji?.(hidden.type) || DEFAULT_TILE_EMOJIS[hidden.type];
+              if (emoji) {
+                ctx.font = '18px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(emoji, cx, cy);
+              }
+            }
+          }
+
+          ctx.globalAlpha = 1;
+        }
+
         // === LAYER 2: OBJECT (if exists) ===
         if (cell.object) {
           // Items use special rendering

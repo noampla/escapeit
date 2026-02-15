@@ -13,8 +13,10 @@ export const TILE_TYPES = {
     color: '#3d5a28',
     category: 'basic',
     layer: 'floor',
-    tooltip: 'Walkable forest ground.',
-    walkable: true
+    tooltip: 'Walkable forest ground. May contain buried items (Ctrl+click to bury).',
+    walkable: true,
+    configurable: true,
+    defaultConfig: { hiddenObject: null, dug: false }
   },
   tree: {
     label: 'Tree',
@@ -238,6 +240,16 @@ export const TILE_TYPES = {
     isItemTile: true,
     itemType: 'raft',
     tooltip: 'Collectible raft. Press F to pick up. Face water and press Q to place.',
+    walkable: true
+  },
+  'item-shovel': {
+    label: 'Shovel',
+    color: '#8b7355',
+    category: 'interactive',
+    layer: 'object',
+    isItemTile: true,
+    itemType: 'shovel',
+    tooltip: 'Collectible shovel. Press F to pick up. Use to dig ground (hold E) to find buried items.',
     walkable: true
   },
 
@@ -961,6 +973,91 @@ function drawTorch(ctx, cx, cy, size) {
   ctx.restore();
 }
 
+// Draw a shovel
+function drawShovel(ctx, cx, cy, size) {
+  const handleColor = '#6b4423';
+  const handleDark = '#4a2f1a';
+  const bladeColor = '#888888';
+  const bladeDark = '#666666';
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.4); // Slight angle
+
+  // Wooden handle
+  ctx.fillStyle = handleColor;
+  ctx.fillRect(-size * 0.04, -size * 0.38, size * 0.08, size * 0.55);
+
+  // Handle texture
+  ctx.fillStyle = handleDark;
+  ctx.fillRect(-size * 0.04, -size * 0.32, size * 0.08, size * 0.03);
+  ctx.fillRect(-size * 0.04, -size * 0.18, size * 0.08, size * 0.03);
+  ctx.fillRect(-size * 0.04, -size * 0.04, size * 0.08, size * 0.03);
+
+  // Metal blade
+  ctx.fillStyle = bladeColor;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.15, size * 0.17);
+  ctx.lineTo(size * 0.15, size * 0.17);
+  ctx.lineTo(size * 0.12, size * 0.38);
+  ctx.quadraticCurveTo(0, size * 0.45, -size * 0.12, size * 0.38);
+  ctx.closePath();
+  ctx.fill();
+
+  // Blade edge highlight
+  ctx.fillStyle = bladeDark;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.1, size * 0.32);
+  ctx.quadraticCurveTo(0, size * 0.38, size * 0.1, size * 0.32);
+  ctx.lineTo(size * 0.12, size * 0.38);
+  ctx.quadraticCurveTo(0, size * 0.45, -size * 0.12, size * 0.38);
+  ctx.closePath();
+  ctx.fill();
+
+  // Handle top grip
+  ctx.fillStyle = handleDark;
+  ctx.fillRect(-size * 0.06, -size * 0.4, size * 0.12, size * 0.05);
+
+  ctx.restore();
+}
+
+// Draw dug ground (disturbed earth after digging)
+function drawDugGround(ctx, cx, cy, size) {
+  // Base darker ground color (disturbed earth)
+  ctx.fillStyle = '#4a3a20';
+  ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+  // Dirt mounds around the hole
+  ctx.fillStyle = '#5a4a30';
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.25, cy - size * 0.25, size * 0.18, size * 0.12, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.22, cy - size * 0.18, size * 0.15, size * 0.1, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.18, cy + size * 0.22, size * 0.16, size * 0.11, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.2, cy + size * 0.2, size * 0.14, size * 0.1, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Darker depression in center (the hole)
+  ctx.fillStyle = '#3a2a15';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.22, size * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Even darker center
+  ctx.fillStyle = '#2a1a0a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + size * 0.02, size * 0.12, size * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // Draw a wooden sign
 function drawSign(ctx, cx, cy, size) {
   const woodColor = '#8b7355';
@@ -1457,6 +1554,18 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Shovel gets custom rendering
+  if (tile.type === 'item-shovel') {
+    drawShovel(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Dug ground gets custom rendering (floor that has been dug)
+  if (tile.type === 'ground' && tile.config?.dug) {
+    drawDugGround(ctx, cx, cy, size);
+    return true;
+  }
+
   // Removed/defeated object states get custom rendering
   if (tile.type === 'tree-stump') {
     drawTreeStump(ctx, cx, cy, size);
@@ -1529,6 +1638,7 @@ export function getTileEmoji(tileType) {
     'item-sweater': '🧥',
     'item-wood': null,  // Custom draw
     'item-raft': '🛶',  // Raft item uses boat emoji
+    'item-shovel': null,  // Custom draw
     friend: '👤',
     fire: '🔥',
     bear: '🐻',
@@ -1550,7 +1660,7 @@ export function getTileEmoji(tileType) {
 export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start', 'cave', 'cave-entry'];
 
 // Tiles player can interact with (E key)
-export const INTERACTABLE_TILES = ['tree', 'boulder', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign', 'item-drawing-board'];
+export const INTERACTABLE_TILES = ['tree', 'boulder', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign', 'item-drawing-board', 'ground'];
 
 // Tiles to ignore for floor color detection when picking up items
 export const IGNORE_TILES = ['wall', 'empty', 'door-key', 'door-card', 'door-key-open', 'door-card-open', 'tree', 'boulder', 'thorny-bush', 'water', 'snow', 'bear'];

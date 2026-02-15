@@ -45,7 +45,9 @@
     "caveBlocked": "You can't enter the cave from here. Find the cave entrance!",
     "caveExitBlocked": "You can't exit the cave here. Find the cave entrance to leave!",
     "cantPickupInDark": "Too dark to find items! You need a torch.",
-    "cantInteractInDark": "Too dark to interact! You need a torch."
+    "cantInteractInDark": "Too dark to interact! You need a torch.",
+    "foundBuried": "You found something buried!",
+    "nothingBuried": "Just dirt. Nothing here."
   },
   "tiles": {
     "empty": "Empty",
@@ -78,7 +80,8 @@
     "ancient-gate": "Ancient Gate",
     "sign": "Sign",
     "cave-entry": "Cave Entry",
-    "cave": "Cave Floor"
+    "cave": "Cave Floor",
+    "item-shovel": "Shovel"
   },
   "items": {
     "key": "Key",
@@ -90,6 +93,7 @@
     "knife": "Knife",
     "sweater": "Sweater",
     "wood": "Wood",
-    "raft": "Raft"
+    "raft": "Raft",
+    "shovel": "Shovel"
   }
 }

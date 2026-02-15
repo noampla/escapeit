@@ -543,6 +543,49 @@ export const INTERACTIONS = {
       };
     }
   },
+
+  'dig-ground': {
+    label: 'Dig',
+    duration: 3000,  // Longer than regular interactions (1500ms)
+    requirements: {
+      inventory: ['shovel'],
+      selfOnly: true  // Only check tile player is standing on
+    },
+    checkCustom: (gameState, tile, grid, x, y) => {
+      // Can only dig undug ground tiles
+      const cell = grid[y][x];
+      return cell.floor?.type === 'ground' && !cell.floor?.config?.dug;
+    },
+    execute: (gameState, grid, x, y) => {
+      const cell = grid[y][x];
+
+      // Initialize config if needed
+      if (!cell.floor.config) cell.floor.config = {};
+
+      // Always mark as dug (changes visual to dug ground)
+      cell.floor.config.dug = true;
+
+      // Check for buried object
+      if (cell.floor.config.hiddenObject) {
+        const hidden = cell.floor.config.hiddenObject;
+        cell.floor.config.hiddenObject = null;
+        cell.object = hidden;  // Move to object layer (revealed!)
+
+        return {
+          success: true,
+          messageKey: 'foundBuried',
+          modifyGrid: true
+        };
+      }
+
+      // Nothing found - still shows dug ground visual
+      return {
+        success: true,
+        messageKey: 'nothingBuried',
+        modifyGrid: true
+      };
+    }
+  },
 };
 
 // Get all available interactions at a position
@@ -567,7 +610,8 @@ export function getAvailableInteractions(gameState, grid, x, y, isSelfCheck = fa
 }
 
 // Check if requirements are met
-function checkRequirements(requirements, gameState, tile, interaction = null, grid = null, x = 0, y = 0, isSelfCheck = false) {
+// isSelfCheck: true = self-check, false = facing-check, undefined = skip directional checks (execution phase)
+function checkRequirements(requirements, gameState, tile, interaction = null, grid = null, x = 0, y = 0, isSelfCheck = undefined) {
   if (!requirements) return true;
 
   // selfOnly/facingOnly checks only apply when finding interactions (isSelfCheck is boolean)

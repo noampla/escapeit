@@ -19,7 +19,13 @@ export function cloneGrid(grid) {
   return grid.map(row => row.map(cell => ({
     floor: {
       type: cell.floor.type,
-      config: { ...cell.floor.config }
+      config: {
+        ...cell.floor.config,
+        // Deep clone hiddenObject if present (for buried items)
+        hiddenObject: cell.floor.config?.hiddenObject
+          ? { ...cell.floor.config.hiddenObject, config: { ...cell.floor.config.hiddenObject.config } }
+          : cell.floor.config?.hiddenObject
+      }
     },
     object: cell.object ? {
       type: cell.object.type,
@@ -198,4 +204,49 @@ export function findAllTiles(grid, type) {
     }
   }
   return results;
+}
+
+// === BURIED OBJECT HELPERS ===
+
+/**
+ * Check if a floor tile has a hidden/buried object
+ * @param {Object} cell - Grid cell with floor and object layers
+ * @returns {boolean} - True if floor has a buried object
+ */
+export function hasHiddenObject(cell) {
+  return cell.floor?.config?.hiddenObject != null;
+}
+
+/**
+ * Check if a floor tile has been dug
+ * @param {Object} cell - Grid cell with floor and object layers
+ * @returns {boolean} - True if floor has been dug
+ */
+export function isDug(cell) {
+  return cell.floor?.config?.dug === true;
+}
+
+/**
+ * Reveal a hidden object by digging (modifies cell in place)
+ * Marks the floor as dug and moves hidden object to object layer
+ * @param {Object} cell - Grid cell to dig
+ * @returns {Object|null} - The revealed object or null if nothing buried
+ */
+export function revealHiddenObject(cell) {
+  if (!cell.floor?.config) {
+    cell.floor.config = {};
+  }
+
+  // Mark as dug
+  cell.floor.config.dug = true;
+
+  // Check for hidden object
+  const hidden = cell.floor.config.hiddenObject;
+  if (hidden) {
+    cell.floor.config.hiddenObject = null;
+    cell.object = hidden;
+    return hidden;
+  }
+
+  return null;
 }
