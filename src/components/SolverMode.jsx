@@ -394,7 +394,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Check if any activation requirements are now met
     const activationResults = checkActivations(newGrid, gameStateRef.current);
     if (activationResults.length > 0) {
-      soundManager.play('unlock');
+      soundManager.play('success');
       const msg = getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!';
       showMessage(msg, 2000, 'success');
     }
