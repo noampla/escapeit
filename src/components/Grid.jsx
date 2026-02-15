@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, isBuilder = false }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, activationMarkers, activationPickMode, isBuilder = false }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -411,6 +411,71 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       });
     }
 
+    // Activation markers overlay (for showing requirement positions)
+    if (activationMarkers && activationMarkers.length > 0) {
+      activationMarkers.forEach((marker) => {
+        const px = (marker.x - offsetX) * TILE_SIZE;
+        const py = (marker.y - offsetY) * TILE_SIZE;
+
+        // Skip if out of viewport bounds
+        if (viewportBounds) {
+          if (marker.x < viewportBounds.minX || marker.x > viewportBounds.maxX ||
+              marker.y < viewportBounds.minY || marker.y > viewportBounds.maxY) {
+            return;
+          }
+        }
+
+        // Highlight tile with orange/gold color
+        ctx.fillStyle = 'rgba(255, 180, 50, 0.35)';
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
+        // Border
+        ctx.strokeStyle = 'rgba(255, 180, 50, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(px + 1.5, py + 1.5, TILE_SIZE - 3, TILE_SIZE - 3);
+
+        // Show number if order matters, otherwise show a marker dot
+        if (marker.showNumbers) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.font = 'bold 18px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(marker.index.toString(), px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+        } else {
+          // Draw a small diamond marker
+          ctx.fillStyle = 'rgba(255, 220, 100, 0.9)';
+          ctx.beginPath();
+          const cx = px + TILE_SIZE / 2;
+          const cy = py + TILE_SIZE / 2;
+          const s = 8;
+          ctx.moveTo(cx, cy - s);
+          ctx.lineTo(cx + s, cy);
+          ctx.lineTo(cx, cy + s);
+          ctx.lineTo(cx - s, cy);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Show itemId label at bottom
+        if (marker.itemId) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(px + 2, py + TILE_SIZE - 14, TILE_SIZE - 4, 12);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.font = '9px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const label = marker.itemId.length > 8 ? marker.itemId.slice(0, 7) + '…' : marker.itemId;
+          ctx.fillText(label, px + TILE_SIZE / 2, py + TILE_SIZE - 8);
+        }
+      });
+    }
+
+    // Activation pick mode hint (highlight all floor tiles when picking)
+    if (activationPickMode) {
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.1)';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
+
     // Interaction progress overlay on target tile
     if (interactionTarget && interactionProgress > 0) {
       const itx = (interactionTarget.x - offsetX) * TILE_SIZE;
@@ -512,7 +577,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       }
     }
 
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths, activationMarkers, activationPickMode]);
 
   useEffect(() => {
     draw();

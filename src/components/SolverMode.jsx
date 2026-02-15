@@ -14,6 +14,7 @@ import { submitScore } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
 import soundManager from '../engine/soundManager.js';
 import { moveEntities } from '../engine/entities.js';
+import { checkActivations } from '../engine/activationSystem.js';
 import NotificationPanel from './NotificationPanel';
 import StoryModal from './StoryModal';
 
@@ -383,8 +384,17 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const droppedLabel = getItemLabel(themeId, dropped.itemType, itemDef?.label || dropped.itemType);
     soundManager.play('drop');
     showNotification('notifications.dropped', 'info', { emoji: itemDef?.emoji || '', label: droppedLabel });
+
+    // Check if any activation requirements are now met
+    const activationResults = checkActivations(newGrid, gameStateRef.current);
+    if (activationResults.length > 0) {
+      soundManager.play('unlock');
+      const msg = getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!';
+      showMessage(msg, 2000, 'success');
+    }
+
     setDropMenuOpen(false);
-  }, [showNotification, theme, getItemLabel, themeId]);
+  }, [showNotification, theme, getItemLabel, themeId, getMessage, showMessage]);
 
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;

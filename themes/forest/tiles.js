@@ -363,6 +363,7 @@ export const CONFIG_HELP = {
   },
   'ancient-gate': {
     pathTiles: 'Click tiles on the map to define the path. Tiles must be connected (up/down/left/right). Player must walk the path in order without leaving.',
+    activationRequirements: 'Configure items that must be placed at specific positions to open the gate. Alternative to path-based opening.',
   },
   sign: {
     message: 'The message that appears when the player presses E to read the sign.',
@@ -397,6 +398,15 @@ export const CONFIG_SCHEMA = {
       type: 'path',  // Special type handled by the builder
       label: 'Path Tiles',
       default: []
+    },
+    activationRequirements: {
+      type: 'activation',
+      label: 'Item Activation',
+      default: {
+        enabled: false,
+        orderMatters: false,
+        requirements: []
+      }
     }
   },
   sign: {

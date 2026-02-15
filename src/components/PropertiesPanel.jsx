@@ -26,7 +26,9 @@ export default function PropertiesPanel({
   // Path editing
   onStartPathEdit,
   // Canvas editing (for drawing tiles)
-  onStartCanvasEdit
+  onStartCanvasEdit,
+  // Activation position picking
+  onStartActivationPick
 }) {
   const theme = useContext(ThemeContext);
   const { t, isRTL, getTileLabel } = useLanguage();
@@ -35,6 +37,30 @@ export default function PropertiesPanel({
   const CONFIG_HELP = theme?.getConfigHelp() || {};
   const CONFIG_SCHEMA = theme?.getConfigSchema?.() || {};
   const primaryColor = theme?.primaryColor || '#6688aa';
+
+  // Collect all available item IDs from the grid (for activation requirements)
+  const availableItemIds = useMemo(() => {
+    const ids = new Set();
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[y].length; x++) {
+        const cell = grid[y][x];
+        const obj = cell.object;
+        if (obj?.type?.startsWith('item-')) {
+          // Check for imageId in config (drawing boards)
+          const imageId = obj.config?.imageId;
+          if (imageId) {
+            ids.add(imageId);
+          }
+          // Also add the item type suffix (e.g., 'key' from 'item-key')
+          const typeSuffix = obj.type.replace('item-', '');
+          if (typeSuffix && typeSuffix !== 'drawing-board') {
+            ids.add(typeSuffix);
+          }
+        }
+      }
+    }
+    return Array.from(ids).sort();
+  }, [grid]);
 
   // Get options for a select field from theme
   const getSelectOptions = (optionsKey) => {
@@ -336,6 +362,187 @@ export default function PropertiesPanel({
               <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
             </div>
           );
+
+        case 'activation': {
+          const activationData = currentValue || fieldDef.default || { enabled: false, orderMatters: false, requirements: [] };
+          const requirements = activationData.requirements || [];
+
+          const updateActivation = (updates) => {
+            update(fieldKey, { ...activationData, ...updates });
+          };
+
+          const addRequirement = () => {
+            updateActivation({
+              requirements: [...requirements, { x: 0, y: 0, itemId: '' }]
+            });
+          };
+
+          const removeRequirement = (idx) => {
+            updateActivation({
+              requirements: requirements.filter((_, i) => i !== idx)
+            });
+          };
+
+          const updateRequirement = (idx, field, value) => {
+            const updated = requirements.map((req, i) =>
+              i === idx ? { ...req, [field]: value } : req
+            );
+            updateActivation({ requirements: updated });
+          };
+
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <div
+                style={{
+                  background: '#1a1a1a',
+                  padding: 10,
+                  borderRadius: 4,
+                  border: '1px solid #333'
+                }}
+              >
+                {/* Enable checkbox */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#aaa', fontSize: 11, marginBottom: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={activationData.enabled || false}
+                    onChange={e => updateActivation({ enabled: e.target.checked })}
+                  />
+                  Enable activation
+                </label>
+
+                {activationData.enabled && (
+                  <>
+                    {/* Order matters checkbox */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#888', fontSize: 10, marginBottom: 10 }}>
+                      <input
+                        type="checkbox"
+                        checked={activationData.orderMatters || false}
+                        onChange={e => updateActivation({ orderMatters: e.target.checked })}
+                      />
+                      Order matters (items must be placed in sequence)
+                    </label>
+
+                    {/* Requirements list */}
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ color: '#888', fontSize: 10 }}>
+                          Requirements ({requirements.length})
+                        </span>
+                        <button
+                          onClick={addRequirement}
+                          style={{
+                            padding: '2px 8px',
+                            background: '#3a5a3a',
+                            border: 'none',
+                            borderRadius: 3,
+                            color: '#ccc',
+                            fontSize: 10,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          + Add
+                        </button>
+                      </div>
+
+                      {requirements.length === 0 && (
+                        <p style={{ color: '#666', fontSize: 10, margin: 0, fontStyle: 'italic' }}>
+                          No requirements. Add items that must be placed to activate.
+                        </p>
+                      )}
+
+                      {requirements.map((req, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                            marginBottom: 6,
+                            padding: '6px 8px',
+                            background: '#252525',
+                            borderRadius: 3
+                          }}
+                        >
+                          {/* Row 1: Index, position, and pick button */}
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <span style={{ color: '#666', fontSize: 9, width: 18 }}>#{idx + 1}</span>
+                            <span style={{ color: '#888', fontSize: 9 }}>X:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="99"
+                              value={req.x || 0}
+                              onChange={e => updateRequirement(idx, 'x', Number(e.target.value))}
+                              style={{ ...inputStyle, width: 36, padding: '2px 4px', fontSize: 10 }}
+                            />
+                            <span style={{ color: '#888', fontSize: 9 }}>Y:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="99"
+                              value={req.y || 0}
+                              onChange={e => updateRequirement(idx, 'y', Number(e.target.value))}
+                              style={{ ...inputStyle, width: 36, padding: '2px 4px', fontSize: 10 }}
+                            />
+                            <button
+                              onClick={() => onStartActivationPick?.(x, y, fieldKey, idx)}
+                              style={{
+                                padding: '2px 6px',
+                                background: '#3a4a5a',
+                                border: 'none',
+                                borderRadius: 2,
+                                color: '#ccc',
+                                fontSize: 9,
+                                cursor: 'pointer'
+                              }}
+                              title="Click on map to pick position"
+                            >
+                              Pick
+                            </button>
+                            <button
+                              onClick={() => removeRequirement(idx)}
+                              style={{
+                                padding: '2px 5px',
+                                background: '#4a2a2a',
+                                border: 'none',
+                                borderRadius: 2,
+                                color: '#aaa',
+                                fontSize: 9,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          {/* Row 2: Item ID dropdown */}
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 18 }}>
+                            <span style={{ color: '#888', fontSize: 9 }}>Item:</span>
+                            <select
+                              value={req.itemId || ''}
+                              onChange={e => updateRequirement(idx, 'itemId', e.target.value)}
+                              style={{ ...inputStyle, flex: 1, padding: '2px 4px', fontSize: 10 }}
+                            >
+                              <option value="">-- Select item --</option>
+                              {availableItemIds.map(id => (
+                                <option key={id} value={id}>{id}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p style={{ color: '#666', fontSize: 9, margin: 0, lineHeight: 1.4 }}>
+                      Place items with matching imageId or item-type at specified positions to activate this tile.
+                    </p>
+                  </>
+                )}
+              </div>
+              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
+            </div>
+          );
+        }
 
         default:
           return null;

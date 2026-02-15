@@ -377,6 +377,15 @@ export const CONFIG_SCHEMA = {
       label: 'Lock Color',
       options: 'LOCK_COLORS',
       default: 'red'
+    },
+    activationRequirements: {
+      type: 'activation',
+      label: 'Item Activation',
+      default: {
+        enabled: false,
+        orderMatters: false,
+        requirements: []
+      }
     }
   },
   'door-card': {
@@ -385,6 +394,15 @@ export const CONFIG_SCHEMA = {
       label: 'Lock Color',
       options: 'LOCK_COLORS',
       default: 'red'
+    },
+    activationRequirements: {
+      type: 'activation',
+      label: 'Item Activation',
+      default: {
+        enabled: false,
+        orderMatters: false,
+        requirements: []
+      }
     }
   },
   'item-key': {

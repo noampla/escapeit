@@ -143,6 +143,9 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   // Canvas editing state (for drawing tiles)
   const [canvasEditMode, setCanvasEditMode] = useState(null); // { x, y, fieldKey, fieldDef, initialData }
 
+  // Activation position picking state
+  const [activationPickMode, setActivationPickMode] = useState(null); // { tileX, tileY, fieldKey, reqIndex }
+
   // Collect all tile paths from the grid for display (theme-agnostic)
   // Looks for any tile that has a 'path' type field in its CONFIG_SCHEMA
   const allTilePaths = useMemo(() => {
@@ -178,6 +181,26 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
   const hasStory = useMemo(() => theme?.hasStoryContent?.() || false, [theme]);
+
+  // Compute activation markers for the selected cell (if it has activation requirements)
+  const activationMarkers = useMemo(() => {
+    if (!selectedCell) return [];
+    const { x, y } = selectedCell;
+    const cell = grid[y]?.[x];
+    if (!cell) return [];
+
+    const config = cell.object?.config || cell.floor?.config;
+    const activationReqs = config?.activationRequirements;
+    if (!activationReqs?.enabled || !activationReqs.requirements?.length) return [];
+
+    return activationReqs.requirements.map((req, idx) => ({
+      x: req.x,
+      y: req.y,
+      index: idx + 1,
+      itemId: req.itemId,
+      showNumbers: activationReqs.orderMatters
+    }));
+  }, [selectedCell, grid]);
 
   // Viewport state for infinite grid - center starts at middle of grid
   const [viewportCenter, setViewportCenter] = useState({ x: 50, y: 50 });
@@ -268,6 +291,12 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     // Handle path editing mode
     if (pathEditMode) {
       handlePathTileClick(x, y);
+      return;
+    }
+
+    // Handle activation position picking mode
+    if (activationPickMode) {
+      handleActivationPickClick(x, y);
       return;
     }
 
@@ -532,6 +561,43 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     } else {
       updateGrid();
     }
+  };
+
+  // Start activation position picking mode
+  const handleStartActivationPick = (tileX, tileY, fieldKey, reqIndex) => {
+    setActivationPickMode({ tileX, tileY, fieldKey, reqIndex });
+  };
+
+  // Handle clicking on grid tiles while in activation pick mode
+  const handleActivationPickClick = (clickX, clickY) => {
+    if (!activationPickMode) return false;
+
+    const { tileX, tileY, fieldKey, reqIndex } = activationPickMode;
+    const cell = grid[tileY][tileX];
+    const config = cell.object?.config || cell.floor?.config || {};
+    const activationData = config[fieldKey] || { enabled: false, orderMatters: false, requirements: [] };
+
+    // Update the requirement with the new position
+    const updatedRequirements = activationData.requirements.map((req, i) =>
+      i === reqIndex ? { ...req, x: clickX, y: clickY } : req
+    );
+
+    const newActivationData = { ...activationData, requirements: updatedRequirements };
+
+    // Update the grid
+    const newGrid = cloneGrid(grid);
+    const newCell = newGrid[tileY][tileX];
+    if (newCell.object) {
+      newCell.object.config = { ...newCell.object.config, [fieldKey]: newActivationData };
+    } else if (newCell.floor) {
+      newCell.floor.config = { ...newCell.floor.config, [fieldKey]: newActivationData };
+    }
+
+    setGrid(newGrid);
+    setSaved(false);
+    setActivationPickMode(null);
+
+    return true; // Event handled
   };
 
   const handleSave = () => {
@@ -981,6 +1047,8 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             viewportBounds={viewportBounds}
             pathTiles={pathEditMode ? pathTiles : undefined}
             allTilePaths={allTilePaths}
+            activationMarkers={activationMarkers}
+            activationPickMode={activationPickMode}
             isBuilder
           />
           {/* Placement error message */}
@@ -1018,6 +1086,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           onInventoryCapacityChange={c => { setInventoryCapacity(c); setSaved(false); }}
           onStartPathEdit={handleStartPathEdit}
           onStartCanvasEdit={handleStartCanvasEdit}
+          onStartActivationPick={handleStartActivationPick}
         />
       </div>
 
