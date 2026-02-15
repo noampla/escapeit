@@ -3,11 +3,39 @@ import { db } from './firebase';
 
 const COLLECTION = 'maps';
 
+/**
+ * Recursively remove undefined values from an object (Firebase doesn't accept undefined)
+ * Also removes null values for hiddenObject to keep data clean
+ */
+function cleanForFirebase(obj) {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanForFirebase);
+  }
+  if (typeof obj === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip undefined values entirely
+      if (value === undefined) continue;
+      // For hiddenObject specifically, skip if null (don't store empty hiddenObject)
+      if (key === 'hiddenObject' && value === null) continue;
+      cleaned[key] = cleanForFirebase(value);
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
 // Firestore doesn't allow nested arrays. Flatten grid (2D) to 1D on save, restore on load.
 function flattenLevel(level) {
   const { grid, ...rest } = level;
+  // Clean the data to remove undefined values before saving
+  const cleanedGrid = cleanForFirebase(grid.flat());
+  const cleanedRest = cleanForFirebase(rest);
   // Store grid dimensions for proper restoration
-  return { ...rest, grid: grid.flat(), gridCols: grid[0].length, gridRows: grid.length };
+  return { ...cleanedRest, grid: cleanedGrid, gridCols: grid[0].length, gridRows: grid.length };
 }
 
 /**
