@@ -216,5 +216,10 @@
     "confirm": "Confirm",
     "yes": "Yes",
     "no": "No"
+  },
+  "exitConfirm": {
+    "title": "Exit Game?",
+    "exitTest": "Exit to Builder?",
+    "message": "Your progress will be lost."
   }
 }

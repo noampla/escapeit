@@ -959,7 +959,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             {isRTL ? `${t('builder.exitTest')} →` : `← ${t('builder.exitTest')}`}
           </button>
         </div>
-        <SolverMode level={testLevel} onBack={() => setTestMode(false)} />
+        <SolverMode level={testLevel} onBack={() => setTestMode(false)} isTestMode={true} />
       </div>
     );
   }

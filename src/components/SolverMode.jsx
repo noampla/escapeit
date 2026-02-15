@@ -219,6 +219,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [showStoryModal, setShowStoryModal] = useState(false);
   const [messageModal, setMessageModal] = useState(null); // { title, message }
   const [hoveredInventoryItem, setHoveredInventoryItem] = useState(null); // For inventory preview on hover
+  const [showExitConfirm, setShowExitConfirm] = useState(false); // Exit confirmation modal
 
   // Check if theme has story content and show on first load
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -274,6 +275,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   dropMenuOpenRef.current = dropMenuOpen;
   inlineMenuRef.current = inlineMenu;
   showRestartConfirmRef.current = showRestartConfirm;
+  const messageModalRef = useRef(null);
+  const showStoryModalRef = useRef(false);
+  const showExitConfirmRef = useRef(false);
+  messageModalRef.current = messageModal;
+  showStoryModalRef.current = showStoryModal;
+  showExitConfirmRef.current = showExitConfirm;
 
   // Notification helper using translation keys
   // transient: if true, show notification but don't save to history (default for 'info' type)
@@ -1310,6 +1317,19 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
 
       if (key === 'escape') {
+        // Close modals/menus in priority order
+        if (showExitConfirmRef.current) {
+          setShowExitConfirm(false);
+          return;
+        }
+        if (messageModalRef.current) {
+          setMessageModal(null);
+          return;
+        }
+        if (showStoryModalRef.current) {
+          setShowStoryModal(false);
+          return;
+        }
         if (inlineMenuRef.current) {
           setInlineMenu(null);
           return;
@@ -1318,12 +1338,17 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           setDropMenuOpen(false);
           return;
         }
-        callbacksRef.current.onBack();
+        if (showRestartConfirmRef.current) {
+          setShowRestartConfirm(false);
+          return;
+        }
+        // Show exit confirmation modal
+        setShowExitConfirm(true);
         return;
       }
       if (key === 'r') {
-        if (showRestartConfirmRef.current) {
-          // Already showing confirm, do nothing (handled by Y/N)
+        if (showRestartConfirmRef.current || showExitConfirmRef.current) {
+          // Already showing a confirm dialog, do nothing
           return;
         }
         setShowRestartConfirm(true);
@@ -1333,8 +1358,17 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         if (key === 'y') {
           setShowRestartConfirm(false);
           callbacksRef.current.restart();
-        } else if (key === 'n' || key === 'escape') {
+        } else if (key === 'n') {
           setShowRestartConfirm(false);
+        }
+        return;
+      }
+      if (showExitConfirmRef.current) {
+        if (key === 'y') {
+          setShowExitConfirm(false);
+          callbacksRef.current.onBack();
+        } else if (key === 'n') {
+          setShowExitConfirm(false);
         }
         return;
       }
@@ -2528,6 +2562,67 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                 }}
               >
                 No (N)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exit Confirmation */}
+      {showExitConfirm && !gameOver && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 250,
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(45, 45, 60, 0.98), rgba(30, 30, 45, 0.98))',
+            borderRadius: 16,
+            padding: '28px 40px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(100, 150, 200, 0.4)',
+            textAlign: 'center',
+          }}>
+            <h3 style={{ color: '#a8c8f8', margin: '0 0 16px 0', fontSize: 20, fontWeight: '700' }}>
+              {isTestMode ? t('exitConfirm.exitTest') : t('exitConfirm.title')}
+            </h3>
+            <p style={{ color: '#99aabb', margin: '0 0 20px 0', fontSize: 14 }}>
+              {t('exitConfirm.message')}
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => { setShowExitConfirm(false); onBack(); }}
+                style={{
+                  padding: '10px 24px',
+                  background: 'linear-gradient(145deg, #4a4a5a, #3a3a4a)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                {t('common.yes')} (Y)
+              </button>
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                style={{
+                  padding: '10px 24px',
+                  background: 'linear-gradient(145deg, #3a3a3a, #2a2a2a)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: '#ccc',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                {t('common.no')} (N)
               </button>
             </div>
           </div>
