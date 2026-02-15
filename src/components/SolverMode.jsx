@@ -205,6 +205,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const isInDarkZone = theme?.isPlayerInDarkZone?.(startPos, level.grid, {}) || false;
     return initializeRevealedTiles(startPos.x, startPos.y, level.grid, darkZoneTiles, isInDarkZone);
   });
+  // Track cave borders that player has "bumped into" (tried to move beyond)
+  // Format: "x,y-direction" e.g., "5,3-up" means top edge of tile (5,3)
+  const [caveBordersRevealed, setCaveBordersRevealed] = useState(new Set());
   const [tick, setTick] = useState(0);
   const [message, setMessage] = useState(null);
   const [gameOver, setGameOver] = useState(null);
@@ -328,6 +331,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     setMoveCount(0);
     setStartTime(Date.now());
     setElapsedTime(0);
+    setCaveBordersRevealed(new Set()); // Reset cave border exploration
     keysDown.current.clear();
     keyPressOrder.current = [];
     exitMessageShownRef.current = false;
@@ -1022,14 +1026,48 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const nx = prev.x + d.dx, ny = prev.y + d.dy;
 
     const currentGrid = gridRef.current;
+    const currentCell = currentGrid[prev.y][prev.x];
+    const currentGS = gameStateRef.current;
+
+    // Helper to mark cave border when player bumps into edge
+    // Only marks borders when player has a torch (light source)
+    const markCaveBorder = () => {
+      const darkZoneTiles = theme?.getDarkZoneTiles?.(currentGrid) || new Set();
+      const currentIsDarkZone = darkZoneTiles.has(`${prev.x},${prev.y}`);
+      const hasLight = theme?.hasLightInDarkZone?.(currentGS) || false;
+      // Only mark borders when player is in a cave tile AND has torch
+      if (currentIsDarkZone && hasLight) {
+        setCaveBordersRevealed(prevBorders => {
+          const newBorders = new Set(prevBorders);
+          newBorders.add(`${prev.x},${prev.y}-${dir}`);
+          return newBorders;
+        });
+      }
+    };
 
     if (nx < 0 || nx >= currentGrid[0].length || ny < 0 || ny >= currentGrid.length) {
+      markCaveBorder(); // Mark border when hitting map edge from cave
       soundManager.play('blocked');
       return;
     }
     const targetCell = currentGrid[ny][nx];
-    const currentCell = currentGrid[prev.y][prev.x];
-    const currentGS = gameStateRef.current;
+
+    // Check if moving from cave to non-cave (outside) - mark border
+    // Skip if target is cave-entry (threshold tile, not a real boundary)
+    // Only mark borders when player has torch
+    const darkZoneTilesForBorder = theme?.getDarkZoneTiles?.(currentGrid) || new Set();
+    const currentIsDarkZoneForBorder = darkZoneTilesForBorder.has(`${prev.x},${prev.y}`);
+    const targetIsDarkZoneForBorder = darkZoneTilesForBorder.has(`${nx},${ny}`);
+    const targetIsCaveEntry = targetCell?.floor?.type === 'cave-entry';
+    const hasLightForBorder = theme?.hasLightInDarkZone?.(currentGS) || false;
+    if (currentIsDarkZoneForBorder && !targetIsDarkZoneForBorder && !targetIsCaveEntry && hasLightForBorder) {
+      // Moving from cave to outside (not through entry) with torch - mark this border
+      setCaveBordersRevealed(prevBorders => {
+        const newBorders = new Set(prevBorders);
+        newBorders.add(`${prev.x},${prev.y}-${dir}`);
+        return newBorders;
+      });
+    }
 
     // Helper to reveal tiles when moving/attempting to move
     // Dark zone tiles: with torch = permanent reveal, without torch = temporary 5-tile visibility
@@ -2025,6 +2063,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             interactionProgressColor={(interactionState || mouseHoldState)?.progressColor}
             theme={theme}
             gameState={gameState}
+            caveBordersRevealed={caveBordersRevealed}
           />
 
           {/* Inline interaction menu next to player */}

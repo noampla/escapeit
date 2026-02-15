@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, activationMarkers, activationPickMode, isBuilder = false }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, activationMarkers, activationPickMode, isBuilder = false, caveBordersRevealed }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -290,6 +290,65 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
             }
           }
         }
+
+        // === OUTSIDE DARKENING - when player is on actual cave tiles (not entry), darken outside ===
+        if (playerOnDarkTile && !isDarkZoneTile) {
+          ctx.fillStyle = 'rgba(0, 0, 20, 0.6)';
+          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        }
+      }
+    }
+
+    // === CAVE BORDER LINES - show explored boundaries (only visible when inside cave) ===
+    if (playerInDarkZone && caveBordersRevealed && caveBordersRevealed.size > 0) {
+      ctx.strokeStyle = 'rgba(100, 120, 140, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+
+      for (const border of caveBordersRevealed) {
+        const [pos, dir] = border.split('-');
+        const [bx, by] = pos.split(',').map(Number);
+
+        // Skip if outside viewport
+        if (viewportBounds && (bx < startX || bx > endX || by < startY || by > endY)) continue;
+
+        // Check if the adjacent tile (in the border direction) is a cave-entry - skip border if so
+        let adjX = bx, adjY = by;
+        switch (dir) {
+          case 'up': adjY = by - 1; break;
+          case 'down': adjY = by + 1; break;
+          case 'left': adjX = bx - 1; break;
+          case 'right': adjX = bx + 1; break;
+        }
+        // Skip border if adjacent tile is cave-entry (threshold tile, not a real boundary)
+        if (adjY >= 0 && adjY < grid.length && adjX >= 0 && adjX < grid[0].length) {
+          const adjCell = grid[adjY][adjX];
+          if (adjCell?.floor?.type === 'cave-entry') continue;
+        }
+
+        const bpx = (bx - offsetX) * TILE_SIZE;
+        const bpy = (by - offsetY) * TILE_SIZE;
+
+        ctx.beginPath();
+        switch (dir) {
+          case 'up':
+            ctx.moveTo(bpx + 2, bpy + 2);
+            ctx.lineTo(bpx + TILE_SIZE - 2, bpy + 2);
+            break;
+          case 'down':
+            ctx.moveTo(bpx + 2, bpy + TILE_SIZE - 2);
+            ctx.lineTo(bpx + TILE_SIZE - 2, bpy + TILE_SIZE - 2);
+            break;
+          case 'left':
+            ctx.moveTo(bpx + 2, bpy + 2);
+            ctx.lineTo(bpx + 2, bpy + TILE_SIZE - 2);
+            break;
+          case 'right':
+            ctx.moveTo(bpx + TILE_SIZE - 2, bpy + 2);
+            ctx.lineTo(bpx + TILE_SIZE - 2, bpy + TILE_SIZE - 2);
+            break;
+        }
+        ctx.stroke();
       }
     }
 
@@ -577,7 +636,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       }
     }
 
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths, activationMarkers, activationPickMode]);
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths, activationMarkers, activationPickMode, caveBordersRevealed, isBuilder]);
 
   useEffect(() => {
     draw();
