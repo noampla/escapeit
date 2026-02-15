@@ -17,6 +17,7 @@ import { moveEntities } from '../engine/entities.js';
 import { checkActivations } from '../engine/activationSystem.js';
 import NotificationPanel from './NotificationPanel';
 import StoryModal from './StoryModal';
+import InventoryPreview from './InventoryPreview';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -217,6 +218,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [mouseHoldState, setMouseHoldState] = useState(null);
   const [showStoryModal, setShowStoryModal] = useState(false);
   const [messageModal, setMessageModal] = useState(null); // { title, message }
+  const [hoveredInventoryItem, setHoveredInventoryItem] = useState(null); // For inventory preview on hover
 
   // Check if theme has story content and show on first load
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -1844,16 +1846,22 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                   : 'rgba(200, 150, 100, 0.3)';
 
                 return (
-                  <div key={i} style={{
-                    background: 'rgba(60, 45, 30, 0.6)',
-                    padding: '6px',
-                    borderRadius: 6,
-                    fontSize: 16,
-                    border: `2px solid ${borderColor}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
+                  <div
+                    key={i}
+                    style={{
+                      background: 'rgba(60, 45, 30, 0.6)',
+                      padding: '6px',
+                      borderRadius: 6,
+                      fontSize: 16,
+                      border: `2px solid ${borderColor}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={() => setHoveredInventoryItem(item)}
+                    onMouseLeave={() => setHoveredInventoryItem(null)}
+                  >
                     <InventoryIcon theme={theme} itemType={item.itemType} size={20} itemState={item} />
                   </div>
                 );
@@ -1877,17 +1885,23 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                 {t('hud.wearShort')}:
               </div>
               {gameState.inventory.filter(item => theme?.isWearable?.(item.itemType)).map((item, i) => (
-                <div key={i} style={{
-                  background: 'rgba(34, 68, 120, 0.6)',
-                  padding: '6px',
-                  borderRadius: 6,
-                  fontSize: 16,
-                  border: '2px solid rgba(100, 140, 220, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                }}>
+                <div
+                  key={i}
+                  style={{
+                    background: 'rgba(34, 68, 120, 0.6)',
+                    padding: '6px',
+                    borderRadius: 6,
+                    fontSize: 16,
+                    border: '2px solid rgba(100, 140, 220, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={() => setHoveredInventoryItem(item)}
+                  onMouseLeave={() => setHoveredInventoryItem(null)}
+                >
                   <InventoryIcon theme={theme} itemType={item.itemType} size={20} itemState={item} />
                 </div>
               ))}
@@ -2292,10 +2306,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = 'rgba(50, 75, 50, 0.8)';
                         e.currentTarget.style.transform = 'translateX(4px)';
+                        setHoveredInventoryItem(item);
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = 'rgba(40, 55, 40, 0.6)';
                         e.currentTarget.style.transform = 'translateX(0)';
+                        setHoveredInventoryItem(null);
                       }}
                     >
                       <span style={{
@@ -2377,10 +2393,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
                           onMouseEnter={(e) => {
                             e.currentTarget.style.background = 'rgba(44, 88, 150, 0.7)';
                             e.currentTarget.style.transform = 'translateX(4px)';
+                            setHoveredInventoryItem(item);
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = 'rgba(34, 68, 120, 0.5)';
                             e.currentTarget.style.transform = 'translateX(0)';
+                            setHoveredInventoryItem(null);
                           }}
                         >
                           <span style={{
@@ -2833,6 +2851,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Inventory item preview on hover */}
+      {hoveredInventoryItem && (
+        <InventoryPreview item={hoveredInventoryItem} theme={theme} />
       )}
     </div>
   );
