@@ -42,9 +42,10 @@ export function checkAllRequirements(grid, activationRequirements) {
  * @param {Object} gameState - Current game state (will be mutated for progress tracking)
  * @param {Object} activationRequirements - The activation config
  * @param {string} tileKey - Unique key for this tile ("x,y")
+ * @param {Object} dropPosition - { x, y } position where item was just dropped (optional)
  * @returns {boolean} - True if all requirements are met in order
  */
-export function checkOrderedRequirements(grid, gameState, activationRequirements, tileKey) {
+export function checkOrderedRequirements(grid, gameState, activationRequirements, tileKey, dropPosition) {
   if (!activationRequirements?.enabled || !activationRequirements.orderMatters) return false;
 
   const requirements = activationRequirements.requirements || [];
@@ -59,9 +60,18 @@ export function checkOrderedRequirements(grid, gameState, activationRequirements
   // Only advance if:
   // 1. All previous requirements are still met
   // 2. The NEXT requirement (at index fulfilledCount) is now met
+  // 3. The drop position matches the next required position (if dropPosition provided)
   const nextIndex = progress.fulfilledCount;
 
   if (nextIndex < requirements.length) {
+    const nextReq = requirements[nextIndex];
+
+    // If dropPosition is provided, only advance if this drop is at the next required position
+    if (dropPosition && (dropPosition.x !== nextReq.x || dropPosition.y !== nextReq.y)) {
+      // Drop is not at the next required position - don't advance
+      return progress.fulfilledCount >= requirements.length;
+    }
+
     // First verify all previous requirements are still in place
     let allPreviousMet = true;
     for (let i = 0; i < nextIndex; i++) {
@@ -72,7 +82,7 @@ export function checkOrderedRequirements(grid, gameState, activationRequirements
     }
 
     // Only check next requirement if previous ones are still met
-    if (allPreviousMet && checkRequirement(grid, requirements[nextIndex])) {
+    if (allPreviousMet && checkRequirement(grid, nextReq)) {
       progress.fulfilledCount = nextIndex + 1;
       gameState.activationProgress[tileKey] = progress;
     }
@@ -139,9 +149,10 @@ export function getActivatableTiles(grid) {
  * Checks all activatable tiles and activates those with met requirements
  * @param {Array} grid - The game grid
  * @param {Object} gameState - Current game state
+ * @param {Object} dropPosition - { x, y } position where item was just dropped (optional, for ordered mode)
  * @returns {Array} - Array of activated tiles { x, y, type }
  */
-export function checkActivations(grid, gameState) {
+export function checkActivations(grid, gameState, dropPosition) {
   const activatableTiles = getActivatableTiles(grid);
   const results = [];
 
@@ -155,7 +166,7 @@ export function checkActivations(grid, gameState) {
 
     let allMet = false;
     if (reqs.orderMatters) {
-      allMet = checkOrderedRequirements(grid, gameState, reqs, tileKey);
+      allMet = checkOrderedRequirements(grid, gameState, reqs, tileKey, dropPosition);
     } else {
       allMet = checkAllRequirements(grid, reqs);
     }

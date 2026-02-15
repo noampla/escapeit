@@ -392,7 +392,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     showNotification('notifications.dropped', 'info', { emoji: itemDef?.emoji || '', label: droppedLabel });
 
     // Check if any activation requirements are now met
-    const activationResults = checkActivations(newGrid, gameStateRef.current);
+    const activationResults = checkActivations(newGrid, gameStateRef.current, { x: pos.x, y: pos.y });
     if (activationResults.length > 0) {
       soundManager.play('success');
       const msg = getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!';
