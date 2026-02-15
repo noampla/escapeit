@@ -42,7 +42,14 @@
     "statusBuild": "בנייה",
     "statusEdit": "עריכה",
     "panHint": "גלילה/חצים להזזה",
-    "currentTool": "כלי"
+    "currentTool": "כלי",
+    "randomGen": "אקראי",
+    "confirmGenerate": "פעולה זו תחליף את המפה הנוכחית. להמשיך?",
+    "draftFound": "נמצאה עבודה שלא נשמרה",
+    "draftDescription": "יש לך עבודה שלא נשמרה מפעם קודמת.",
+    "draftSavedAt": "נשמר לאחרונה",
+    "restoreDraft": "שחזר טיוטה",
+    "discardDraft": "התחל מחדש"
   },
   "properties": {
     "tileProperties": "מאפייני אריח",

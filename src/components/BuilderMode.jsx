@@ -7,6 +7,7 @@ import TilePreview from './TilePreview';
 import RandomMapGeneratorPanel from './RandomMapGeneratorPanel';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid, validateObjectPlacement } from '../engine/tiles';
 import { saveLevel, generateId, loadLevelsByCreator } from '../utils/storage';
+import { saveDraft, loadDraft, clearDraft, getDraftInfo, hasDraft } from '../utils/draftStorage';
 import { generateMap, getMapInfo } from '../engine/mapGenerator';
 import { DEFAULT_LIVES, DEFAULT_INVENTORY_CAPACITY, TILE_SIZE } from '../utils/constants';
 import { ThemeContext } from '../App';
@@ -146,6 +147,19 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   // Activation position picking state
   const [activationPickMode, setActivationPickMode] = useState(null); // { tileX, tileY, fieldKey, reqIndex }
 
+  // Draft restore prompt state
+  const [showDraftPrompt, setShowDraftPrompt] = useState(() => {
+    // Check for existing draft on initial render (only for new levels)
+    if (editLevel) return false;
+    return hasDraft(themeId);
+  });
+  const [draftInfo, setDraftInfo] = useState(() => {
+    // Load draft info on initial render (only for new levels)
+    if (editLevel) return null;
+    return getDraftInfo(themeId);
+  });
+  const draftSaveTimerRef = useRef(null);
+
   // Collect all tile paths from the grid for display (theme-agnostic)
   // Looks for any tile that has a 'path' type field in its CONFIG_SCHEMA
   const allTilePaths = useMemo(() => {
@@ -230,6 +244,67 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
       observer.disconnect();
     };
   }, [testMode]);
+
+  // Auto-save draft when builder state changes (debounced)
+  useEffect(() => {
+    // Don't auto-save if we're showing the draft prompt (user hasn't decided yet)
+    if (showDraftPrompt) return;
+
+    // Clear any existing timer
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+    }
+
+    // Debounce the save - wait 1 second after last change
+    draftSaveTimerRef.current = setTimeout(() => {
+      // Only save if there's actual content (not just empty grid)
+      const hasContent = grid.some(row => row.some(cell =>
+        cell.floor?.type !== 'empty' || cell.object
+      ));
+
+      if (hasContent || missions.length > 0 || levelName.trim()) {
+        saveDraft(themeId, {
+          grid,
+          missions,
+          lives,
+          inventoryCapacity,
+          fixedOrder,
+          levelName,
+          levelId,
+        });
+      }
+    }, 1000);
+
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, [grid, missions, lives, inventoryCapacity, fixedOrder, levelName, themeId, showDraftPrompt]);
+
+  // Handle restoring draft
+  const handleRestoreDraft = useCallback(() => {
+    const draft = loadDraft(themeId);
+    if (draft) {
+      if (draft.grid) setGrid(draft.grid);
+      if (draft.missions) setMissions(draft.missions);
+      if (draft.lives) setLives(draft.lives);
+      if (draft.inventoryCapacity) setInventoryCapacity(draft.inventoryCapacity);
+      if (draft.fixedOrder !== undefined) setFixedOrder(draft.fixedOrder);
+      if (draft.levelName) setLevelName(draft.levelName);
+      if (draft.levelId) setLevelId(draft.levelId);
+      setSaved(false);
+    }
+    setShowDraftPrompt(false);
+    setDraftInfo(null);
+  }, [themeId]);
+
+  // Handle discarding draft
+  const handleDiscardDraft = useCallback(() => {
+    clearDraft(themeId);
+    setShowDraftPrompt(false);
+    setDraftInfo(null);
+  }, [themeId]);
 
   // Calculate viewport bounds to fill container
   const viewportBounds = useMemo(() => {
@@ -627,6 +702,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     saveLevel(level)
       .then(() => {
         setSaved(true);
+        clearDraft(themeId); // Clear draft after successful save
         console.log('Level saved successfully:', level.id, level.name);
       })
       .catch(err => {
@@ -1201,6 +1277,110 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
             >
               {t('builder.cancel')}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Draft Restore Prompt */}
+      {showDraftPrompt && draftInfo && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(160deg, rgba(30, 40, 50, 0.98) 0%, rgba(20, 30, 40, 0.98) 100%)',
+              border: `2px solid ${theme?.primaryColor ? `${theme.primaryColor}66` : 'rgba(100, 180, 255, 0.4)'}`,
+              borderRadius: 20,
+              padding: 40,
+              minWidth: 450,
+              maxWidth: 550,
+              boxShadow: `
+                0 25px 80px rgba(0, 0, 0, 0.9),
+                0 0 0 1px ${theme?.primaryColor ? `${theme.primaryColor}33` : 'rgba(100, 180, 255, 0.2)'},
+                inset 0 2px 0 rgba(255, 255, 255, 0.08)
+              `,
+              backdropFilter: 'blur(20px)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 16 }}>
+              {theme?.emoji || '💾'}
+            </div>
+            <h2 style={{
+              color: theme?.primaryColor || '#88ccff',
+              margin: '0 0 16px 0',
+              fontSize: 24,
+              fontWeight: '800',
+              textShadow: `0 0 20px ${theme?.primaryColor ? `${theme.primaryColor}80` : 'rgba(136, 204, 255, 0.5)'}`,
+            }}>
+              {t('builder.draftFound') || 'Unsaved Work Found'}
+            </h2>
+            <p style={{
+              color: '#bbccdd',
+              fontSize: 15,
+              marginBottom: 8,
+              lineHeight: 1.5,
+            }}>
+              {t('builder.draftDescription') || 'You have unsaved work from a previous session.'}
+            </p>
+            <p style={{
+              color: '#8899aa',
+              fontSize: 13,
+              marginBottom: 24,
+            }}>
+              {draftInfo.levelName && draftInfo.levelName !== 'Untitled' && (
+                <span style={{ color: '#aabbcc', fontWeight: '600' }}>"{draftInfo.levelName}" - </span>
+              )}
+              {t('builder.draftSavedAt') || 'Last saved'}: {new Date(draftInfo.savedAt).toLocaleString()}
+            </p>
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+              <button
+                onClick={handleRestoreDraft}
+                style={{
+                  padding: '14px 28px',
+                  background: `linear-gradient(145deg, ${theme?.primaryColor || '#3a6a9a'} 0%, ${theme?.primaryColor ? theme.primaryColor + 'cc' : '#2a5a8a'} 100%)`,
+                  border: 'none',
+                  borderRadius: 10,
+                  color: '#ffffff',
+                  fontSize: 15,
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: `0 4px 16px ${theme?.primaryColor ? `${theme.primaryColor}66` : 'rgba(58, 106, 154, 0.4)'}`,
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                {t('builder.restoreDraft') || 'Restore Draft'}
+              </button>
+              <button
+                onClick={handleDiscardDraft}
+                style={{
+                  padding: '14px 28px',
+                  background: 'linear-gradient(145deg, #4a4a4a 0%, #3a3a3a 100%)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: '#cccccc',
+                  fontSize: 15,
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                {t('builder.discardDraft') || 'Start Fresh'}
+              </button>
+            </div>
           </div>
         </div>
       )}

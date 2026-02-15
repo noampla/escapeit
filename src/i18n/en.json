@@ -42,7 +42,14 @@
     "statusBuild": "Build",
     "statusEdit": "Edit",
     "panHint": "Scroll/Arrows to pan",
-    "currentTool": "Tool"
+    "currentTool": "Tool",
+    "randomGen": "Random",
+    "confirmGenerate": "This will replace the current map. Continue?",
+    "draftFound": "Unsaved Work Found",
+    "draftDescription": "You have unsaved work from a previous session.",
+    "draftSavedAt": "Last saved",
+    "restoreDraft": "Restore Draft",
+    "discardDraft": "Start Fresh"
   },
   "properties": {
     "tileProperties": "Tile Properties",
