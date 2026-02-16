@@ -1,4 +1,5 @@
 // Bank Robbery Theme - Tile Definitions
+import { getLaserBeamTiles } from './hazards.js';
 
 // Shared color options for doors, keys, and cards
 export const LOCK_COLORS = {
@@ -1345,8 +1346,29 @@ function hasMatchingItem(inventory, itemType, lockColor) {
 
 // Check if player can move into a tile
 // Returns { allowed, message?, loseLife?, moveRaft?, respawn? }
-export function checkMovementInto(tileType, gameState, tileConfig) {
+export function checkMovementInto(tileType, gameState, tileConfig, grid, x, y) {
   const inventory = gameState?.inventory || [];
+
+  // Check if player is trying to move into a laser beam
+  if (grid && x !== undefined && y !== undefined) {
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid[0].length; col++) {
+        const cell = grid[row][col];
+        if (cell.object?.type === 'laser') {
+          const direction = cell.object.config?.direction || 'down';
+          const beamTiles = getLaserBeamTiles(grid, col, row, direction);
+          // Check if target position is in the laser beam
+          if (beamTiles.some(tile => tile.x === x && tile.y === y)) {
+            return {
+              allowed: false,
+              loseLife: true,
+              messageKey: 'laserBlocking'
+            };
+          }
+        }
+      }
+    }
+  }
 
   switch (tileType) {
     case 'door-key': {
