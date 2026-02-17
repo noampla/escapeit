@@ -41,21 +41,20 @@ export default function PropertiesPanel({
   // Collect all available item IDs from the grid (for activation requirements)
   const availableItemIds = useMemo(() => {
     const ids = new Set();
+    const addItemIds = (obj) => {
+      if (!obj?.type?.startsWith('item-')) return;
+      const imageId = obj.config?.imageId;
+      if (imageId) ids.add(imageId);
+      const typeSuffix = obj.type.replace('item-', '');
+      if (typeSuffix && typeSuffix !== 'drawing-board') ids.add(typeSuffix);
+    };
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[y].length; x++) {
         const cell = grid[y][x];
-        const obj = cell.object;
-        if (obj?.type?.startsWith('item-')) {
-          // Check for imageId in config (drawing boards)
-          const imageId = obj.config?.imageId;
-          if (imageId) {
-            ids.add(imageId);
-          }
-          // Also add the item type suffix (e.g., 'key' from 'item-key')
-          const typeSuffix = obj.type.replace('item-', '');
-          if (typeSuffix && typeSuffix !== 'drawing-board') {
-            ids.add(typeSuffix);
-          }
+        addItemIds(cell.object);
+        // Also check hidden (buried) objects
+        if (cell.floor?.config?.hiddenObject) {
+          addItemIds(cell.floor.config.hiddenObject);
         }
       }
     }
@@ -162,11 +161,112 @@ export default function PropertiesPanel({
     const config = cell.object ? cell.object.config : cell.floor?.config;
     const def = TILE_TYPES[tileType];
 
+    // Check for hidden (buried) object beneath floor
+    const hiddenObj = cell.floor?.config?.hiddenObject;
+    const hiddenType = hiddenObj?.type;
+    const hiddenDef = hiddenType ? TILE_TYPES[hiddenType] : null;
+    const hiddenSchema = hiddenType ? CONFIG_SCHEMA[hiddenType] : null;
+    const hiddenFields = hiddenSchema ? Object.entries(hiddenSchema) : [];
+    const hiddenConfig = hiddenObj?.config || {};
+    const hasEditableHidden = hiddenObj && hiddenDef && hiddenFields.length > 0;
+
+    const updateHidden = (key, value) => {
+      onConfigChange(x, y, { ...hiddenConfig, [key]: value }, 'hidden');
+    };
+
+    // Render a hidden object's config field
+    const renderHiddenField = (fieldKey, fieldDef, isFirst) => {
+      const currentValue = hiddenConfig[fieldKey];
+      const baseLabel = { ...labelStyle, marginTop: isFirst ? 0 : 10 };
+
+      switch (fieldDef.type) {
+        case 'checkbox':
+          return (
+            <div key={fieldKey}>
+              <label style={{ ...baseLabel, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={currentValue !== undefined ? currentValue : fieldDef.default} onChange={e => updateHidden(fieldKey, e.target.checked)} />
+                {fieldDef.label}
+              </label>
+            </div>
+          );
+        case 'text':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <input style={inputStyle} value={currentValue || fieldDef.default || ''} onChange={e => updateHidden(fieldKey, e.target.value)} placeholder={fieldDef.placeholder || ''} />
+            </div>
+          );
+        case 'number':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <input type="number" style={{ ...inputStyle, width: 80 }} min={fieldDef.min} max={fieldDef.max} value={currentValue !== undefined ? currentValue : fieldDef.default} onChange={e => updateHidden(fieldKey, Number(e.target.value))} />
+            </div>
+          );
+        case 'select': {
+          const options = getSelectOptions(fieldDef.options);
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <select style={inputStyle} value={currentValue || fieldDef.default} onChange={e => updateHidden(fieldKey, e.target.value)}>
+                {Object.entries(options).map(([optId, optDef]) => (
+                  <option key={optId} value={optId}>{optDef.label}</option>
+                ))}
+              </select>
+            </div>
+          );
+        }
+        case 'textarea':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }} value={currentValue || fieldDef.default || ''} onChange={e => updateHidden(fieldKey, e.target.value)} placeholder={fieldDef.placeholder || ''} />
+            </div>
+          );
+        case 'canvas':
+          return (
+            <div key={fieldKey}>
+              <label style={baseLabel}>{fieldDef.label}</label>
+              <div
+                style={{ ...inputStyle, background: '#1a1a1a', minHeight: 60, padding: 8, borderRadius: 4, color: '#aaa', fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => onStartCanvasEdit?.(x, y, fieldKey, fieldDef, 'hidden')}
+              >
+                {currentValue ? (
+                  <>
+                    <img src={currentValue} alt="Drawing preview" style={{ width: 64, height: 64, imageRendering: 'pixelated', border: '1px solid #444', borderRadius: 4 }} />
+                    <p style={{ margin: '6px 0 0', color: '#888', fontSize: 10 }}>Click to edit</p>
+                  </>
+                ) : (
+                  <p style={{ margin: 0, color: '#bbb' }}>Click to create drawing</p>
+                )}
+              </div>
+            </div>
+          );
+        default:
+          return null;
+      }
+    };
+
+    // Helper to render the buried object section
+    const renderHiddenSection = (withTopMargin) => {
+      if (!hasEditableHidden) return null;
+      return (
+        <div style={{ marginTop: withTopMargin ? 16 : 8, paddingTop: withTopMargin ? 12 : 8, borderTop: '1px dashed #554433' }}>
+          <p style={{ color: '#bb8844', fontSize: 11, margin: '0 0 8px', fontWeight: 600 }}>
+            Buried: {getTileLabel(themeId, hiddenType, hiddenDef.label)}
+          </p>
+          {hiddenFields.map(([fieldKey, fieldDef], idx) => renderHiddenField(fieldKey, fieldDef, idx === 0))}
+        </div>
+      );
+    };
+
     if (!def || !def.configurable) {
       return (
         <>
           <p style={{ color: '#888', fontSize: 12, margin: '0 0 4px', direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.tileAt', { label: getTileLabel(themeId, tileType, def?.label || tileType), x, y })}</p>
-          <p style={{ color: '#666', fontSize: 11, margin: 0, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.notConfigurable')}</p>
+          {hasEditableHidden ? renderHiddenSection(false) : (
+            <p style={{ color: '#666', fontSize: 11, margin: 0, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.notConfigurable')}</p>
+          )}
         </>
       );
     }
@@ -553,6 +653,7 @@ export default function PropertiesPanel({
       <>
         <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>{t('properties.tileAt', { label: getTileLabel(themeId, tileType, def.label), x, y })}</p>
         {schemaFields.map(([fieldKey, fieldDef], idx) => renderField(fieldKey, fieldDef, idx === 0))}
+        {renderHiddenSection(true)}
       </>
     );
   };

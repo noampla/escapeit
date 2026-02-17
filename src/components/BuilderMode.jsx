@@ -571,12 +571,20 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     setSaved(false);
   };
 
-  const handleConfigChange = (x, y, newConfig) => {
+  const handleConfigChange = (x, y, newConfig, layer) => {
     const newGrid = cloneGrid(grid);
     const cell = newGrid[y][x];
 
-    // Update config on the appropriate layer (object takes priority over floor)
-    if (cell.object) {
+    if (layer === 'hidden') {
+      // Update hidden object config (buried beneath floor)
+      if (cell.floor?.config?.hiddenObject) {
+        cell.floor.config.hiddenObject = {
+          ...cell.floor.config.hiddenObject,
+          config: newConfig
+        };
+      }
+    } else if (cell.object) {
+      // Update config on the appropriate layer (object takes priority over floor)
       cell.object.config = newConfig;
     } else if (cell.floor) {
       cell.floor.config = newConfig;
@@ -660,32 +668,47 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   };
 
   // Start canvas editing mode (for drawing tiles)
-  const handleStartCanvasEdit = (x, y, fieldKey, fieldDef) => {
+  const handleStartCanvasEdit = (x, y, fieldKey, fieldDef, layer) => {
     const cell = grid[y][x];
-    const config = cell.object?.config || cell.floor?.config || {};
+    let config;
+    if (layer === 'hidden') {
+      config = cell.floor?.config?.hiddenObject?.config || {};
+    } else {
+      config = cell.object?.config || cell.floor?.config || {};
+    }
     const currentData = config[fieldKey] || null;
 
-    setCanvasEditMode({ x, y, fieldKey, fieldDef, initialData: currentData });
+    setCanvasEditMode({ x, y, fieldKey, fieldDef, initialData: currentData, layer });
   };
 
   // Save canvas edit
   const handleSaveCanvasEdit = (imageData) => {
     if (!canvasEditMode) return;
 
-    const { x, y, fieldKey } = canvasEditMode;
+    const { x, y, fieldKey, layer } = canvasEditMode;
 
     // Function to update the grid
     const updateGrid = () => {
       const newGrid = cloneGrid(grid);
       const cell = newGrid[y][x];
-      const config = cell.object?.config || cell.floor?.config || {};
 
-      const newConfig = { ...config, [fieldKey]: imageData };
+      if (layer === 'hidden') {
+        // Save to hidden object's config
+        const hiddenConfig = cell.floor?.config?.hiddenObject?.config || {};
+        const newConfig = { ...hiddenConfig, [fieldKey]: imageData };
+        cell.floor.config.hiddenObject = {
+          ...cell.floor.config.hiddenObject,
+          config: newConfig
+        };
+      } else {
+        const config = cell.object?.config || cell.floor?.config || {};
+        const newConfig = { ...config, [fieldKey]: imageData };
 
-      if (cell.object) {
-        cell.object.config = newConfig;
-      } else if (cell.floor) {
-        cell.floor.config = newConfig;
+        if (cell.object) {
+          cell.object.config = newConfig;
+        } else if (cell.floor) {
+          cell.floor.config = newConfig;
+        }
       }
 
       setGrid(newGrid);
