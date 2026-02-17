@@ -5,6 +5,7 @@
     "cameraSpotted": "נתפסת על ידי מצלמת אבטחה!",
     "laserCut": "נחתכת על ידי קרן לייזר!",
     "laserBlocking": "קרן הלייזר חוסמת את הדרך!",
+    "cameraBlocking": "המצלמה חוסמת את הדרך! צריך מדי שומר.",
     "guardSpotted": "נתפסת על ידי השומר!",
     "needKey": "צריך מפתח {color}!",
     "doorUnlocked": "דלת {color} נפתחה עם מפתח!",

@@ -7,19 +7,19 @@ export const HAZARD_TYPES = {
     name: 'Security Camera',
     damage: 1,
     messageKey: 'cameraSpotted',
-    renderColor: 'rgba(255, 50, 50, 0.25)'
+    renderColor: 'rgba(255, 50, 50, 0.4)'
   },
   laser: {
     name: 'Laser Tripwire',
     damage: 1,
     messageKey: 'laserCut',
-    renderColor: 'rgba(255, 20, 20, 0.6)'
+    renderColor: 'rgba(255, 20, 20, 0.9)'
   },
   guard: {
     name: 'Guard',
     damage: 1,
     messageKey: 'guardSpotted',
-    renderColor: 'rgba(50, 100, 255, 0.25)',
+    renderColor: 'rgba(50, 100, 255, 0.4)',
     range: 4 // Guards have a default vision range
   }
 };

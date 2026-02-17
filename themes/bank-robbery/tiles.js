@@ -1,5 +1,5 @@
 // Bank Robbery Theme - Tile Definitions
-import { getLaserBeamTiles } from './hazards.js';
+import { getLaserBeamTiles, getCameraVisionTiles } from './hazards.js';
 
 // Shared color options for doors, keys, and cards
 export const LOCK_COLORS = {
@@ -40,7 +40,7 @@ export const TILE_TYPES = {
   start: {
     label: 'Entry Point (Start)',
     color: '#44aa44',
-    category: 'basic',
+    category: 'entry-exit',
     layer: 'floor',
     unique: true,
     tooltip: 'Player spawn point. Only one per level.',
@@ -49,7 +49,7 @@ export const TILE_TYPES = {
   exit: {
     label: 'Escape Van (Exit)',
     color: '#4488cc',
-    category: 'basic',
+    category: 'entry-exit',
     layer: 'floor',
     unique: true,
     tooltip: 'Level exit. Escape here after completing all missions.',
@@ -1370,6 +1370,30 @@ export function checkMovementInto(tileType, gameState, tileConfig, grid, x, y) {
     }
   }
 
+  // Check if player is trying to move into a camera vision cone
+  if (grid && x !== undefined && y !== undefined) {
+    const cameraImmune = gameState?.worn?.body === 'uniform';
+    if (!cameraImmune) {
+      for (let row = 0; row < grid.length; row++) {
+        for (let col = 0; col < grid[0].length; col++) {
+          const cell = grid[row][col];
+          if (cell.object?.type === 'camera') {
+            const direction = cell.object.config?.direction || 'down';
+            const range = cell.object.config?.range || 3;
+            const visionTiles = getCameraVisionTiles(grid, col, row, direction, range);
+            if (visionTiles.some(tile => tile.x === x && tile.y === y)) {
+              return {
+                allowed: false,
+                loseLife: true,
+                messageKey: 'cameraBlocking'
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
   switch (tileType) {
     case 'door-key': {
       const doorColor = tileConfig?.lockColor || 'red';
@@ -1624,6 +1648,7 @@ export function renderPlayer(ctx, x, y, size, direction, gameState = {}) {
     ctx.fill();
   } else {
     // Render default player (civilian)
+    ctx.fillStyle = '#ffffff';
     ctx.font = `${size * 0.65}px serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

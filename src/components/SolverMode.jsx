@@ -340,6 +340,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y, level.grid, darkZoneTiles, isInDarkZone));
     setTick(0);
     setGameOver(null);
+    setShowRestartConfirm(false);
     setMessage(null);
     setInteractionState(null);
     setDropMenuOpen(false);
@@ -1386,6 +1387,11 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           // Already showing a confirm dialog, do nothing
           return;
         }
+        // When game is over, restart directly without confirmation
+        if (gameOverRef.current) {
+          callbacksRef.current.restart();
+          return;
+        }
         setShowRestartConfirm(true);
         return;
       }
@@ -1694,7 +1700,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         const newTick = t + 1;
         // Only update hazard zones every 2 ticks (every 1 second) to reduce render load
         if (newTick % 2 === 0) {
-          setHazardZones(getAllHazardZones(gridRef.current));
+          const engineZones = getAllHazardZones(gridRef.current);
+          const themeZones = theme?.getAllHazardZones?.(gridRef.current) || [];
+          setHazardZones([...engineZones, ...themeZones]);
         }
         return newTick;
       });

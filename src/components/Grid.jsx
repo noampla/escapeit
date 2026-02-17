@@ -47,6 +47,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    ctx.globalAlpha = 1;
 
     // Fill with plain dark background (tiles will render on top)
     ctx.fillStyle = '#000';
@@ -405,42 +406,48 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
 
     // Hazard zones overlay
     if (showHazardZones) {
-      // Use theme's hazard zones if available, otherwise fall back to engine's
+      ctx.save();
       const themeZones = theme?.getAllHazardZones?.(grid) || [];
       const engineZones = getAllHazardZones(grid);
       const zones = hazardZoneOverrides || [...engineZones, ...themeZones];
 
-      ctx.globalAlpha = 0.35;
+      const zoneAlpha = isBuilder ? 0.35 : 0.5;
       for (const z of zones) {
-        // Skip zones outside viewport
         if (viewportBounds && (z.x < startX || z.x > endX || z.y < startY || z.y > endY)) continue;
         if (revealedTiles && !revealedTiles.has(`${z.x},${z.y}`)) continue;
+        if (!isBuilder && playerPos && z.x === playerPos.x && z.y === playerPos.y) continue;
 
-        // Skip hazard zones in dark zone tiles that aren't visible
-        // In dark zones, hazards are ONLY visible when player has light (torch) or tile is torch-lit
-        // Also check cave region - hazards in other caves shouldn't show
         const zKey = `${z.x},${z.y}`;
         if (darkZoneTiles.has(zKey)) {
-          // Must be in current cave region (independent caves)
           if (!currentCaveRegion.has(zKey)) continue;
           const zTorchLit = torchLitTiles.has(zKey);
-          if (!hasLight && !zTorchLit) continue; // No hazard indicators without light
+          if (!hasLight && !zTorchLit) continue;
           const zVisible = zTorchLit || (playerInDarkZone && (
             revealedTiles?.has(zKey) || darkZoneVisible.has(zKey)
           ));
           if (!zVisible) continue;
         }
 
-        const zpx = (z.x - offsetX) * TILE_SIZE, zpy = (z.y - offsetY) * TILE_SIZE;
-        ctx.fillStyle = z.renderColor || '#ff4400';
-        ctx.fillRect(zpx, zpy, TILE_SIZE, TILE_SIZE);
+        // Bake alpha into color directly (no globalAlpha change)
+        let r = 255, g = 68, b = 0, a = zoneAlpha;
+        const rc = z.renderColor;
+        if (rc) {
+          const rgbaMatch = rc.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+          if (rgbaMatch) {
+            r = parseInt(rgbaMatch[1]); g = parseInt(rgbaMatch[2]); b = parseInt(rgbaMatch[3]);
+            a = rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]) * zoneAlpha : zoneAlpha;
+          }
+        }
 
-        // Add border for better visibility
-        ctx.strokeStyle = z.renderColor || '#ff4400';
+        const zpx = (z.x - offsetX) * TILE_SIZE, zpy = (z.y - offsetY) * TILE_SIZE;
+        const color = `rgba(${r}, ${g}, ${b}, ${a})`;
+        ctx.fillStyle = color;
+        ctx.fillRect(zpx, zpy, TILE_SIZE, TILE_SIZE);
+        ctx.strokeStyle = color;
         ctx.lineWidth = 2;
         ctx.strokeRect(zpx + 1, zpy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
       }
-      ctx.globalAlpha = 1;
+      ctx.restore();
     }
 
     // All gate paths overlay (always visible in builder with reduced opacity)
@@ -653,8 +660,15 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.strokeRect(barX, barY, barWidth, barHeight);
     }
 
-    // Player
+    // Player - fully reset canvas state to prevent any leaks from prior rendering
     if (playerPos) {
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+
       const ppx = (playerPos.x - offsetX) * TILE_SIZE, ppy = (playerPos.y - offsetY) * TILE_SIZE;
       const centerX = ppx + TILE_SIZE / 2;
       const centerY = ppy + TILE_SIZE / 2;
@@ -667,6 +681,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         ctx.font = '26px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
         ctx.fillText('🧑', centerX, centerY);
       }
 
@@ -713,6 +728,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         ctx.fillStyle = 'rgba(0, 0, 10, 0.6)';
         ctx.fillRect(ppx, ppy, TILE_SIZE, TILE_SIZE);
       }
+      ctx.restore();
     }
 
   }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths, activationMarkers, activationPickMode, caveBordersRevealed, isBuilder]);

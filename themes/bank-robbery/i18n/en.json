@@ -5,6 +5,7 @@
     "cameraSpotted": "Spotted by security camera!",
     "laserCut": "Cut by laser tripwire!",
     "laserBlocking": "Laser beam blocks the way!",
+    "cameraBlocking": "Camera blocks the way! Need a guard uniform.",
     "guardSpotted": "Spotted by guard!",
     "needKey": "Need a {color} key!",
     "doorUnlocked": "Unlocked {color} door with key!",
