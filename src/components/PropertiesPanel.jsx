@@ -1,7 +1,10 @@
-import { useContext, useMemo, useState } from 'react';
+import { useContext, useMemo, useState, useRef, useCallback } from 'react';
 import { ThemeContext } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
 import { BASE_MISSION_TYPES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+
+// Max dimension for uploaded images (keeps data URL size reasonable for Firestore)
+const MAX_IMAGE_DIM = 128;
 
 const HelpText = ({ type, field, show, CONFIG_HELP }) => {
   if (!show) return null;
@@ -37,6 +40,40 @@ export default function PropertiesPanel({
   const CONFIG_HELP = theme?.getConfigHelp() || {};
   const CONFIG_SCHEMA = theme?.getConfigSchema?.() || {};
   const primaryColor = theme?.primaryColor || '#6688aa';
+  const fileInputRef = useRef(null);
+  const pendingUploadCallback = useRef(null);
+
+  // Handle image upload: resize to fit MAX_IMAGE_DIM and convert to data URL
+  const handleImageUpload = useCallback((file, onResult) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Resize to fit within MAX_IMAGE_DIM while keeping aspect ratio
+        let w = img.width, h = img.height;
+        if (w > MAX_IMAGE_DIM || h > MAX_IMAGE_DIM) {
+          const scale = MAX_IMAGE_DIM / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/png');
+        onResult(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const triggerUpload = useCallback((callback) => {
+    pendingUploadCallback.current = callback;
+    fileInputRef.current?.click();
+  }, []);
 
   // Collect all available item IDs from the grid (for activation requirements)
   const availableItemIds = useMemo(() => {
@@ -227,19 +264,44 @@ export default function PropertiesPanel({
           return (
             <div key={fieldKey}>
               <label style={baseLabel}>{fieldDef.label}</label>
-              <div
-                style={{ ...inputStyle, background: '#1a1a1a', minHeight: 60, padding: 8, borderRadius: 4, color: '#aaa', fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
-                onClick={() => onStartCanvasEdit?.(x, y, fieldKey, fieldDef, 'hidden')}
-              >
-                {currentValue ? (
-                  <>
-                    <img src={currentValue} alt="Drawing preview" style={{ width: 64, height: 64, imageRendering: 'pixelated', border: '1px solid #444', borderRadius: 4 }} />
-                    <p style={{ margin: '6px 0 0', color: '#888', fontSize: 10 }}>Click to edit</p>
-                  </>
-                ) : (
-                  <p style={{ margin: 0, color: '#bbb' }}>Click to create drawing</p>
-                )}
+              {currentValue && (
+                <div style={{ textAlign: 'center', marginBottom: 6 }}>
+                  <img
+                    src={currentValue}
+                    alt="Drawing preview"
+                    style={{
+                      width: 96,
+                      height: 96,
+                      objectFit: 'contain',
+                      imageRendering: (fieldDef.width || 16) <= 32 ? 'pixelated' : 'auto',
+                      border: '1px solid #444',
+                      borderRadius: 4
+                    }}
+                  />
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  style={{ flex: 1, padding: '6px 8px', background: '#2a3a4a', border: '1px solid #444', borderRadius: 4, color: '#ccc', fontSize: 10, cursor: 'pointer' }}
+                  onClick={() => onStartCanvasEdit?.(x, y, fieldKey, fieldDef, 'hidden')}
+                >
+                  {currentValue ? 'Edit Drawing' : 'Draw'}
+                </button>
+                <button
+                  style={{ flex: 1, padding: '6px 8px', background: '#3a3a2a', border: '1px solid #444', borderRadius: 4, color: '#ccc', fontSize: 10, cursor: 'pointer' }}
+                  onClick={() => triggerUpload((dataUrl) => updateHidden(fieldKey, dataUrl))}
+                >
+                  Upload Image
+                </button>
               </div>
+              {currentValue && (
+                <button
+                  style={{ marginTop: 4, width: '100%', padding: '4px 8px', background: '#3a2a2a', border: '1px solid #444', borderRadius: 4, color: '#999', fontSize: 9, cursor: 'pointer' }}
+                  onClick={() => updateHidden(fieldKey, null)}
+                >
+                  Clear
+                </button>
+              )}
             </div>
           );
         default:
@@ -419,46 +481,44 @@ export default function PropertiesPanel({
           return (
             <div key={fieldKey}>
               <label style={baseLabel}>{fieldDef.label}</label>
-              <div
-                style={{
-                  ...inputStyle,
-                  background: '#1a1a1a',
-                  minHeight: 60,
-                  padding: 8,
-                  borderRadius: 4,
-                  color: '#aaa',
-                  fontSize: 11,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                onClick={() => {
-                  if (onStartCanvasEdit) {
-                    onStartCanvasEdit(x, y, fieldKey, fieldDef);
-                  }
-                }}
-              >
-                {currentValue ? (
-                  <>
-                    <img
-                      src={currentValue}
-                      alt="Drawing preview"
-                      style={{
-                        width: 64,
-                        height: 64,
-                        imageRendering: 'pixelated',
-                        border: '1px solid #444',
-                        borderRadius: 4
-                      }}
-                    />
-                    <p style={{ margin: '6px 0 0', color: '#888', fontSize: 10 }}>Click to edit</p>
-                  </>
-                ) : (
-                  <p style={{ margin: 0, color: '#bbb' }}>Click to create drawing</p>
-                )}
+              {currentValue && (
+                <div style={{ textAlign: 'center', marginBottom: 6 }}>
+                  <img
+                    src={currentValue}
+                    alt="Drawing preview"
+                    style={{
+                      width: 96,
+                      height: 96,
+                      objectFit: 'contain',
+                      imageRendering: (fieldDef.width || 16) <= 32 ? 'pixelated' : 'auto',
+                      border: '1px solid #444',
+                      borderRadius: 4
+                    }}
+                  />
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  style={{ flex: 1, padding: '6px 8px', background: '#2a3a4a', border: '1px solid #444', borderRadius: 4, color: '#ccc', fontSize: 10, cursor: 'pointer' }}
+                  onClick={() => onStartCanvasEdit?.(x, y, fieldKey, fieldDef)}
+                >
+                  {currentValue ? 'Edit Drawing' : 'Draw'}
+                </button>
+                <button
+                  style={{ flex: 1, padding: '6px 8px', background: '#3a3a2a', border: '1px solid #444', borderRadius: 4, color: '#ccc', fontSize: 10, cursor: 'pointer' }}
+                  onClick={() => triggerUpload((dataUrl) => update(fieldKey, dataUrl))}
+                >
+                  Upload Image
+                </button>
               </div>
+              {currentValue && (
+                <button
+                  style={{ marginTop: 4, width: '100%', padding: '4px 8px', background: '#3a2a2a', border: '1px solid #444', borderRadius: 4, color: '#999', fontSize: 9, cursor: 'pointer' }}
+                  onClick={() => update(fieldKey, null)}
+                >
+                  Clear
+                </button>
+              )}
               <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
             </div>
           );
@@ -667,6 +727,22 @@ export default function PropertiesPanel({
       flexDirection: 'column',
       overflowY: 'auto',
     }}>
+      {/* Hidden file input for image uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && pendingUploadCallback.current) {
+            handleImageUpload(file, pendingUploadCallback.current);
+            pendingUploadCallback.current = null;
+          }
+          e.target.value = ''; // Reset so same file can be re-selected
+        }}
+      />
+
       {/* Properties Section */}
       <div style={sectionStyle}>
         <h3 style={{ ...headerStyle, direction: isRTL ? 'rtl' : 'ltr' }}>{t('properties.tileProperties')}</h3>
