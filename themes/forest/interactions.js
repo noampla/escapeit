@@ -552,9 +552,10 @@ export const INTERACTIONS = {
       selfOnly: true  // Only check tile player is standing on
     },
     checkCustom: (gameState, tile, grid, x, y) => {
-      // Can only dig undug ground tiles
+      // Can only dig undug ground or snow tiles
       const cell = grid[y][x];
-      return cell.floor?.type === 'ground' && !cell.floor?.config?.dug;
+      const floorType = cell.floor?.type;
+      return (floorType === 'ground' || floorType === 'snow') && !cell.floor?.config?.dug;
     },
     execute: (gameState, grid, x, y) => {
       const cell = grid[y][x];

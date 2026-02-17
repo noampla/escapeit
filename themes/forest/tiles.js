@@ -71,8 +71,10 @@ export const TILE_TYPES = {
     color: '#ddeeff',
     category: 'basic',
     layer: 'floor',
-    tooltip: 'Blocks movement unless wearing a Sweater (press T). Can place items here.',
-    walkable: true  // Base walkable so objects can be placed in builder; conditional in gameplay
+    tooltip: 'Blocks movement unless wearing a Sweater (press T). Can place items here. May contain buried items (Ctrl+click to bury).',
+    walkable: true,  // Base walkable so objects can be placed in builder; conditional in gameplay
+    configurable: true,
+    defaultConfig: { hiddenObject: null, dug: false }
   },
   'cave-entry': {
     label: 'Cave Entry',
@@ -1058,6 +1060,43 @@ function drawDugGround(ctx, cx, cy, size) {
   ctx.fill();
 }
 
+// Draw dug snow (disturbed snow after digging)
+function drawDugSnow(ctx, cx, cy, size) {
+  // Base snow color (slightly darker/disturbed)
+  ctx.fillStyle = '#c0d0e0';
+  ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+  // Snow mounds around the hole
+  ctx.fillStyle = '#d8e8f5';
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.25, cy - size * 0.25, size * 0.18, size * 0.12, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.22, cy - size * 0.18, size * 0.15, size * 0.1, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.18, cy + size * 0.22, size * 0.16, size * 0.11, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.2, cy + size * 0.2, size * 0.14, size * 0.1, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Darker depression in center (the hole - exposed dark earth under snow)
+  ctx.fillStyle = '#6a5a4a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.22, size * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Even darker center
+  ctx.fillStyle = '#4a3a2a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + size * 0.02, size * 0.12, size * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // Draw a wooden sign
 function drawSign(ctx, cx, cy, size) {
   const woodColor = '#8b7355';
@@ -1563,6 +1602,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
   // Dug ground gets custom rendering (floor that has been dug)
   if (tile.type === 'ground' && tile.config?.dug) {
     drawDugGround(ctx, cx, cy, size);
+    return true;
+  }
+
+  // Dug snow gets custom rendering
+  if (tile.type === 'snow' && tile.config?.dug) {
+    drawDugSnow(ctx, cx, cy, size);
     return true;
   }
 
