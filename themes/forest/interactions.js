@@ -653,14 +653,17 @@ function checkRequirements(requirements, gameState, tile, interaction = null, gr
   }
 
   // Check item state (e.g., bucket filled/empty)
+  // Find an item that matches BOTH type AND all state criteria
   if (requirements.itemState) {
     const { itemType, ...stateChecks } = requirements.itemState;
-    const item = gameState.inventory.find(i => i.itemType === itemType);
-    if (!item) return false;
-
-    for (const [key, value] of Object.entries(stateChecks)) {
-      if (item[key] !== value) return false;
-    }
+    const matchingItem = gameState.inventory.find(i => {
+      if (i.itemType !== itemType) return false;
+      for (const [key, value] of Object.entries(stateChecks)) {
+        if (i[key] !== value) return false;
+      }
+      return true;
+    });
+    if (!matchingItem) return false;
   }
 
   // Check custom requirement (e.g., matching key/card color, checking current tile for snow)
@@ -730,9 +733,18 @@ const DIRECTION_OFFSETS = {
   right: { dx: 1, dy: 0 }
 };
 
-// Clone grid helper
+// Clone grid helper (two-layer format)
 function cloneGrid(grid) {
-  return grid.map(row => row.map(cell => ({ ...cell, config: { ...cell.config } })));
+  return grid.map(row => row.map(cell => ({
+    floor: {
+      type: cell.floor.type,
+      config: { ...cell.floor.config }
+    },
+    object: cell.object ? {
+      type: cell.object.type,
+      config: { ...cell.object.config }
+    } : null
+  })));
 }
 
 // Custom drop handler - rafts now drop on player tile (use E to place on water instead)
@@ -761,14 +773,14 @@ export function customPickup(gameState, grid, playerPos, direction, maxInventory
 
   const targetTile = grid[targetY][targetX];
 
-  // Only handle raft tile pickup
-  if (targetTile.type !== 'raft') {
+  // Only handle raft tile pickup (check object layer for two-layer grid format)
+  if (targetTile.object?.type !== 'raft') {
     return null; // Not a raft, let default pickup handle
   }
 
   // Check if standing on the raft (can't pick up raft you're standing on)
   const currentTile = grid[playerPos.y][playerPos.x];
-  if (currentTile.type === 'raft') {
+  if (currentTile.object?.type === 'raft') {
     return { handled: true, messageKey: 'cantPickupRaftOnIt' };
   }
 
@@ -777,9 +789,12 @@ export function customPickup(gameState, grid, playerPos, direction, maxInventory
     return { handled: true, messageKey: 'inventoryFull', messageParams: { max: maxInventory } };
   }
 
-  // Pick up raft - convert raft tile to water
+  // Pick up raft - remove raft object, keep water floor
   const newGrid = cloneGrid(grid);
-  newGrid[targetY][targetX] = { type: 'water', config: {} };
+  newGrid[targetY][targetX] = {
+    floor: { type: 'water', config: {} },
+    object: null
+  };
 
   // Add raft to inventory
   const newInventory = [...gameState.inventory, { itemType: 'raft', filled: false }];

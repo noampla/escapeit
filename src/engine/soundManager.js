@@ -32,6 +32,8 @@ class SoundManager {
     // Procedural sound definitions (used when files not available)
     this.proceduralSounds = {
       walk: { type: 'noise', frequency: 200, duration: 0.08, attack: 0.01, decay: 0.07 },
+      walkSnow: { type: 'noise', frequency: 500, duration: 0.1, attack: 0.01, decay: 0.09, volume: 1.0 }, // Higher freq = crunchy snow
+      sail: { type: 'noise', frequency: 300, duration: 0.15, attack: 0.01, decay: 0.14, volume: 1.2 }, // Water splash sound
       blocked: { type: 'square', frequency: 150, duration: 0.1, attack: 0.01, decay: 0.09, detune: -10 },
       pickup: { type: 'sine', frequency: 600, duration: 0.15, attack: 0.01, decay: 0.14, sweep: 800 },
       drop: { type: 'sine', frequency: 400, duration: 0.12, attack: 0.01, decay: 0.11, sweep: -200 },

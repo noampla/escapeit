@@ -1146,6 +1146,16 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
     };
 
+    // Helper to determine movement sound based on tile type
+    const getMoveSound = (tile) => {
+      if (!tile) return 'walk';
+      // Check if on water floor (with raft object) -> sailing
+      if (tile.floor?.type === 'water' || tile.object?.type === 'raft') return 'sail';
+      // Check if on snow -> crunchy snow walk
+      if (tile.floor?.type === 'snow') return 'walkSnow';
+      return 'walk';
+    };
+
     // Use theme's movement rules
     // Check object layer first (for doors, hazards, etc.), then floor layer
     const targetType = targetCell.object?.type || targetCell.floor?.type;
@@ -1183,6 +1193,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         if (moveResult.setDestTile) {
           newGrid[ny][nx] = moveResult.setDestTile;
         }
+        // Play movement sound based on destination tile
+        const destTile = moveResult.setDestTile || currentGrid[ny][nx];
+        soundManager.play(getMoveSound(destTile));
         setGrid(newGrid);
         setPlayerPos({ x: nx, y: ny });
         setMoveCount(prev => prev + 1);
@@ -1204,7 +1217,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       }
 
       // Movement allowed by theme
-      soundManager.play('walk');
+      soundManager.play(getMoveSound(currentGrid[ny][nx]));
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
       revealTargetTile();
@@ -1239,7 +1252,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     // Fallback: use standard canMoveTo check if theme doesn't handle this tile
     if (canMoveTo(currentGrid, nx, ny)) {
-      soundManager.play('walk');
+      soundManager.play(getMoveSound(currentGrid[ny][nx]));
       setPlayerPos({ x: nx, y: ny });
       setMoveCount(prev => prev + 1);
       revealTargetTile();
