@@ -107,8 +107,7 @@ export const TILE_TYPES = {
     color: '#cc6600',
     category: 'entry-exit',
     layer: 'floor',
-    unique: true,
-    tooltip: 'Player spawn point. Only one per level.',
+    tooltip: 'Player spawn point. Place 2+ for multiplayer (each player starts at a different one).',
     walkable: true
   },
   car: {
