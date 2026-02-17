@@ -18,7 +18,7 @@ const DEFAULT_TILE_EMOJIS = {
   'item-wood': '🪵',
 };
 
-export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, activationMarkers, activationPickMode, isBuilder = false, caveBordersRevealed }) {
+export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag, onHoldStart, onHoldEnd, playerPos, playerDirection = 'down', showHazardZones, tick = 0, hazardZoneOverrides, showTooltips = false, revealedTiles, viewportBounds, interactionTarget = null, interactionProgress = 0, interactionProgressColor = null, theme, gameState = {}, onTileHover, enablePreview = false, pathTiles, allTilePaths, activationMarkers, activationPickMode, isBuilder = false, caveBordersRevealed, peerPositions = [] }) {
   const canvasRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const isDragging = useRef(false);
@@ -731,7 +731,55 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       ctx.restore();
     }
 
-  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths, activationMarkers, activationPickMode, caveBordersRevealed, isBuilder]);
+    // Render peer players (other online players)
+    // Only show a peer if they are standing on a tile the local player has revealed
+    for (const peer of peerPositions) {
+      if (peer.x === undefined || peer.y === undefined) continue;
+      const peerKey = `${peer.x},${peer.y}`;
+      if (revealedTiles && !revealedTiles.has(peerKey)) continue;
+      // Must be within viewport
+      if (peer.x < offsetX || peer.x > offsetX + (canvasWidth / TILE_SIZE) ||
+          peer.y < offsetY || peer.y > offsetY + (canvasHeight / TILE_SIZE)) continue;
+
+      ctx.save();
+      const ppx = (peer.x - offsetX) * TILE_SIZE;
+      const ppy = (peer.y - offsetY) * TILE_SIZE;
+      const cx = ppx + TILE_SIZE / 2;
+      const cy = ppy + TILE_SIZE / 2;
+
+      // Draw peer as a distinct colored player (cyan/teal to differentiate from local yellow)
+      ctx.globalAlpha = 0.85;
+      ctx.font = '26px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🧑', cx, cy);
+
+      // Teal tint overlay to distinguish from local player
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = '#00cccc';
+      ctx.beginPath();
+      ctx.arc(cx, cy, TILE_SIZE * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Direction arrow (teal)
+      ctx.globalAlpha = 0.9;
+      const peerDir = peer.direction || 'down';
+      const dirOffsets = { up: { x: 0, y: -8 }, down: { x: 0, y: 8 }, left: { x: -8, y: 0 }, right: { x: 8, y: 0 } };
+      const ao = dirOffsets[peerDir] || dirOffsets.down;
+      const ax = cx + ao.x, ay = cy + ao.y;
+      ctx.fillStyle = 'rgba(0, 220, 220, 0.9)';
+      ctx.beginPath();
+      if (peerDir === 'up') { ctx.moveTo(ax, ay - 3); ctx.lineTo(ax - 3, ay + 2); ctx.lineTo(ax + 3, ay + 2); }
+      else if (peerDir === 'down') { ctx.moveTo(ax, ay + 3); ctx.lineTo(ax - 3, ay - 2); ctx.lineTo(ax + 3, ay - 2); }
+      else if (peerDir === 'left') { ctx.moveTo(ax - 3, ay); ctx.lineTo(ax + 2, ay - 3); ctx.lineTo(ax + 2, ay + 3); }
+      else { ctx.moveTo(ax + 3, ay); ctx.lineTo(ax - 2, ay - 3); ctx.lineTo(ax - 2, ay + 3); }
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+  }, [grid, playerPos, playerDirection, showHazardZones, tick, hazardZoneOverrides, revealedTiles, viewportBounds, canvasWidth, canvasHeight, offsetX, offsetY, interactionTarget, interactionProgress, interactionProgressColor, theme, gameState, pathTiles, allTilePaths, activationMarkers, activationPickMode, caveBordersRevealed, isBuilder, peerPositions]);
 
   useEffect(() => {
     draw();

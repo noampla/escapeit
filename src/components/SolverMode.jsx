@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react';
 import Grid from './Grid';
-import { findTile, cloneGrid } from '../engine/tiles';
+import { findTile, findAllTiles, cloneGrid } from '../engine/tiles';
 import { canMoveTo, isSamePos } from '../engine/collision';
 import { getAllHazardZones } from '../engine/hazards';
 import { checkAllMissions, checkMissionComplete } from '../engine/missions';
@@ -135,7 +135,8 @@ function initializeRevealedTiles(startX, startY, grid, darkZoneTiles, isInDarkZo
 
 // isMissionDone is now imported as checkMissionComplete from missions.js
 
-export default function SolverMode({ level, onBack, isTestMode = false }) {
+export default function SolverMode({ level, onBack, isTestMode = false, multiplayerConfig = null, wsSend = null, wsConnected = false, wsPeers = [], wsRegisterHandler = null }) {
+  const isMultiplayer = !!multiplayerConfig;
   const theme = useContext(ThemeContext);
   const themeId = theme?.themeId || 'forest';
   const { t, isRTL, language, setLanguage, getItemLabel, getTileLabel, getMessage } = useLanguage();
@@ -183,12 +184,18 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   }, [level.missions, theme]);
 
   const [grid, setGrid] = useState(() => convertLegacyItems(level.grid));
-  // Find start position using theme's start tile type, with fallback to generic 'start'
+  // Find start position - in multiplayer, each player gets a different start tile
   const startPos = useMemo(() => {
+    if (isMultiplayer && multiplayerConfig?.assignedStartIndex != null) {
+      const allStarts = findAllTiles(level.grid, startTileType);
+      const fallbackStarts = allStarts.length ? allStarts : findAllTiles(level.grid, 'start');
+      const assigned = fallbackStarts[multiplayerConfig.assignedStartIndex];
+      if (assigned) return { x: assigned.x, y: assigned.y };
+    }
     return findTile(level.grid, startTileType)
       || findTile(level.grid, 'start')
       || { x: 1, y: 1 };
-  }, [level.grid, startTileType]);
+  }, [level.grid, startTileType, isMultiplayer, multiplayerConfig]);
   const [playerPos, setPlayerPos] = useState(() => ({ ...startPos }));
   const [lives, setLives] = useState(level.lives || 3);
   const maxInventory = level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY;
@@ -220,6 +227,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   const [messageModal, setMessageModal] = useState(null); // { title, message }
   const [hoveredInventoryItem, setHoveredInventoryItem] = useState(null); // For inventory preview on hover
   const [showExitConfirm, setShowExitConfirm] = useState(false); // Exit confirmation modal
+
+  // Multiplayer state
+  const [peerStates, setPeerStates] = useState({}); // { [playerId]: { x, y, direction, inventory?: [] } }
+  const [peersAtExit, setPeersAtExit] = useState(new Set());
+  // Track recent local pickups for race condition resolution: "tileX,tileY" -> { itemType, timestamp }
+  const pendingPickupsRef = useRef(new Map());
 
   // Check if theme has story content and show on first load
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -282,6 +295,155 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
   showStoryModalRef.current = showStoryModal;
   showExitConfirmRef.current = showExitConfirm;
 
+  // Ref so handleMultiplayerMessage can call showMessage without a dependency on it
+  // (showMessage is defined later in this component - using a ref avoids TDZ errors)
+  const showMessageRef = useRef(null);
+
+  // Multiplayer: handle incoming messages from peers
+  const handleMultiplayerMessage = useCallback((msg) => {
+    switch (msg.type) {
+      case 'player_move': {
+        setPeerStates(prev => ({
+          ...prev,
+          [msg.fromPlayerId]: {
+            ...(prev[msg.fromPlayerId] || {}),
+            x: msg.x,
+            y: msg.y,
+            direction: msg.direction,
+          }
+        }));
+        break;
+      }
+      case 'item_pickup': {
+        const tileKey = `${msg.tileX},${msg.tileY}`;
+        const localPickup = pendingPickupsRef.current.get(tileKey);
+        if (localPickup) {
+          // Both players tried to pick up the same item - compare timestamps
+          if (msg.timestamp < localPickup.timestamp) {
+            // Peer was first - remove item from our inventory
+            setGameState(prev => ({
+              ...prev,
+              inventory: prev.inventory.filter((item, i) =>
+                !(i === prev.inventory.findLastIndex(it => it.itemType === localPickup.itemType))
+              ),
+              collectedItems: prev.collectedItems.filter((_, i) =>
+                i !== prev.collectedItems.findLastIndex(id => id === localPickup.itemType)
+              ),
+            }));
+            showMessageRef.current?.('Someone else grabbed that first!', 2000, 'warning');
+          }
+          // Either way, remove from pending - race window closed
+          pendingPickupsRef.current.delete(tileKey);
+        } else {
+          // We didn't pick this up - remove from grid if still there
+          const currentGrid = gridRef.current;
+          const cell = currentGrid[msg.tileY]?.[msg.tileX];
+          if (cell?.object?.type?.startsWith('item-')) {
+            const newGrid = cloneGrid(currentGrid);
+            newGrid[msg.tileY][msg.tileX].object = null;
+            gridRef.current = newGrid;
+            setGrid(newGrid);
+          }
+        }
+        break;
+      }
+      case 'tile_change': {
+        const currentGrid = gridRef.current;
+        const newGrid = cloneGrid(currentGrid);
+        const cell = newGrid[msg.tileY]?.[msg.tileX];
+        if (!cell) break;
+        if (msg.layer === 'object') {
+          cell.object = msg.newType ? { type: msg.newType, config: msg.newConfig || {} } : null;
+        } else {
+          cell.floor = { type: msg.newType, config: msg.newConfig || {} };
+        }
+        gridRef.current = newGrid;
+        setGrid(newGrid);
+        break;
+      }
+      case 'at_exit': {
+        const pid = msg.fromPlayerId;
+        if (msg.atExit) {
+          setPeersAtExit(prev => new Set([...prev, pid]));
+        } else {
+          setPeersAtExit(prev => {
+            const next = new Set(prev);
+            next.delete(pid);
+            return next;
+          });
+        }
+        break;
+      }
+      case 'player_inventory': {
+        // Peer's inventory changed - store it so we can use it for shared exit checks
+        setPeerStates(prev => ({
+          ...prev,
+          [msg.fromPlayerId]: {
+            ...(prev[msg.fromPlayerId] || {}),
+            inventory: msg.inventory,
+          }
+        }));
+        break;
+      }
+      case 'player_joined': {
+        // A new peer just joined - immediately re-broadcast our current position and inventory
+        const pos = playerPosRef.current;
+        if (pos) {
+          mpSendRef.current({ type: 'player_move', x: pos.x, y: pos.y, direction: playerDirectionRef.current });
+        }
+        mpSendRef.current({ type: 'player_inventory', inventory: gameStateRef.current.inventory });
+        break;
+      }
+      case 'player_left': {
+        setPeerStates(prev => {
+          const next = { ...prev };
+          delete next[msg.playerId];
+          return next;
+        });
+        setPeersAtExit(prev => {
+          const next = new Set(prev);
+          next.delete(msg.playerId);
+          return next;
+        });
+        showMessageRef.current?.('A player disconnected. Continue to the exit!', 3000, 'warning');
+        break;
+      }
+      default:
+        break;
+    }
+  }, []);
+
+  // WebSocket is owned by App.jsx and passed as props - no double connection
+  const mpConnected = wsConnected;
+  const mpPeers = wsPeers;
+  // Stable refs so doMove/pickUpItem callbacks can always call send without stale closures
+  const mpSendRef = useRef(wsSend);
+  mpSendRef.current = wsSend;
+  const isMultiplayerRef = useRef(isMultiplayer);
+  isMultiplayerRef.current = isMultiplayer;
+  // Tracks the last at_exit value we sent so we only broadcast on actual changes
+  const lastSentAtExitRef = useRef(null);
+
+  // Register our message handler with App so it receives incoming WS messages
+  // and immediately broadcast our starting position so peers see us right away
+  useEffect(() => {
+    if (isMultiplayer && wsRegisterHandler) {
+      wsRegisterHandler(handleMultiplayerMessage);
+      // Broadcast initial position and inventory so peers have our state immediately
+      mpSendRef.current({ type: 'player_move', x: startPos.x, y: startPos.y, direction: playerDirectionRef.current });
+      mpSendRef.current({ type: 'player_inventory', inventory: gameStateRef.current.inventory });
+      return () => wsRegisterHandler(null);
+    }
+    // wsRegisterHandler must be stable (useCallback in App) - do NOT add it to deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMultiplayer, handleMultiplayerMessage]);
+
+  // Broadcast inventory to peers whenever it changes (for shared exit key check)
+  useEffect(() => {
+    if (!isMultiplayer) return;
+    mpSendRef.current({ type: 'player_inventory', inventory: gameState.inventory });
+  }, [isMultiplayer, gameState.inventory]);
+
   // Notification helper using translation keys
   // transient: if true, show notification but don't save to history (default for 'info' type)
   const showNotification = useCallback((key, type = 'info', params = {}, duration = null, transient = null) => {
@@ -302,6 +464,44 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const isTransient = transient ?? (type === 'info' || type === 'warning');
     notification.notifyRaw(translatedMsg, type, duration, isTransient);
   }, [notification, theme]);
+  // Keep the ref up to date so handleMultiplayerMessage (defined earlier) can call it
+  showMessageRef.current = showMessage;
+
+  // Broadcast all tiles that differ between oldGrid and newGrid to peers
+  const broadcastGridDiff = useCallback((oldGrid, newGrid) => {
+    if (!isMultiplayerRef.current) return;
+    for (let row = 0; row < newGrid.length; row++) {
+      for (let col = 0; col < newGrid[row].length; col++) {
+        const oldCell = oldGrid[row]?.[col];
+        const newCell = newGrid[row][col];
+        const objectChanged = (newCell?.object?.type ?? null) !== (oldCell?.object?.type ?? null) ||
+          JSON.stringify(newCell?.object?.config ?? {}) !== JSON.stringify(oldCell?.object?.config ?? {});
+        const floorChanged = !objectChanged && (
+          (newCell?.floor?.type ?? null) !== (oldCell?.floor?.type ?? null) ||
+          JSON.stringify(newCell?.floor?.config ?? {}) !== JSON.stringify(oldCell?.floor?.config ?? {})
+        );
+        if (objectChanged) {
+          mpSendRef.current({
+            type: 'tile_change',
+            tileX: col,
+            tileY: row,
+            layer: 'object',
+            newType: newCell.object?.type ?? null,
+            newConfig: newCell.object?.config ?? {},
+          });
+        } else if (floorChanged) {
+          mpSendRef.current({
+            type: 'tile_change',
+            tileX: col,
+            tileY: row,
+            layer: 'floor',
+            newType: newCell.floor?.type ?? null,
+            newConfig: newCell.floor?.config ?? {},
+          });
+        }
+      }
+    }
+  }, []);
 
   const respawn = useCallback(() => {
     setPlayerPos({ ...startPos });
@@ -393,12 +593,25 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
 
     const newGrid = cloneGrid(currentGrid);
     // Drop to object layer
-    newGrid[pos.y][pos.x].object = { type: `item-${dropped.itemType}`, config: { ...dropped } };
+    const droppedObj = { type: `item-${dropped.itemType}`, config: { ...dropped } };
+    newGrid[pos.y][pos.x].object = droppedObj;
+    gridRef.current = newGrid;
     setGrid(newGrid);
     setGameState(prev => ({
       ...prev,
       inventory: prev.inventory.filter((_, i) => i !== index),
     }));
+    // Multiplayer: broadcast the tile change so peers see the dropped item
+    if (isMultiplayerRef.current) {
+      mpSendRef.current({
+        type: 'tile_change',
+        tileX: pos.x,
+        tileY: pos.y,
+        layer: 'object',
+        newType: droppedObj.type,
+        newConfig: droppedObj.config,
+      });
+    }
     const ITEM_TYPES = theme?.getItemTypes() || {};
     const itemDef = ITEM_TYPES[dropped.itemType];
     const droppedLabel = getItemLabel(themeId, dropped.itemType, itemDef?.label || dropped.itemType);
@@ -406,15 +619,19 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     showNotification('notifications.dropped', 'info', { emoji: itemDef?.emoji || '', label: droppedLabel });
 
     // Check if any activation requirements are now met
+    const preDropActivGrid = cloneGrid(newGrid);
     const activationResults = checkActivations(newGrid, gameStateRef.current, { x: pos.x, y: pos.y }, pos);
     if (activationResults.length > 0) {
       soundManager.play('success');
       const msg = getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!';
       showMessage(msg, 2000, 'success');
+      const afterDropActivGrid = cloneGrid(newGrid);
+      setGrid(afterDropActivGrid);
+      broadcastGridDiff(preDropActivGrid, afterDropActivGrid);
     }
 
     setDropMenuOpen(false);
-  }, [showNotification, theme, getItemLabel, themeId, getMessage, showMessage]);
+  }, [showNotification, theme, getItemLabel, themeId, getMessage, showMessage, broadcastGridDiff]);
 
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;
@@ -447,6 +664,16 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // With two-layer system, just clear the object layer - floor remains!
     newGrid[py][px].object = null;
     setGrid(newGrid);
+
+    // Multiplayer: record in pending pickups for race condition resolution, then broadcast
+    if (isMultiplayerRef.current) {
+      const tileKey = `${px},${py}`;
+      const pickupTimestamp = Date.now();
+      pendingPickupsRef.current.set(tileKey, { itemType, timestamp: pickupTimestamp });
+      // Clear pending after 200ms - race window closed
+      setTimeout(() => pendingPickupsRef.current.delete(tileKey), 200);
+      mpSendRef.current({ type: 'item_pickup', tileX: px, tileY: py, itemType, timestamp: pickupTimestamp });
+    }
 
     // Preserve all config properties from tile to inventory item
     const itemObj = { itemType, filled: false, ...cell.object.config };
@@ -729,6 +956,8 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       if (result.modifyGrid) {
         gridRef.current = newGrid; // Update ref IMMEDIATELY to prevent race condition with moveEntities
         setGrid(newGrid);
+        // Multiplayer: broadcast all changed tiles to peers
+        broadcastGridDiff(currentGrid, newGrid);
       }
 
       // Apply inventory/state changes
@@ -775,7 +1004,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Mark that E/number key must be released before starting new interaction
     interactionKeyReleasedRef.current = false;
     cancelInteraction();
-  }, [theme, showMessage, cancelInteraction, setMessageModal]);
+  }, [theme, showMessage, cancelInteraction, setMessageModal, broadcastGridDiff]);
 
   const doPickup = useCallback(() => {
     const currentGrid = gridRef.current;
@@ -1037,6 +1266,13 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     lastDirRef.current = dir;
     playerDirectionRef.current = dir;
     setPlayerDirection(dir);
+
+    // Multiplayer helper: broadcast position after a successful move
+    const sendMove = (x, y) => {
+      if (isMultiplayerRef.current) {
+        mpSendRef.current({ type: 'player_move', x, y, direction: dir });
+      }
+    };
     const d = DIRECTIONS[dir];
     const prev = playerPosRef.current;
     const nx = prev.x + d.dx, ny = prev.y + d.dy;
@@ -1197,16 +1433,22 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         // Play movement sound based on destination tile
         const destTile = moveResult.setDestTile || currentGrid[ny][nx];
         soundManager.play(getMoveSound(destTile));
+        broadcastGridDiff(currentGrid, newGrid);
         setGrid(newGrid);
         setPlayerPos({ x: nx, y: ny });
+        sendMove(nx, ny);
         setMoveCount(prev => prev + 1);
         revealTargetTile();
         autoMarkCaveBorders(nx, ny);
         // Check activation requirements (player may need to stand on a spot)
+        const preSwapActivGrid = cloneGrid(newGrid);
         const tileSwapActivations = checkActivations(newGrid, gameStateRef.current, null, { x: nx, y: ny });
         if (tileSwapActivations.length > 0) {
           soundManager.play('success');
           showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
+          const afterSwapActivGrid = cloneGrid(newGrid);
+          setGrid(afterSwapActivGrid);
+          broadcastGridDiff(preSwapActivGrid, afterSwapActivGrid);
         }
         return;
       }
@@ -1226,19 +1468,24 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       // Movement allowed by theme
       soundManager.play(getMoveSound(currentGrid[ny][nx]));
       setPlayerPos({ x: nx, y: ny });
+      sendMove(nx, ny);
       setMoveCount(prev => prev + 1);
       revealTargetTile();
       autoMarkCaveBorders(nx, ny);
 
       // Check activation requirements (player may need to stand on a spot)
+      const preThemeActivGrid = cloneGrid(currentGrid);
       const themeMoveActivations = checkActivations(currentGrid, gameStateRef.current, null, { x: nx, y: ny });
       if (themeMoveActivations.length > 0) {
         soundManager.play('success');
         showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
-        setGrid(cloneGrid(currentGrid));
+        const afterThemeActivGrid = cloneGrid(currentGrid);
+        setGrid(afterThemeActivGrid);
+        broadcastGridDiff(preThemeActivGrid, afterThemeActivGrid);
       }
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
+      const preMovGrid = cloneGrid(currentGrid);
       const postMoveResult = theme?.onPlayerMove?.(currentGS, currentGrid, nx, ny);
       if (postMoveResult) {
         // Only provide feedback on success (gate opening), silent on failure
@@ -1248,7 +1495,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           showMessage(postMoveResult.message, 3000, 'success');
         }
         if (postMoveResult.modifyGrid) {
-          setGrid(cloneGrid(currentGrid));
+          const afterMovGrid = cloneGrid(currentGrid);
+          setGrid(afterMovGrid);
+          broadcastGridDiff(preMovGrid, afterMovGrid);
         }
       }
 
@@ -1269,19 +1518,24 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     if (canMoveTo(currentGrid, nx, ny)) {
       soundManager.play(getMoveSound(currentGrid[ny][nx]));
       setPlayerPos({ x: nx, y: ny });
+      sendMove(nx, ny);
       setMoveCount(prev => prev + 1);
       revealTargetTile();
       autoMarkCaveBorders(nx, ny);
 
       // Check activation requirements (player may need to stand on a spot)
+      const preActivGrid = cloneGrid(currentGrid);
       const fallbackActivations = checkActivations(currentGrid, gameStateRef.current, null, { x: nx, y: ny });
       if (fallbackActivations.length > 0) {
         soundManager.play('success');
         showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
-        setGrid(cloneGrid(currentGrid));
+        const afterActivGrid = cloneGrid(currentGrid);
+        setGrid(afterActivGrid);
+        broadcastGridDiff(preActivGrid, afterActivGrid);
       }
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
+      const preMovGrid2 = cloneGrid(currentGrid);
       const postMoveResult = theme?.onPlayerMove?.(gameStateRef.current, currentGrid, nx, ny);
       if (postMoveResult) {
         if (postMoveResult.message) {
@@ -1292,7 +1546,9 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           showMessage(postMoveResult.message, duration, msgType);
         }
         if (postMoveResult.modifyGrid) {
-          setGrid(cloneGrid(currentGrid));
+          const afterMovGrid2 = cloneGrid(currentGrid);
+          setGrid(afterMovGrid2);
+          broadcastGridDiff(preMovGrid2, afterMovGrid2);
         }
       }
 
@@ -1307,7 +1563,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         }
       }
     }
-  }, [theme, showMessage, loseLife, respawn, cancelInteraction, getMessage, themeId]);
+  }, [theme, showMessage, loseLife, respawn, cancelInteraction, getMessage, themeId, broadcastGridDiff]);
 
   // Store callback refs so keyboard handler doesn't need to depend on them
   const callbacksRef = useRef({});
@@ -1782,7 +2038,18 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     const exitPos = exitTiles.reduce((found, tileType) =>
       found || findTile(level.grid, tileType), null
     );
-    if (!exitPos || !isSamePos(playerPos, exitPos)) {
+    const localAtExit = exitPos && isSamePos(playerPos, exitPos);
+
+    // Multiplayer: broadcast exit status only when it actually changes
+    if (isMultiplayer) {
+      const atExitBool = !!localAtExit;
+      if (atExitBool !== lastSentAtExitRef.current) {
+        lastSentAtExitRef.current = atExitBool;
+        mpSendRef.current({ type: 'at_exit', atExit: atExitBool });
+      }
+    }
+
+    if (!exitPos || !localAtExit) {
       exitMessageShownRef.current = false;
       return;
     }
@@ -1792,7 +2059,18 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     // Use theme's exit requirements check
     // Get config from the appropriate layer (object takes priority over floor)
     const exitConfig = exitCell.object?.config || exitCell.floor?.config || {};
-    const exitResult = theme?.checkExitRequirements?.(gameState, exitConfig);
+    // In multiplayer, combine all players' inventories so either player holding the
+    // key (or other required item) satisfies the exit requirement for everyone
+    const effectiveGameState = isMultiplayer
+      ? {
+          ...gameState,
+          inventory: [
+            ...gameState.inventory,
+            ...Object.values(peerStates).flatMap(p => p.inventory || []),
+          ],
+        }
+      : gameState;
+    const exitResult = theme?.checkExitRequirements?.(effectiveGameState, exitConfig);
     if (exitResult && !exitResult.allowed) {
       if (!exitMessageShownRef.current) {
         exitMessageShownRef.current = true;
@@ -1802,6 +2080,19 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         showMessage(exitMsg, 1500, 'warning');
       }
       return;
+    }
+
+    // Multiplayer: wait for all peers to also be at the exit
+    if (isMultiplayer) {
+      const expectedPeers = multiplayerConfig.peers.length;
+      if (peersAtExit.size < expectedPeers) {
+        if (!exitMessageShownRef.current) {
+          exitMessageShownRef.current = true;
+          const missing = expectedPeers - peersAtExit.size;
+          showMessage(`Waiting for ${missing} more player${missing > 1 ? 's' : ''} to reach the exit...`, 999999, 'info');
+        }
+        return;
+      }
     }
 
     const gs = { ...gameState, reachedExit: true };
@@ -1823,7 +2114,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       exitMessageShownRef.current = true;
       showNotification('notifications.completeMissions', 'warning');
     }
-  }, [playerPos, gameOver, level, showMessage, grid, gameState, exitTiles, theme]);
+  }, [playerPos, gameOver, level, showMessage, grid, gameState, exitTiles, theme, isMultiplayer, peersAtExit, multiplayerConfig]);
 
   // Measure container to fill available space
   useEffect(() => {
@@ -2180,6 +2471,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
             theme={theme}
             gameState={gameState}
             caveBordersRevealed={caveBordersRevealed}
+            peerPositions={isMultiplayer ? Object.values(peerStates) : []}
           />
 
           {/* Inline interaction menu next to player */}
@@ -2284,6 +2576,23 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
           <span>{t('controls.drop')}</span>
           <span>{t('controls.restart')}</span>
         </div>
+        {isMultiplayer && (
+          <div style={{
+            background: mpConnected ? 'rgba(30, 80, 30, 0.7)' : 'rgba(80, 40, 20, 0.7)',
+            border: `1px solid ${mpConnected ? 'rgba(68, 170, 68, 0.5)' : 'rgba(200, 100, 40, 0.5)'}`,
+            borderRadius: 8,
+            padding: '4px 8px',
+            fontSize: 11,
+            color: mpConnected ? '#88dd88' : '#ddaa55',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 8, borderRadius: '50%', display: 'inline-block', width: 8, height: 8, background: mpConnected ? '#44cc44' : '#cc8833' }} />
+            {mpConnected ? `Online (${mpPeers.length + 1})` : 'Connecting...'}
+          </div>
+        )}
         <button
           onClick={toggleSound}
           style={{
