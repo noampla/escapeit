@@ -405,7 +405,7 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
     showNotification('notifications.dropped', 'info', { emoji: itemDef?.emoji || '', label: droppedLabel });
 
     // Check if any activation requirements are now met
-    const activationResults = checkActivations(newGrid, gameStateRef.current, { x: pos.x, y: pos.y });
+    const activationResults = checkActivations(newGrid, gameStateRef.current, { x: pos.x, y: pos.y }, pos);
     if (activationResults.length > 0) {
       soundManager.play('success');
       const msg = getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!';
@@ -1201,6 +1201,12 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
         setMoveCount(prev => prev + 1);
         revealTargetTile();
         autoMarkCaveBorders(nx, ny);
+        // Check activation requirements (player may need to stand on a spot)
+        const tileSwapActivations = checkActivations(newGrid, gameStateRef.current, null, { x: nx, y: ny });
+        if (tileSwapActivations.length > 0) {
+          soundManager.play('success');
+          showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
+        }
         return;
       }
 
@@ -1222,6 +1228,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setMoveCount(prev => prev + 1);
       revealTargetTile();
       autoMarkCaveBorders(nx, ny);
+
+      // Check activation requirements (player may need to stand on a spot)
+      const themeMoveActivations = checkActivations(currentGrid, gameStateRef.current, null, { x: nx, y: ny });
+      if (themeMoveActivations.length > 0) {
+        soundManager.play('success');
+        showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
+        setGrid(cloneGrid(currentGrid));
+      }
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
       const postMoveResult = theme?.onPlayerMove?.(currentGS, currentGrid, nx, ny);
@@ -1257,6 +1271,14 @@ export default function SolverMode({ level, onBack, isTestMode = false }) {
       setMoveCount(prev => prev + 1);
       revealTargetTile();
       autoMarkCaveBorders(nx, ny);
+
+      // Check activation requirements (player may need to stand on a spot)
+      const fallbackActivations = checkActivations(currentGrid, gameStateRef.current, null, { x: nx, y: ny });
+      if (fallbackActivations.length > 0) {
+        soundManager.play('success');
+        showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
+        setGrid(cloneGrid(currentGrid));
+      }
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
       const postMoveResult = theme?.onPlayerMove?.(gameStateRef.current, currentGrid, nx, ny);

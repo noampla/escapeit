@@ -2,6 +2,7 @@ import { useContext, useMemo, useState, useRef, useCallback } from 'react';
 import { ThemeContext } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
 import { BASE_MISSION_TYPES, DEFAULT_INVENTORY_CAPACITY } from '../utils/constants';
+import { PLAYER_REQUIREMENT_ID } from '../engine/activationSystem.js';
 
 // Max dimension for uploaded images (keeps data URL size reasonable for Firestore)
 const MAX_IMAGE_DIM = 128;
@@ -684,6 +685,7 @@ export default function PropertiesPanel({
                               style={{ ...inputStyle, flex: 1, padding: '2px 4px', fontSize: 10 }}
                             >
                               <option value="">-- Select item --</option>
+                              <option value={PLAYER_REQUIREMENT_ID} style={{ color: '#7af' }}>Player (stand on spot)</option>
                               {availableItemIds.map(id => (
                                 <option key={id} value={id}>{id}</option>
                               ))}
@@ -694,7 +696,7 @@ export default function PropertiesPanel({
                     </div>
 
                     <p style={{ color: '#666', fontSize: 9, margin: 0, lineHeight: 1.4 }}>
-                      Place items with matching imageId or item-type at specified positions to activate this tile.
+                      Place items at specified positions or require the player to stand on a spot to activate this tile.
                     </p>
                   </>
                 )}

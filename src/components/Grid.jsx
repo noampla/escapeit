@@ -579,18 +579,31 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
           ctx.fill();
         }
 
-        // Show itemId label at bottom
+        // Show itemId label at bottom (or player icon for player requirements)
         if (marker.itemId) {
+          const isPlayer = marker.itemId === '__player__';
           const bgAlpha = isActive ? 0.7 : 0.4;
           const labelAlpha = isActive ? 0.9 : 0.6;
-          ctx.fillStyle = `rgba(0, 0, 0, ${bgAlpha})`;
-          ctx.fillRect(px + 2, py + TILE_SIZE - 14, TILE_SIZE - 4, 12);
-          ctx.fillStyle = `rgba(255, 255, 255, ${labelAlpha})`;
-          ctx.font = '9px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const label = marker.itemId.length > 8 ? marker.itemId.slice(0, 7) + '…' : marker.itemId;
-          ctx.fillText(label, px + TILE_SIZE / 2, py + TILE_SIZE - 8);
+
+          if (isPlayer) {
+            // Draw a distinct player marker (blue tint + person icon)
+            ctx.fillStyle = `rgba(80, 160, 255, ${bgAlpha})`;
+            ctx.fillRect(px + 2, py + TILE_SIZE - 14, TILE_SIZE - 4, 12);
+            ctx.fillStyle = `rgba(255, 255, 255, ${labelAlpha})`;
+            ctx.font = '9px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Player', px + TILE_SIZE / 2, py + TILE_SIZE - 8);
+          } else {
+            ctx.fillStyle = `rgba(0, 0, 0, ${bgAlpha})`;
+            ctx.fillRect(px + 2, py + TILE_SIZE - 14, TILE_SIZE - 4, 12);
+            ctx.fillStyle = `rgba(255, 255, 255, ${labelAlpha})`;
+            ctx.font = '9px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const label = marker.itemId.length > 8 ? marker.itemId.slice(0, 7) + '…' : marker.itemId;
+            ctx.fillText(label, px + TILE_SIZE / 2, py + TILE_SIZE - 8);
+          }
         }
       });
     }

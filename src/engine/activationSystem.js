@@ -1,14 +1,24 @@
 // Activation System - Enables puzzle-based activation of doors/gates
 // Items with specific IDs must be placed at specific positions to activate
+// Special itemId '__player__' means player must stand on the position
+
+export const PLAYER_REQUIREMENT_ID = '__player__';
 
 /**
  * Check if a single requirement is met
  * @param {Array} grid - The game grid
  * @param {Object} requirement - { x, y, itemId }
+ * @param {Object} playerPos - { x, y } current player position (needed for player requirements)
  * @returns {boolean} - True if requirement is met
  */
-export function checkRequirement(grid, requirement) {
+export function checkRequirement(grid, requirement, playerPos) {
   const { x, y, itemId } = requirement;
+
+  // Player position requirement
+  if (itemId === PLAYER_REQUIREMENT_ID) {
+    return playerPos && playerPos.x === x && playerPos.y === y;
+  }
+
   const cell = grid[y]?.[x];
   if (!cell?.object) return false;
 
@@ -24,16 +34,17 @@ export function checkRequirement(grid, requirement) {
  * Check all requirements for an activatable tile (unordered mode)
  * @param {Array} grid - The game grid
  * @param {Object} activationRequirements - The activation config
+ * @param {Object} playerPos - { x, y } current player position
  * @returns {boolean} - True if all requirements are met
  */
-export function checkAllRequirements(grid, activationRequirements) {
+export function checkAllRequirements(grid, activationRequirements, playerPos) {
   if (!activationRequirements?.enabled) return false;
 
   const requirements = activationRequirements.requirements || [];
   if (requirements.length === 0) return false;
 
   // All requirements must be met
-  return requirements.every(req => checkRequirement(grid, req));
+  return requirements.every(req => checkRequirement(grid, req, playerPos));
 }
 
 /**
@@ -43,9 +54,10 @@ export function checkAllRequirements(grid, activationRequirements) {
  * @param {Object} activationRequirements - The activation config
  * @param {string} tileKey - Unique key for this tile ("x,y")
  * @param {Object} dropPosition - { x, y } position where item was just dropped (optional)
+ * @param {Object} playerPos - { x, y } current player position
  * @returns {boolean} - True if all requirements are met in order
  */
-export function checkOrderedRequirements(grid, gameState, activationRequirements, tileKey, dropPosition) {
+export function checkOrderedRequirements(grid, gameState, activationRequirements, tileKey, dropPosition, playerPos) {
   if (!activationRequirements?.enabled || !activationRequirements.orderMatters) return false;
 
   const requirements = activationRequirements.requirements || [];
@@ -67,7 +79,9 @@ export function checkOrderedRequirements(grid, gameState, activationRequirements
     const nextReq = requirements[nextIndex];
 
     // If dropPosition is provided, only advance if this drop is at the next required position
-    if (dropPosition && (dropPosition.x !== nextReq.x || dropPosition.y !== nextReq.y)) {
+    // (skip this check for player requirements since those are position-based already)
+    if (dropPosition && nextReq.itemId !== PLAYER_REQUIREMENT_ID &&
+        (dropPosition.x !== nextReq.x || dropPosition.y !== nextReq.y)) {
       // Drop is not at the next required position - don't advance
       return progress.fulfilledCount >= requirements.length;
     }
@@ -75,14 +89,14 @@ export function checkOrderedRequirements(grid, gameState, activationRequirements
     // First verify all previous requirements are still in place
     let allPreviousMet = true;
     for (let i = 0; i < nextIndex; i++) {
-      if (!checkRequirement(grid, requirements[i])) {
+      if (!checkRequirement(grid, requirements[i], playerPos)) {
         allPreviousMet = false;
         break;
       }
     }
 
     // Only check next requirement if previous ones are still met
-    if (allPreviousMet && checkRequirement(grid, nextReq)) {
+    if (allPreviousMet && checkRequirement(grid, nextReq, playerPos)) {
       progress.fulfilledCount = nextIndex + 1;
       gameState.activationProgress[tileKey] = progress;
     }
@@ -145,14 +159,15 @@ export function getActivatableTiles(grid) {
 }
 
 /**
- * Main check function: call after item drop/pickup
+ * Main check function: call after item drop/pickup or player movement
  * Checks all activatable tiles and activates those with met requirements
  * @param {Array} grid - The game grid
  * @param {Object} gameState - Current game state
  * @param {Object} dropPosition - { x, y } position where item was just dropped (optional, for ordered mode)
+ * @param {Object} playerPos - { x, y } current player position
  * @returns {Array} - Array of activated tiles { x, y, type }
  */
-export function checkActivations(grid, gameState, dropPosition) {
+export function checkActivations(grid, gameState, dropPosition, playerPos) {
   const activatableTiles = getActivatableTiles(grid);
   const results = [];
 
@@ -166,9 +181,9 @@ export function checkActivations(grid, gameState, dropPosition) {
 
     let allMet = false;
     if (reqs.orderMatters) {
-      allMet = checkOrderedRequirements(grid, gameState, reqs, tileKey, dropPosition);
+      allMet = checkOrderedRequirements(grid, gameState, reqs, tileKey, dropPosition, playerPos);
     } else {
-      allMet = checkAllRequirements(grid, reqs);
+      allMet = checkAllRequirements(grid, reqs, playerPos);
     }
 
     if (allMet) {
