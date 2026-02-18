@@ -9,13 +9,13 @@
  *   startTileCount - number of start tiles on the map
  *   connected      - ws connected boolean (from App)
  *   peers          - array of peer playerIds currently in room (from App)
- *   onSolo         - called when player chooses solo
- *   onStartOnline  - called when player clicks "Online" (App opens the ws)
+ *   onStartOnline  - called when player clicks "Find Game" (App opens the ws)
  *   onBack         - called when player goes back from waiting room (App closes ws)
+ *   onBackToSelect - called when player goes back from the choose screen (returns to level select)
  */
 import { useState } from 'react';
 
-export default function MultiplayerLobby({ startTileCount, connected, peers, onSolo, onStartOnline, onBack }) {
+export default function MultiplayerLobby({ startTileCount, connected, peers, onStartOnline, onBack, onBackToSelect }) {
   const [phase, setPhase] = useState('choose'); // 'choose' | 'waiting'
 
   const overlayStyle = {
@@ -97,19 +97,19 @@ export default function MultiplayerLobby({ startTileCount, connected, peers, onS
     return (
       <div style={overlayStyle}>
         <div style={cardStyle}>
-          <div style={titleStyle}>Choose Game Mode</div>
+          <div style={titleStyle}>Multiplayer Required</div>
           <div style={subtitleStyle}>
-            This map supports up to {startTileCount} players
+            This map requires {startTileCount} players
           </div>
 
           <button style={onlineBtn} onClick={() => {
             setPhase('waiting');
             onStartOnline();
           }}>
-            Online Multiplayer
+            Find Game
           </button>
-          <button style={soloBtn} onClick={onSolo}>
-            Solo
+          <button style={soloBtn} onClick={onBackToSelect}>
+            Back
           </button>
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function MultiplayerLobby({ startTileCount, connected, peers, onS
 
   // Waiting room
   const playerCount = peers.length + 1; // peers + self
-  const needed = 2;
+  const needed = startTileCount;
 
   return (
     <div style={overlayStyle}>
