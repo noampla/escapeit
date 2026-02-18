@@ -144,9 +144,14 @@ export async function deleteLevel(id) {
 
 // Load a single level by ID (for direct URL access)
 export async function loadLevelById(id) {
-  const docSnap = await getDoc(doc(db, COLLECTION, id));
-  if (!docSnap.exists()) return null;
-  return { ...restoreLevel(docSnap.data()), id: docSnap.id };
+  try {
+    const docSnap = await getDoc(doc(db, COLLECTION, id));
+    if (!docSnap.exists()) return null;
+    return { ...restoreLevel(docSnap.data()), id: docSnap.id };
+  } catch (err) {
+    console.error('loadLevelById failed:', err);
+    return null;
+  }
 }
 
 // Load levels created by a specific user
