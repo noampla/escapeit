@@ -834,7 +834,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
       e.preventDefault();
       const pos = getTileAt(e);
       if (pos) {
-        if (onRightClick) onRightClick(pos.x, pos.y);
+        if (onRightClick) onRightClick(pos.x, pos.y, e);
         isRightDragging.current = true;
       }
     }
