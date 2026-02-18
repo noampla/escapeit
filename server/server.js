@@ -25,7 +25,7 @@ const httpServer = createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/generate-map') {
     try {
       const body = await readBody(req);
-      const { story, themeId, tileCatalog, startTile, exitTile, missionTypes, difficulty } = body;
+      const { story, themeId, tileCatalog, startTile, exitTile, missionTypes, aiRules, difficulty } = body;
 
       if (!story || !tileCatalog?.length) {
         respond(res, 400, { error: 'Missing story or tileCatalog' });
@@ -34,7 +34,7 @@ const httpServer = createServer(async (req, res) => {
 
       log(`AI-GEN  theme=${themeId} difficulty=${difficulty} storyLen=${story.length}`);
 
-      const systemPrompt = buildSystemPrompt(tileCatalog, startTile, exitTile, missionTypes || ['escape']);
+      const systemPrompt = buildSystemPrompt(tileCatalog, startTile, exitTile, missionTypes || ['escape'], aiRules || []);
       const userPrompt = buildUserPrompt(story, themeId, difficulty);
 
       const response = await anthropic.messages.create({
@@ -197,7 +197,7 @@ httpServer.listen(PORT, () => {
 // AI MAP GENERATION — prompt building, expansion, validation
 // ═════════════════════════════════════════════════════════════════
 
-function buildSystemPrompt(tileCatalog, startTile, exitTile, missionTypes) {
+function buildSystemPrompt(tileCatalog, startTile, exitTile, missionTypes, aiRules) {
   const floorTiles = tileCatalog.filter(t => t.layer === 'floor');
   const objectTiles = tileCatalog.filter(t => t.layer === 'object');
 
@@ -241,33 +241,14 @@ ${floorTiles.map(fmt).join('\n')}
 OBJECT TILES (use in "object" fields only):
 ${objectTiles.map(fmt).join('\n')}
 
-BURIED ITEMS:
-Ground and snow tiles can hide items underground. The player digs them up with a shovel.
-To bury an item, add "floorConfig" to a cell:
-  { "r": 50, "c": 50, "floor": "ground", "floorConfig": { "hiddenObject": { "type": "item-knife", "config": {} } } }
-The "type" must be a valid object tile ID (e.g. "item-knife", "item-key", "item-axe").
-Only "ground" and "snow" floors support buried items. Always pair buried items with an "item-shovel" on the map so the player can dig.
-
 TILE CONFIG:
 Some tiles accept extra config via "floorConfig" or "objectConfig" in a cell entry:
-- car (exit): { "needsKey": true } — player needs a key item to use the exit. Default is true.
 - sign: { "message": "your text here" } — displayed when the player reads the sign.
 - friend: { "name": "Alex" } — NPC name shown during rescue.
 - door-key / door-card: { "lockColor": "red" } — color must match the key/card color. Options: "red", "blue", "green", "yellow", "purple".
 - item-key / item-card: { "lockColor": "red" } — same colors as above, must match the door.
 
-STRUCTURE RULES — tiles that need specific neighbors to work:
-- CAVE: Every group of "cave" floor tiles MUST have at least one "cave-entry" floor tile directly adjacent (up/down/left/right). cave-entry is the only way in or out of cave tiles. Place cave-entry between ground and cave tiles as a doorway. Without cave-entry, the cave is completely inaccessible. Caves are DARK — the player cannot see or interact with anything inside without a torch. To get a torch: either place an "item-torch" directly, OR place a "thorny-bush" + "item-machete" (cutting the bush gives a stick) + a "fire" tile nearby (the player lights the stick at the fire to make a torch). Always ensure the player can obtain a torch BEFORE entering the cave.
-- WATER: If the player needs to cross water, place an "item-raft" somewhere reachable on ground. The player can only cross 1 water tile at a time with the raft, so for wider crossings place stepping-stone ground tiles so each water gap is only 1 tile wide.
-- SNOW: The player cannot walk on snow without a sweater. If using snow tiles, place an "item-sweater" on reachable ground.
-- DOORS: Every "door-key" or "door-card" must have a matching "item-key" or "item-card" with the same lockColor. Place walkable tiles on both sides of a door.
-- FIRE: If fire blocks a required path, place an "item-bucket" nearby. The player fills it at water, then uses it to extinguish fire.
-- BEAR: If a bear blocks a required path, place an "item-knife" somewhere reachable. The player uses the knife to defeat the bear.
-- TREES: If a tree blocks a required path, place an "item-axe" somewhere reachable.
-- BOULDERS: If a boulder blocks a required path, place an "item-pickaxe" somewhere reachable.
-- THORNY BUSHES: If a thorny bush blocks a required path, place an "item-machete" somewhere reachable.
-
-RULES:
+${aiRules.length ? `THEME-SPECIFIC RULES — important mechanics for this theme:\n${aiRules.map(r => `- ${r}`).join('\n')}\n` : ''}RULES:
 1. Floor tile IDs go ONLY in "floor" fields. Object tile IDs go ONLY in "object" fields. Never mix.
 2. Place at least one "${startTile}" floor tile (player spawn).
 3. Place exactly one "${exitTile}" floor tile (level exit).

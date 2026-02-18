@@ -29,6 +29,7 @@ export function getTileCatalogForAI(theme) {
     startTile: theme.getStartTile?.() || 'campfire',
     exitTile: (theme.getExitTiles?.() || ['car'])[0],
     missionTypes: theme.getMissionTypes?.() || ['escape'],
+    aiRules: theme.getAIRules?.() || [],
   };
 }
 
@@ -37,7 +38,7 @@ export function getTileCatalogForAI(theme) {
  * Returns { name, grid, missions, lives, inventoryCapacity, repairs }.
  */
 export async function generateAIMap(story, themeId, theme, difficulty) {
-  const { tileCatalog, startTile, exitTile, missionTypes } = getTileCatalogForAI(theme);
+  const { tileCatalog, startTile, exitTile, missionTypes, aiRules } = getTileCatalogForAI(theme);
 
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -49,6 +50,7 @@ export async function generateAIMap(story, themeId, theme, difficulty) {
       startTile,
       exitTile,
       missionTypes,
+      aiRules,
       difficulty,
     }),
   });
