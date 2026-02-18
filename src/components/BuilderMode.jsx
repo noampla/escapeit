@@ -526,11 +526,22 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     setSaved(false);
   };
 
-  const handleGridRightClick = (x, y) => {
+  const handleGridRightClick = (x, y, e) => {
     if (subMode === 'edit') return;
     pushUndo(grid);
     const TILE_TYPES = theme?.getTileTypes() || {};
     const cell = grid[y][x];
+
+    // Ctrl+right-click: remove buried object only (leave surface object intact)
+    if (e?.ctrlKey && cell.floor?.config?.hiddenObject) {
+      const newGrid = cloneGrid(grid);
+      newGrid[y][x].floor.config.hiddenObject = null;
+      setGrid(newGrid);
+      setSelectedCell(null);
+      setSaved(false);
+      lastDragPos.current = `${x},${y}`;
+      return;
+    }
 
     // Priority: remove object first, then buried object, then floor
     if (cell.object) {
