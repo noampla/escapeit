@@ -28,6 +28,16 @@
       "danger": { "bg": "rgba(120, 30, 30, 0.95)", "text": "#ffd0d0", "border": "#993333" }
     }
   },
+  "aiRules": [
+    "CAMERAS: Security cameras detect the player in their vision cone (costs a life). Place cameras on walls or map edges. Configure direction with objectConfig: { direction: 'up'|'down'|'left'|'right' }. To counter cameras, place an 'item-uniform' — wearing the guard uniform makes the player invisible to cameras.",
+    "LASERS: Laser tripwires fire a beam that blocks movement. Place on walls/floor boundaries. Configure direction with objectConfig. To bypass lasers, place an 'item-mirror' — the player places it to block the beam.",
+    "GUARDS: Walking guards patrol back and forth and detect the player. Configure with objectConfig: { direction: 'left'|'right'|'up'|'down', visionRange: 4 }. To defeat a guard, place 'item-poison' — the player uses it from behind the guard to knock them out and obtain a 'guard-card'.",
+    "VAULT DOORS: 'vault-door' blocks movement. To open, place an 'item-drill' somewhere reachable (player holds E to drill). Alternative: place 'item-bomb' + 'item-detonator' (player places bomb near vault, detonates from safe distance).",
+    "GUARD DOORS: 'door-guard' requires a guard-card to open. The player gets guard-cards by poisoning guards. Always ensure at least one guard + poison are reachable before a guard door.",
+    "DOORS: Every 'door-key' or 'door-card' must have a matching 'item-key' or 'item-card' with the same lockColor config. Place walkable tiles on both sides of a door.",
+    "MONEY + BAGS: To create a collect-amount mission, place 'item-money' tiles with objectConfig: { amount: 50000 } and an 'item-bag' the player picks up first. The bag auto-equips and collects money when the player holds E on money tiles.",
+    "STEALTH LAYOUT: Design realistic bank layouts with lobbies, offices, security rooms, vault areas. Use cameras and guards to create stealth puzzle paths. Give the player multiple approach options."
+  ],
   "missions": {
     "types": ["collect", "collect-amount", "reach", "escape"],
     "config": {

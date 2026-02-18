@@ -28,6 +28,17 @@
       "danger": { "bg": "rgba(180, 30, 60, 0.95)", "text": "#ffd0d0", "border": "#b41e3c" }
     }
   },
+  "aiRules": [
+    "TOXIC SPILLS: 'toxic_spill' floor tiles damage the player over time (1 life per 3 seconds). The hazmat suit provides immunity. If the player must cross toxic areas, place an 'item-hazmat' somewhere reachable before the spill.",
+    "RADIATION: 'radiation' floor tiles damage the player over time (1 life per 3 seconds). The hazmat suit provides immunity. Same as toxic spills — place 'item-hazmat' if player must cross.",
+    "BROKEN GLASS: 'broken-glass' floor tiles damage the player over time (1 life per 4 seconds). The hazmat suit provides immunity.",
+    "LASER GRIDS: 'laser_grid' tiles completely block movement — the player cannot walk through them at all. To disable ALL laser grids on the map, the player must use a terminal. Place a 'terminal' object tile, plus 'item-tablet' and 'item-battery' somewhere reachable. Using the terminal with both items disables every laser grid on the map.",
+    "CHEMICAL DOORS: 'door-chemical' requires a matching colored 'item-chemical' vial to open. Configure lockColor on both door and item. Colors: red, blue, green, yellow, purple.",
+    "SECURITY DOORS: 'door-card' requires a matching colored 'item-card' keycard to open. Configure lockColor on both door and card. Colors: red, blue, green, yellow, purple.",
+    "HAZMAT SUIT: 'item-hazmat' can be worn (E key) to protect against toxic_spill, radiation, and broken-glass. Place it before any required hazardous areas.",
+    "MEDKIT: 'item-medkit' restores 1 life when used. Place these as safety nets in dangerous areas.",
+    "LAB LAYOUT: Design realistic laboratory layouts with corridors, experiment rooms, containment areas, server rooms. Use hazards to create puzzle paths where the player must find the right equipment before proceeding."
+  ],
   "missions": {
     "types": ["collect", "rescue", "reach", "escape"],
     "targetOptions": {

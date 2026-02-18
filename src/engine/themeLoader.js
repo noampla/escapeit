@@ -301,6 +301,11 @@ export class ThemeLoader {
 
   // === NEW: Mission Methods ===
 
+  // Get AI generation rules specific to this theme
+  getAIRules() {
+    return this.theme?.aiRules || [];
+  }
+
   // Get mission types available for this theme
   getMissionTypes() {
     return this.theme?.missions?.types || null;
