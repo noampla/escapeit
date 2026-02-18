@@ -1,15 +1,100 @@
+import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import Anthropic from '@anthropic-ai/sdk';
+import 'dotenv/config';
 
 const PORT = process.env.PORT || 8080;
-const wss = new WebSocketServer({ port: PORT });
+
+// ─── Anthropic client ────────────────────────────────────────────
+const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
+
+// ─── HTTP server (handles REST + upgrades to WS) ────────────────
+const httpServer = createServer(async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // ── POST /api/generate-map ──
+  if (req.method === 'POST' && req.url === '/api/generate-map') {
+    try {
+      const body = await readBody(req);
+      const { story, themeId, tileCatalog, startTile, exitTile, missionTypes, difficulty } = body;
+
+      if (!story || !tileCatalog?.length) {
+        respond(res, 400, { error: 'Missing story or tileCatalog' });
+        return;
+      }
+
+      log(`AI-GEN  theme=${themeId} difficulty=${difficulty} storyLen=${story.length}`);
+
+      const systemPrompt = buildSystemPrompt(tileCatalog, startTile, exitTile, missionTypes || ['escape']);
+      const userPrompt = buildUserPrompt(story, themeId, difficulty);
+
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 16000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const text = response.content[0].text;
+
+      // Parse JSON — strip markdown fences if Claude adds them
+      const jsonStr = text.replace(/^```json?\n?/m, '').replace(/\n?```$/m, '').trim();
+      let sparseData;
+      try {
+        sparseData = JSON.parse(jsonStr);
+      } catch {
+        log('AI-GEN  ERROR: invalid JSON from Claude');
+        respond(res, 422, { error: 'AI returned invalid JSON — try again', raw: text.slice(0, 300) });
+        return;
+      }
+
+      // Expand sparse format → full 100x100 grid
+      const grid = expandSparseMap(sparseData);
+
+      // Validate + auto-repair
+      const { repairs } = validateAndRepair(grid, tileCatalog, startTile, exitTile);
+      if (repairs.length) log(`AI-GEN  repairs: ${repairs.join(', ')}`);
+
+      respond(res, 200, {
+        name: sparseData.name || 'AI Generated Map',
+        grid,
+        missions: sparseData.missions || [{ type: 'escape', description: 'Escape!' }],
+        lives: sparseData.lives || 3,
+        inventoryCapacity: sparseData.inventoryCapacity || 8,
+        repairs,
+      });
+
+      log('AI-GEN  OK');
+    } catch (err) {
+      log(`AI-GEN  ERROR: ${err.message}`);
+      respond(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // Health check
+  if (req.method === 'GET' && (req.url === '/' || req.url === '/health')) {
+    respond(res, 200, { status: 'ok' });
+    return;
+  }
+
+  respond(res, 404, { error: 'Not found' });
+});
+
+// ─── WebSocket relay (attached to the same HTTP server) ──────────
+const wss = new WebSocketServer({ server: httpServer });
 
 // rooms: Map<roomId, Map<playerId, WebSocket>>
 const rooms = new Map();
-
-function log(...args) {
-  const time = new Date().toISOString().slice(11, 23); // HH:MM:SS.mmm
-  console.log(`[${time}]`, ...args);
-}
 
 function relay(roomId, senderId, message) {
   const room = rooms.get(roomId);
@@ -28,7 +113,7 @@ function relay(roomId, senderId, message) {
 wss.on('connection', (ws) => {
   let currentRoom = null;
   let currentPlayerId = null;
-  log('New connection');
+  log('WS  New connection');
 
   ws.on('message', (data) => {
     let msg;
@@ -42,22 +127,20 @@ wss.on('connection', (ws) => {
       rooms.get(currentRoom).set(currentPlayerId, ws);
 
       const room = rooms.get(currentRoom);
-      log(`JOIN  room=${currentRoom} player=${currentPlayerId} roomSize=${room.size}`);
+      log(`WS  JOIN  room=${currentRoom} player=${currentPlayerId} roomSize=${room.size}`);
 
-      // Tell the joining player the current room state
       ws.send(JSON.stringify({
         type: 'room_state',
         playerCount: room.size,
         players: [...room.keys()],
       }));
 
-      // Tell everyone else a new player joined
       const relayed = relay(currentRoom, currentPlayerId, {
         type: 'player_joined',
         playerId: currentPlayerId,
         playerCount: room.size,
       });
-      log(`  → notified ${relayed} peer(s)`);
+      log(`WS  → notified ${relayed} peer(s)`);
       return;
     }
 
@@ -69,23 +152,22 @@ wss.on('connection', (ws) => {
     // Everything else: relay verbatim with fromPlayerId injected
     if (currentRoom && currentPlayerId) {
       relay(currentRoom, currentPlayerId, { ...msg, fromPlayerId: currentPlayerId });
-      // Only log non-move messages to avoid noise
       if (msg.type !== 'player_move') {
-        log(`RELAY room=${currentRoom} type=${msg.type} from=${currentPlayerId}`);
+        log(`WS  RELAY room=${currentRoom} type=${msg.type} from=${currentPlayerId}`);
       }
     }
   });
 
   ws.on('close', () => {
     if (!currentRoom || !currentPlayerId) {
-      log('Connection closed (never joined a room)');
+      log('WS  Connection closed (never joined a room)');
       return;
     }
     const room = rooms.get(currentRoom);
     if (!room) return;
 
     room.delete(currentPlayerId);
-    log(`LEAVE room=${currentRoom} player=${currentPlayerId} roomSize=${room.size}`);
+    log(`WS  LEAVE room=${currentRoom} player=${currentPlayerId} roomSize=${room.size}`);
 
     relay(currentRoom, currentPlayerId, {
       type: 'player_left',
@@ -95,14 +177,233 @@ wss.on('connection', (ws) => {
 
     if (room.size === 0) {
       rooms.delete(currentRoom);
-      log(`  room ${currentRoom} deleted (empty)`);
+      log(`WS  room ${currentRoom} deleted (empty)`);
     }
   });
 
   ws.on('error', (err) => {
-    log(`ERROR player=${currentPlayerId || '?'} err=${err.message}`);
+    log(`WS  ERROR player=${currentPlayerId || '?'} err=${err.message}`);
     ws.close();
   });
 });
 
-log(`Relay server running on ws://localhost:${PORT}`);
+// ─── Start ───────────────────────────────────────────────────────
+httpServer.listen(PORT, () => {
+  log(`Server running on port ${PORT} (HTTP + WebSocket)`);
+});
+
+
+// ═════════════════════════════════════════════════════════════════
+// AI MAP GENERATION — prompt building, expansion, validation
+// ═════════════════════════════════════════════════════════════════
+
+function buildSystemPrompt(tileCatalog, startTile, exitTile, missionTypes) {
+  const floorTiles = tileCatalog.filter(t => t.layer === 'floor');
+  const objectTiles = tileCatalog.filter(t => t.layer === 'object');
+
+  const fmt = (t) => {
+    let line = `- ${t.id}: ${t.tooltip}`;
+    if (t.unique) line += ' (unique — max 1)';
+    return line;
+  };
+
+  return `You are a map generator for "Escape It", a puzzle escape-room game.
+
+RESPONSE FORMAT — return ONLY valid JSON, no markdown fences, no explanation:
+{
+  "name": "short level title",
+  "fills": [
+    { "r1": 0, "c1": 0, "r2": 99, "c2": 99, "floor": "empty" },
+    { "r1": 43, "c1": 42, "r2": 57, "c2": 68, "floor": "ground" }
+  ],
+  "cells": [
+    { "r": 49, "c": 49, "floor": "campfire" },
+    { "r": 49, "c": 50, "object": "bear" },
+    { "r": 49, "c": 51, "object": "item-knife" }
+  ],
+  "missions": [
+    { "type": "escape", "description": "Reach the car to escape!" }
+  ],
+  "lives": 3,
+  "inventoryCapacity": 8
+}
+
+HOW THE GRID WORKS:
+- The map is 100 rows x 100 columns (indices 0-99).
+- Each cell has two layers: "floor" (always present) and "object" (optional, sits on top of floor).
+- "fills" paint rectangular areas. Applied in order — later fills overwrite earlier ones.
+- "cells" set individual tiles after fills. A cell entry can set "floor", "object", or both.
+- Always start with a fill of "empty" for the entire grid, then add ground/water fills for the play area, then individual cells.
+
+FLOOR TILES (use in "floor" fields only):
+${floorTiles.map(fmt).join('\n')}
+
+OBJECT TILES (use in "object" fields only):
+${objectTiles.map(fmt).join('\n')}
+
+BURIED ITEMS:
+Ground and snow tiles can hide items underground. The player digs them up with a shovel.
+To bury an item, add "floorConfig" to a cell:
+  { "r": 50, "c": 50, "floor": "ground", "floorConfig": { "hiddenObject": { "type": "item-knife", "config": {} } } }
+The "type" must be a valid object tile ID (e.g. "item-knife", "item-key", "item-axe").
+Only "ground" and "snow" floors support buried items. Always pair buried items with an "item-shovel" on the map so the player can dig.
+
+TILE CONFIG:
+Some tiles accept extra config via "floorConfig" or "objectConfig" in a cell entry:
+- car (exit): { "needsKey": true } — player needs a key item to use the exit. Default is true.
+- sign: { "message": "your text here" } — displayed when the player reads the sign.
+- friend: { "name": "Alex" } — NPC name shown during rescue.
+- door-key / door-card: { "lockColor": "red" } — color must match the key/card color. Options: "red", "blue", "green", "yellow", "purple".
+- item-key / item-card: { "lockColor": "red" } — same colors as above, must match the door.
+
+STRUCTURE RULES — tiles that need specific neighbors to work:
+- CAVE: Every group of "cave" floor tiles MUST have at least one "cave-entry" floor tile directly adjacent (up/down/left/right). cave-entry is the only way in or out of cave tiles. Place cave-entry between ground and cave tiles as a doorway. Without cave-entry, the cave is completely inaccessible. Caves are DARK — the player cannot see or interact with anything inside without a torch. To get a torch: either place an "item-torch" directly, OR place a "thorny-bush" + "item-machete" (cutting the bush gives a stick) + a "fire" tile nearby (the player lights the stick at the fire to make a torch). Always ensure the player can obtain a torch BEFORE entering the cave.
+- WATER: If the player needs to cross water, place an "item-raft" somewhere reachable on ground. The player can only cross 1 water tile at a time with the raft, so for wider crossings place stepping-stone ground tiles so each water gap is only 1 tile wide.
+- SNOW: The player cannot walk on snow without a sweater. If using snow tiles, place an "item-sweater" on reachable ground.
+- DOORS: Every "door-key" or "door-card" must have a matching "item-key" or "item-card" with the same lockColor. Place walkable tiles on both sides of a door.
+- FIRE: If fire blocks a required path, place an "item-bucket" nearby. The player fills it at water, then uses it to extinguish fire.
+- BEAR: If a bear blocks a required path, place an "item-knife" somewhere reachable. The player uses the knife to defeat the bear.
+- TREES: If a tree blocks a required path, place an "item-axe" somewhere reachable.
+- BOULDERS: If a boulder blocks a required path, place an "item-pickaxe" somewhere reachable.
+- THORNY BUSHES: If a thorny bush blocks a required path, place an "item-machete" somewhere reachable.
+
+RULES:
+1. Floor tile IDs go ONLY in "floor" fields. Object tile IDs go ONLY in "object" fields. Never mix.
+2. Place at least one "${startTile}" floor tile (player spawn).
+3. Place exactly one "${exitTile}" floor tile (level exit).
+4. There must be a solvable walkable path from spawn to exit — no dead-end traps. The player must be able to reach every required item and the exit.
+5. Every collect-mission targetId must have a matching "item-{targetId}" object on the grid.
+6. Center the playable area around row 50, col 50. Keep it compact.
+7. Create rooms, corridors, and obstacles — not random scatter. Make it look intentional.
+8. Place items where they make narrative sense.
+9. Use fills for large areas (ground, water, snow). Use cells for individual placements.
+10. If burying items underground, always place an item-shovel somewhere accessible so the player can dig.
+11. Every obstacle on a required path must have its matching tool placed somewhere the player can reach BEFORE encountering the obstacle.
+
+MISSION FORMAT:
+{ "type": "${missionTypes.join('|')}", "description": "text", "targetId": "for collect only — item name without item- prefix" }`;
+}
+
+function buildUserPrompt(story, themeId, difficulty) {
+  return `Create a map for the "${themeId}" theme.
+
+Story: "${story}"
+
+${difficulty ? `Difficulty: ${difficulty}` : ''}`;
+}
+
+/** Expand sparse fills+cells into a full 100x100 grid. */
+function expandSparseMap(sparseData) {
+  const ROWS = 100, COLS = 100;
+  const empty = () => ({ floor: { type: 'empty', config: {} }, object: null });
+
+  const grid = Array.from({ length: ROWS }, () =>
+    Array.from({ length: COLS }, empty)
+  );
+
+  // Apply fills in order
+  for (const fill of (sparseData.fills || [])) {
+    const r1 = clamp(fill.r1, 0, 99), r2 = clamp(fill.r2, 0, 99);
+    const c1 = clamp(fill.c1, 0, 99), c2 = clamp(fill.c2, 0, 99);
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        if (fill.floor) grid[r][c].floor = { type: fill.floor, config: {} };
+        if (fill.object) grid[r][c].object = { type: fill.object, config: {} };
+      }
+    }
+  }
+
+  // Apply individual cells (with optional floorConfig / objectConfig)
+  for (const cell of (sparseData.cells || [])) {
+    const r = clamp(cell.r, 0, 99), c = clamp(cell.c, 0, 99);
+    if (cell.floor) {
+      grid[r][c].floor = { type: cell.floor, config: cell.floorConfig || {} };
+    }
+    if (cell.object !== undefined) {
+      grid[r][c].object = cell.object
+        ? { type: cell.object, config: cell.objectConfig || {} }
+        : null;
+    }
+  }
+
+  return grid;
+}
+
+/** Validate the grid and auto-repair common issues. */
+function validateAndRepair(grid, tileCatalog, startTile, exitTile) {
+  const tileMap = Object.fromEntries(tileCatalog.map(t => [t.id, t]));
+  const repairs = [];
+  let hasStart = false, exitCount = 0;
+
+  for (let r = 0; r < 100; r++) {
+    for (let c = 0; c < 100; c++) {
+      const cell = grid[r][c];
+
+      // Unknown floor → empty
+      if (cell.floor?.type && cell.floor.type !== 'empty' && !tileMap[cell.floor.type]) {
+        repairs.push(`Unknown floor "${cell.floor.type}" at (${r},${c}) → empty`);
+        cell.floor = { type: 'empty', config: {} };
+      }
+
+      // Object tile used as floor → move to object layer
+      if (cell.floor?.type && tileMap[cell.floor.type]?.layer === 'object') {
+        repairs.push(`Moved "${cell.floor.type}" from floor to object at (${r},${c})`);
+        cell.object = { type: cell.floor.type, config: {} };
+        cell.floor = { type: 'ground', config: {} };
+      }
+
+      // Floor tile used as object → move to floor layer
+      if (cell.object?.type && tileMap[cell.object.type]?.layer === 'floor') {
+        repairs.push(`Moved "${cell.object.type}" from object to floor at (${r},${c})`);
+        cell.floor = { type: cell.object.type, config: {} };
+        cell.object = null;
+      }
+
+      // Unknown object → remove
+      if (cell.object?.type && !tileMap[cell.object.type]) {
+        repairs.push(`Unknown object "${cell.object.type}" at (${r},${c}) → removed`);
+        cell.object = null;
+      }
+
+      if (cell.floor?.type === startTile) hasStart = true;
+      if (cell.floor?.type === exitTile) exitCount++;
+    }
+  }
+
+  if (!hasStart) {
+    grid[50][50].floor = { type: startTile, config: {} };
+    repairs.push(`Added missing ${startTile} at (50,50)`);
+  }
+  if (exitCount === 0) {
+    grid[50][70].floor = { type: exitTile, config: exitTile === 'car' ? { needsKey: false } : {} };
+    repairs.push(`Added missing ${exitTile} at (50,70)`);
+  }
+
+  return { repairs };
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function log(...args) {
+  const time = new Date().toISOString().slice(11, 23);
+  console.log(`[${time}]`, ...args);
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+      catch (e) { reject(new Error('Invalid JSON body')); }
+    });
+    req.on('error', reject);
+  });
+}
+
+function respond(res, status, data) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}

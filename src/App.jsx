@@ -6,6 +6,7 @@ import MainMenu from './components/MainMenu';
 import ThemeSelect from './components/ThemeSelect';
 import MultiplayerLobby from './components/MultiplayerLobby';
 import MapPage from './components/MapPage';
+import UploadForestMap from './components/UploadForestMap';
 import ThemeLoader, { preloadAllThemeTranslations } from './engine/themeLoader';
 import { migrateLevels, loadLevelById } from './utils/storage';
 import { findAllTiles } from './engine/tiles';
@@ -246,6 +247,11 @@ function AppContent() {
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
       </>
     );
+  }
+
+  // Upload map page
+  if (mode === 'uploadMap') {
+    return <UploadForestMap />;
   }
 
   // Theme selection for building
