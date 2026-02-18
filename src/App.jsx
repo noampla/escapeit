@@ -198,8 +198,8 @@ function AppContent() {
       return null;
     }
 
-    // Auto-launch when enough peers have joined (ws runs at App level)
-    if (wsEnabled && wsPeers.length >= 1 && lobbyAssignedIndex !== null && !lobbyLaunchedRef[0]) {
+    // Auto-launch when all required players have joined (ws runs at App level)
+    if (wsEnabled && wsPeers.length >= startTileCount - 1 && lobbyAssignedIndex !== null && !lobbyLaunchedRef[0]) {
       lobbyLaunchedRef[0] = true;
       setMultiplayerConfig({
         roomId: wsRoomId,
@@ -217,11 +217,6 @@ function AppContent() {
             startTileCount={startTileCount}
             connected={wsConnected}
             peers={wsPeers}
-            onSolo={() => {
-              setWsEnabled(false);
-              setMultiplayerConfig(null);
-              setMode('solve');
-            }}
             onStartOnline={() => {
               // Build a stable playerId from userId
               const pid = userId || ('player_' + Math.random().toString(36).slice(2, 9));
@@ -231,6 +226,12 @@ function AppContent() {
               setLobbyAssignedIndex(null);
               lobbyLaunchedRef[0] = false;
               setWsEnabled(true);
+            }}
+            onBackToSelect={() => {
+              setMode('selectLevel');
+              setSelectedLevel(null);
+              setSelectedTheme(null);
+              setTheme(null);
             }}
             onBack={() => {
               setWsEnabled(false);
