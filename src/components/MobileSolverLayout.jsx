@@ -99,6 +99,31 @@ export default function MobileSolverLayout({
 }) {
   const gridContainerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [visibleArea, setVisibleArea] = useState(() => ({
+    top: window.visualViewport?.offsetTop || 0,
+    height: window.visualViewport?.height || window.innerHeight,
+  }));
+
+  // Track actual visible viewport (excludes browser chrome at top and bottom)
+  useEffect(() => {
+    const update = () => {
+      const vv = window.visualViewport;
+      setVisibleArea({
+        top: vv?.offsetTop || 0,
+        height: vv?.height || window.innerHeight,
+      });
+    };
+    update();
+    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
   const [controlMode, setControlMode] = useState(() => {
     try { return localStorage.getItem(CONTROL_MODE_KEY) || 'joystick'; }
     catch { return 'joystick'; }
@@ -178,9 +203,11 @@ export default function MobileSolverLayout({
 
   return (
     <div className="mobile-game-container" style={{
-      position: 'relative',
+      position: 'fixed',
+      top: visibleArea.top,
+      left: 0,
       width: '100vw',
-      height: '100vh',
+      height: visibleArea.height,
       overflow: 'hidden',
       background: '#000',
     }}>
@@ -264,77 +291,90 @@ export default function MobileSolverLayout({
 
       {/* Inline interaction menu (touch-friendly) */}
       {inlineMenu && !gameOver && (
-        <div style={{
-          position: 'absolute',
-          bottom: 220,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 500,
-          pointerEvents: 'auto',
-          background: 'linear-gradient(145deg, rgba(30, 45, 30, 0.96), rgba(20, 35, 20, 0.96))',
-          borderRadius: 14,
-          padding: '12px',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(68, 170, 68, 0.6)',
-          backdropFilter: 'blur(12px)',
-          minWidth: 200,
-          maxWidth: 'calc(100vw - 32px)',
-        }}>
-          <div style={{
-            fontSize: 10,
-            color: '#88ff88',
-            marginBottom: 8,
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            letterSpacing: 1,
-            textAlign: 'center',
-          }}>
-            Choose Action
-          </div>
-          {inlineMenu.actions.map((action, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setInlineMenu(null);
-                action.action();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '12px 14px',
-                background: 'rgba(40, 55, 40, 0.6)',
-                borderRadius: 8,
-                marginBottom: idx < inlineMenu.actions.length - 1 ? 6 : 0,
-                border: '1px solid rgba(68, 170, 68, 0.3)',
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-                width: '100%',
-                textAlign: 'left',
-                minHeight: 48,
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
-          <button
-            onClick={() => setInlineMenu(null)}
+        <div
+          onClick={() => setInlineMenu(null)}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 550,
+            background: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'auto',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
             style={{
-              marginTop: 6,
-              width: '100%',
-              padding: '10px',
-              background: 'rgba(60, 40, 40, 0.5)',
-              border: '1px solid rgba(200, 100, 100, 0.3)',
-              borderRadius: 8,
-              color: '#ffaaaa',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
+              background: 'linear-gradient(145deg, rgba(30, 45, 30, 0.96), rgba(20, 35, 20, 0.96))',
+              borderRadius: 16,
+              padding: '16px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(68, 170, 68, 0.6)',
+              width: 'calc(100vw - 48px)',
+              maxWidth: 320,
+              maxHeight: '60vh',
+              overflowY: 'auto',
             }}
           >
-            Cancel
-          </button>
+            <div style={{
+              fontSize: 10,
+              color: '#88ff88',
+              marginBottom: 10,
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              textAlign: 'center',
+            }}>
+              Choose Action
+            </div>
+            {inlineMenu.actions.map((action, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setInlineMenu(null);
+                  action.action();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '14px 14px',
+                  background: 'rgba(40, 55, 40, 0.6)',
+                  borderRadius: 10,
+                  marginBottom: idx < inlineMenu.actions.length - 1 ? 6 : 0,
+                  border: '1px solid rgba(68, 170, 68, 0.3)',
+                  color: '#fff',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  width: '100%',
+                  textAlign: 'left',
+                  minHeight: 52,
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setInlineMenu(null)}
+              style={{
+                marginTop: 8,
+                width: '100%',
+                padding: '12px',
+                background: 'rgba(60, 40, 40, 0.5)',
+                border: '1px solid rgba(200, 100, 100, 0.3)',
+                borderRadius: 10,
+                color: '#ffaaaa',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
