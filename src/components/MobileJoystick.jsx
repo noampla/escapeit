@@ -265,16 +265,14 @@ export default function MobileJoystick({
   return (
     <div style={{
       position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 240,
+      bottom: 'calc(44px + env(safe-area-inset-bottom, 0px))',
+      left: 'calc(20px + env(safe-area-inset-left, 0px))',
+      right: 'calc(20px + env(safe-area-inset-right, 0px))',
       pointerEvents: 'none',
       zIndex: 500,
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
-      padding: '0 calc(24px + env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) calc(24px + env(safe-area-inset-right, 0px))',
     }}>
       {/* Movement control + mode toggle */}
       <div style={{
@@ -283,6 +281,25 @@ export default function MobileJoystick({
         alignItems: 'center',
         gap: 0,
       }}>
+        {/* Mode toggle - above movement control */}
+        <button
+          onClick={onToggleMode}
+          style={{
+            pointerEvents: 'auto',
+            marginBottom: 8,
+            background: 'rgba(0, 0, 0, 0.45)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: 6,
+            padding: '3px 10px',
+            color: 'rgba(255, 255, 255, 0.5)',
+            fontSize: 10,
+            cursor: 'pointer',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
+        >
+          {mode === 'joystick' ? '✛ D-pad' : '🕹️ Stick'}
+        </button>
         {mode === 'joystick' ? (
           /* Analog joystick */
           <div
@@ -368,25 +385,6 @@ export default function MobileJoystick({
           </div>
         )}
 
-        {/* Mode toggle - below movement control with spacing */}
-        <button
-          onClick={onToggleMode}
-          style={{
-            pointerEvents: 'auto',
-            marginTop: 14,
-            background: 'rgba(0, 0, 0, 0.45)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: 6,
-            padding: '3px 10px',
-            color: 'rgba(255, 255, 255, 0.5)',
-            fontSize: 10,
-            cursor: 'pointer',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-          }}
-        >
-          {mode === 'joystick' ? '✛ D-pad' : '🕹️ Stick'}
-        </button>
       </div>
 
       {/* Action buttons */}
