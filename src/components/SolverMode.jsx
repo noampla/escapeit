@@ -18,6 +18,8 @@ import { checkActivations } from '../engine/activationSystem.js';
 import NotificationPanel from './NotificationPanel';
 import StoryModal from './StoryModal';
 import InventoryPreview from './InventoryPreview';
+import useMobile from '../hooks/useMobile';
+import MobileSolverLayout from './MobileSolverLayout';
 
 const MOVE_COOLDOWN = 150;
 const INTERACTION_DURATION = 1500;
@@ -137,6 +139,7 @@ function initializeRevealedTiles(startX, startY, grid, darkZoneTiles, isInDarkZo
 
 export default function SolverMode({ level, onBack, isTestMode = false, multiplayerConfig = null, wsSend = null, wsConnected = false, wsPeers = [], wsRegisterHandler = null }) {
   const isMultiplayer = !!multiplayerConfig;
+  const isMobile = useMobile();
   const theme = useContext(ThemeContext);
   const themeId = theme?.themeId || 'forest';
   const { t, isRTL, language, setLanguage, getItemLabel, getTileLabel, getMessage } = useLanguage();
@@ -2159,6 +2162,67 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
     const tilesY = Math.max(8, Math.floor(containerSize.height / TILE_SIZE));
     return calculatePlayerViewport(playerPos, grid, tilesX, tilesY);
   }, [playerPos, grid, containerSize]);
+
+  // Mobile layout - full-screen map with floating joystick
+  if (isMobile) {
+    return (
+      <MobileSolverLayout
+        grid={grid}
+        playerPos={playerPos}
+        playerDirection={playerDirection}
+        tick={tick}
+        hazardZones={hazardZones}
+        revealedTiles={revealedTiles}
+        theme={theme}
+        gameState={gameState}
+        caveBordersRevealed={caveBordersRevealed}
+        peerPositions={isMultiplayer ? Object.values(peerStates) : []}
+        interactionState={interactionState}
+        mouseHoldState={mouseHoldState}
+        handleMouseInteraction={handleMouseInteraction}
+        cancelInteraction={cancelInteraction}
+        lives={lives}
+        maxLives={level.lives || 3}
+        elapsedTime={elapsedTime}
+        moveCount={moveCount}
+        gameOver={gameOver}
+        isMultiplayer={isMultiplayer}
+        keysDown={keysDown}
+        keyPressOrder={keyPressOrder}
+        doPickup={doPickup}
+        doInteract={doInteract}
+        doToggleWear={doToggleWear}
+        dropItem={dropItem}
+        restart={restart}
+        onBack={onBack}
+        interactionKeyReleasedRef={interactionKeyReleasedRef}
+        dropMenuOpen={dropMenuOpen}
+        setDropMenuOpen={setDropMenuOpen}
+        inlineMenu={inlineMenu}
+        setInlineMenu={setInlineMenu}
+        showRestartConfirm={showRestartConfirm}
+        setShowRestartConfirm={setShowRestartConfirm}
+        showExitConfirm={showExitConfirm}
+        setShowExitConfirm={setShowExitConfirm}
+        messageModal={messageModal}
+        setMessageModal={setMessageModal}
+        showStoryModal={showStoryModal}
+        setShowStoryModal={setShowStoryModal}
+        storyContent={storyContent}
+        hasStory={hasStory}
+        isRTL={isRTL}
+        isTestMode={isTestMode}
+        soundEnabled={soundEnabled}
+        toggleSound={toggleSound}
+        themeId={themeId}
+        t={t}
+        getItemLabel={getItemLabel}
+        getMissionDescription={getMissionDescription}
+        effectiveMissions={effectiveMissions}
+        level={level}
+      />
+    );
+  }
 
   return (
     <div style={{

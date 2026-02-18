@@ -60,3 +60,15 @@ input::placeholder {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 150, 200, 0.6);
 }
+
+/* Mobile: prevent pinch-zoom and pull-to-refresh on game canvas */
+canvas {
+  touch-action: none;
+}
+
+.mobile-game-container {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
