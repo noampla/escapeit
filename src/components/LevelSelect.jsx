@@ -4,7 +4,6 @@ import { getThemeById } from '../utils/themeRegistry';
 import { useUser } from '../contexts/UserContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getTopScoresByTime, getTopScoresBySteps, formatTime } from '../utils/leaderboardService.js';
-import Leaderboard from './Leaderboard.jsx';
 
 // Mini leaderboard preview showing top 3 for time and steps
 function LeaderboardPreview({ mapId }) {
@@ -70,56 +69,6 @@ function LeaderboardPreview({ mapId }) {
   );
 }
 
-// Modal for full leaderboard
-function LeaderboardModal({ mapId, levelName, onClose }) {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 2000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: '#1a1a1a',
-          borderRadius: 12,
-          padding: 24,
-          maxWidth: 400,
-          width: '90%',
-          maxHeight: '80vh',
-          overflow: 'auto',
-          border: '1px solid #444',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ color: '#fff', margin: 0, fontSize: 18 }}>{levelName}</h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#888',
-              fontSize: 20,
-              cursor: 'pointer',
-              padding: 4,
-            }}
-          >
-            ✕
-          </button>
-        </div>
-        <Leaderboard mapId={mapId} compact={false} />
-      </div>
-    </div>
-  );
-}
-
 // Sort options
 const SORT_OPTIONS = [
   { id: 'random', labelKey: 'levelSelect.sortRandom', icon: '🎲' },
@@ -138,12 +87,11 @@ function shuffleArray(array) {
   return shuffled;
 }
 
-export default function LevelSelect({ onSelect, onEdit, onBack }) {
+export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage }) {
   const { t, isRTL, getLocalizedThemeName } = useLanguage();
   const [levels, setLevels] = useState([]);
   const [bestTimes, setBestTimes] = useState({}); // mapId -> best time in seconds
   const { userId } = useUser();
-  const [modalLevel, setModalLevel] = useState(null);
   const [sortBy, setSortBy] = useState('random');
   const [hoveredCard, setHoveredCard] = useState(null);
 
@@ -463,7 +411,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                       </button>
 
                       <button
-                        onClick={() => setModalLevel(level)}
+                        onClick={() => onViewMapPage(level)}
                         style={{
                           ...btnStyle,
                           padding: '12px 14px',
@@ -476,7 +424,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
                         onMouseLeave={(e) => {
                           e.target.style.background = 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)';
                         }}
-                        title={t('levelSelect.viewLeaderboard')}
+                        title={t('levelSelect.viewMapPage')}
                       >
                         🏆
                       </button>
@@ -530,14 +478,6 @@ export default function LevelSelect({ onSelect, onEdit, onBack }) {
           </div>
         )}
 
-        {/* Leaderboard modal */}
-        {modalLevel && (
-          <LeaderboardModal
-            mapId={modalLevel.id}
-            levelName={modalLevel.name}
-            onClose={() => setModalLevel(null)}
-          />
-        )}
       </div>
     </div>
   );
