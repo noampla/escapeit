@@ -552,10 +552,12 @@ export const INTERACTIONS = {
       selfOnly: true  // Only check tile player is standing on
     },
     checkCustom: (gameState, tile, grid, x, y) => {
-      // Can only dig undug ground or snow tiles
+      // Can only dig ground, snow, or cave tiles
       const cell = grid[y][x];
       const floorType = cell.floor?.type;
-      return (floorType === 'ground' || floorType === 'snow') && !cell.floor?.config?.dug;
+      if (!['ground', 'snow', 'cave'].includes(floorType)) return false;
+      // Can't dig an already-dug tile
+      return !cell.floor?.config?.dug;
     },
     execute: (gameState, grid, x, y) => {
       const cell = grid[y][x];
@@ -563,14 +565,14 @@ export const INTERACTIONS = {
       // Initialize config if needed
       if (!cell.floor.config) cell.floor.config = {};
 
-      // Always mark as dug (changes visual to dug ground)
+      // Mark as dug (changes visual to dug ground)
       cell.floor.config.dug = true;
 
-      // Check for buried object
-      if (cell.floor.config.hiddenObject) {
+      // Reveal buried item only if the object layer is free
+      if (cell.floor.config.hiddenObject && !cell.object) {
         const hidden = cell.floor.config.hiddenObject;
         cell.floor.config.hiddenObject = null;
-        cell.object = hidden;  // Move to object layer (revealed!)
+        cell.object = hidden;
 
         return {
           success: true,
@@ -579,7 +581,7 @@ export const INTERACTIONS = {
         };
       }
 
-      // Nothing found - still shows dug ground visual
+      // Nothing found (or surface item blocking reveal)
       return {
         success: true,
         messageKey: 'nothingBuried',

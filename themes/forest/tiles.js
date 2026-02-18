@@ -1096,6 +1096,43 @@ function drawDugSnow(ctx, cx, cy, size) {
   ctx.fill();
 }
 
+// Draw dug cave floor (disturbed rock after digging in a cave)
+function drawDugCave(ctx, cx, cy, size) {
+  // Base cave color, slightly lighter (disturbed rock)
+  ctx.fillStyle = '#252535';
+  ctx.fillRect(cx - size/2, cy - size/2, size, size);
+
+  // Rock mounds around the hole (broken rocky debris)
+  ctx.fillStyle = '#3a3a4a';
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.25, cy - size * 0.25, size * 0.18, size * 0.12, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.22, cy - size * 0.18, size * 0.15, size * 0.1, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx + size * 0.18, cy + size * 0.22, size * 0.16, size * 0.11, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx - size * 0.2, cy + size * 0.2, size * 0.14, size * 0.1, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Darker depression in center (the hole into rock)
+  ctx.fillStyle = '#12121e';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.22, size * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Even darker center
+  ctx.fillStyle = '#07070f';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + size * 0.02, size * 0.12, size * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // Draw a wooden sign
 function drawSign(ctx, cx, cy, size) {
   const woodColor = '#8b7355';
@@ -1610,6 +1647,12 @@ export function renderTile(ctx, tile, cx, cy, size) {
     return true;
   }
 
+  // Dug cave floor gets custom rendering
+  if (tile.type === 'cave' && tile.config?.dug) {
+    drawDugCave(ctx, cx, cy, size);
+    return true;
+  }
+
   // Removed/defeated object states get custom rendering
   if (tile.type === 'tree-stump') {
     drawTreeStump(ctx, cx, cy, size);
@@ -1701,7 +1744,7 @@ export function getTileEmoji(tileType) {
 // Tiles that items can be dropped on (raft excluded - can't drop items while on water)
 // Snow excluded - it's a floor but you can't drop items on it (too cold!)
 // Cave tiles included - can place items in caves (they'll be hidden in darkness)
-export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start', 'cave', 'cave-entry'];
+export const GROUND_TILES = ['ground', 'campfire', 'floor', 'start', 'cave', 'cave-entry', 'snow'];
 
 // Tiles player can interact with (E key)
 export const INTERACTABLE_TILES = ['tree', 'boulder', 'thorny-bush', 'water', 'raft', 'fire', 'friend', 'bear', 'door-key', 'door-card', 'sign', 'item-drawing-board', 'ground'];
