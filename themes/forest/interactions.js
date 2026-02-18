@@ -557,7 +557,10 @@ export const INTERACTIONS = {
       const floorType = cell.floor?.type;
       if (!['ground', 'snow', 'cave'].includes(floorType)) return false;
       // Can't dig an already-dug tile
-      return !cell.floor?.config?.dug;
+      if (cell.floor?.config?.dug) return false;
+      // Can't dig if there's an object on the tile
+      if (cell.object) return false;
+      return true;
     },
     execute: (gameState, grid, x, y) => {
       const cell = grid[y][x];

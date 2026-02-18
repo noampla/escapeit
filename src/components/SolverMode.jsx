@@ -610,6 +610,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
   }, [level, startPos]);
 
   const dropItem = useCallback((index) => {
+    setHoveredInventoryItem(null);
     const inv = gameStateRef.current.inventory;
     if (index < 0 || index >= inv.length) return;
 
