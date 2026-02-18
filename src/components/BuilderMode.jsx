@@ -5,6 +5,7 @@ import PropertiesPanel from './PropertiesPanel';
 import SolverMode from './SolverMode';
 import TilePreview from './TilePreview';
 import RandomMapGeneratorPanel from './RandomMapGeneratorPanel';
+import AiMapPanel from './AiMapPanel';
 import { createEmptyGrid, placeTile, removeTile, cloneGrid, validateObjectPlacement } from '../engine/tiles';
 import { saveLevel, generateId, loadLevelsByCreator } from '../utils/storage';
 import { saveDraft, loadDraft, clearDraft, getDraftInfo, hasDraft } from '../utils/draftStorage';
@@ -149,6 +150,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const [enablePreview, setEnablePreview] = useState(true);
   const [showRandomGenerator, setShowRandomGenerator] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
   const [generateSeed, setGenerateSeed] = useState('');
 
   // Path editing state
@@ -1163,6 +1165,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         <button onClick={() => setEnablePreview(!enablePreview)} style={{ ...barBtn, background: enablePreview ? 'linear-gradient(145deg, #4a3a4a 0%, #3a2a3a 100%)' : 'linear-gradient(145deg, #3a3a3a 0%, #2a2a2a 100%)' }} title="Toggle tile preview on hover">
           {enablePreview ? '🔍 Preview' : '🔍 Off'}
         </button>
+        <button onClick={() => setShowAiPanel(true)} style={{ ...barBtn, background: 'linear-gradient(145deg, #5a3a6a 0%, #4a2a5a 100%)', boxShadow: '0 4px 12px rgba(100, 60, 180, 0.3), 0 0 0 1px rgba(140, 100, 255, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)' }}>AI Generate</button>
         <button onClick={() => setShowRandomGenerator(true)} style={{ ...barBtn, background: 'linear-gradient(145deg, #4a3a5a 0%, #3a2a4a 100%)' }}>🎲 {t('builder.randomGen') || 'Random'}</button>
         <button onClick={handleTest} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a4a3a 0%, #2a3a2a 100%)' }}>▶ {t('builder.test')}</button>
         <button onClick={() => setShowGenerateModal(true)} style={{ ...barBtn, background: 'linear-gradient(145deg, #3a3a5a 0%, #2a2a4a 100%)' }}>🎲 Generate</button>
@@ -1697,6 +1700,23 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
           tileType={previewTileType}
           theme={theme}
           lockColor={selectedLockColor}
+        />
+      )}
+
+      {/* AI Map Generator */}
+      {showAiPanel && (
+        <AiMapPanel
+          themeId={themeId}
+          theme={theme}
+          onMapGenerated={(newGrid, newMissions, newName) => {
+            pushUndo(grid);
+            setGrid(newGrid);
+            setMissions(newMissions);
+            if (newName) setLevelName(newName);
+            setSaved(false);
+            setShowAiPanel(false);
+          }}
+          onClose={() => setShowAiPanel(false)}
         />
       )}
 

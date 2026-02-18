@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from 'react';
  */
 
 const ROUTES = [
+  { pattern: /^\/upload-map\/?$/, mode: 'uploadMap' },
   { pattern: /^\/edit\/([^/]+)\/?$/, mode: 'build', paramName: 'editMapId' },
   { pattern: /^\/build\/([^/]+)\/?$/, mode: 'build', paramName: 'themeId' },
   { pattern: /^\/build\/?$/, mode: 'theme-select-build' },
