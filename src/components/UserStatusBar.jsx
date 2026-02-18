@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import useMobile from '../hooks/useMobile.js';
 
 const styles = {
   container: {
@@ -133,6 +134,7 @@ const styles = {
 export default function UserStatusBar() {
   const { user, loading, error, isAnonymous, displayName, claimName, getTransferCode, linkWithCode, clearError } = useUser();
   const { t, isRTL } = useLanguage();
+  const isMobile = useMobile();
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -192,30 +194,68 @@ export default function UserStatusBar() {
 
   const displayError = error || localError;
 
-  const containerStyle = {
+  const containerStyle = isMobile ? {
+    position: 'fixed',
+    bottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+    right: 'calc(20px + env(safe-area-inset-right, 0px))',
+    zIndex: 1000,
+    fontFamily: 'monospace',
+    fontSize: 11,
+  } : {
     ...styles.container,
     right: isRTL ? 'auto' : 8,
     left: isRTL ? 8 : 'auto'
   };
 
+  const badgeStyle = isMobile ? {
+    ...styles.badge,
+    padding: '4px 8px',
+    fontSize: 10,
+    gap: 4,
+  } : {
+    ...styles.badge,
+    ...(hover ? styles.badgeHover : {}),
+  };
+
+  const dropdownStyle = isMobile ? {
+    position: 'absolute',
+    bottom: '100%',
+    right: 0,
+    marginBottom: 4,
+    background: 'rgba(20, 20, 20, 0.95)',
+    border: '1px solid #444',
+    borderRadius: 8,
+    padding: 12,
+    minWidth: 220,
+    maxHeight: '50vh',
+    overflowY: 'auto',
+    boxShadow: '0 -4px 12px rgba(0,0,0,0.5)',
+    direction: isRTL ? 'rtl' : 'ltr',
+  } : {
+    ...styles.dropdown,
+    direction: isRTL ? 'rtl' : 'ltr',
+    right: isRTL ? 'auto' : 0,
+    left: isRTL ? 0 : 'auto',
+  };
+
   return (
     <div style={containerStyle}>
       <div
-        style={{ ...styles.badge, ...(hover ? styles.badgeHover : {}) }}
+        style={badgeStyle}
         onClick={() => setOpen(!open)}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
+        onMouseEnter={() => !isMobile && setHover(true)}
+        onMouseLeave={() => !isMobile && setHover(false)}
       >
-        <div style={styles.avatar}>
+        <div style={{ ...styles.avatar, ...(isMobile ? { width: 16, height: 16, fontSize: 8 } : {}) }}>
           {isAnonymous ? '?' : displayName?.charAt(0).toUpperCase()}
         </div>
-        <span style={{ ...styles.name, ...(isAnonymous ? styles.anonymous : {}) }}>
+        <span style={{ ...styles.name, ...(isAnonymous ? styles.anonymous : {}), ...(isMobile ? { maxWidth: 70, fontSize: 10 } : {}) }}>
           {isAnonymous ? t('userStatus.anonymous') : displayName}
         </span>
       </div>
 
       {open && (
-        <div style={{ ...styles.dropdown, direction: isRTL ? 'rtl' : 'ltr', right: isRTL ? 'auto' : 0, left: isRTL ? 0 : 'auto' }} onClick={e => e.stopPropagation()}>
+        <div style={dropdownStyle} onClick={e => e.stopPropagation()}>
           {isAnonymous ? (
             <>
               <div style={styles.section}>
