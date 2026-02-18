@@ -125,11 +125,17 @@ export default function MobileSolverLayout({
     return () => observer.disconnect();
   }, []);
 
-  // Calculate viewport for full screen
-  const viewportBounds = useMemo(() => {
-    const tilesX = Math.max(10, Math.ceil(containerSize.width / TILE_SIZE));
-    const tilesY = Math.max(8, Math.ceil(containerSize.height / TILE_SIZE));
-    return calculatePlayerViewport(playerPos, grid, tilesX, tilesY);
+  // Calculate viewport for full screen - use larger display size so tiles appear bigger
+  const MOBILE_TILE_DISPLAY = 52; // target CSS pixels per tile on mobile
+  const { viewportBounds, canvasScale } = useMemo(() => {
+    const tilesX = Math.max(6, Math.ceil(containerSize.width / MOBILE_TILE_DISPLAY));
+    const tilesY = Math.max(6, Math.ceil(containerSize.height / MOBILE_TILE_DISPLAY));
+    const bounds = calculatePlayerViewport(playerPos, grid, tilesX, tilesY);
+    const canvasW = (bounds.maxX - bounds.minX + 1) * TILE_SIZE;
+    const canvasH = (bounds.maxY - bounds.minY + 1) * TILE_SIZE;
+    // Scale to cover the entire screen
+    const scale = Math.max(containerSize.width / canvasW, containerSize.height / canvasH);
+    return { viewportBounds: bounds, canvasScale: scale };
   }, [playerPos, grid, containerSize]);
 
   // Mobile pickup-or-drop handler
@@ -182,10 +188,15 @@ export default function MobileSolverLayout({
       <div ref={gridContainerRef} style={{
         width: '100%',
         height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        overflow: 'hidden',
+        position: 'relative',
       }}>
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: `translate(-50%, -50%) scale(${canvasScale})`,
+        }}>
         <Grid
           grid={grid}
           playerPos={playerPos}
@@ -207,6 +218,7 @@ export default function MobileSolverLayout({
           caveBordersRevealed={caveBordersRevealed}
           peerPositions={peerPositions}
         />
+        </div>
       </div>
 
       {/* Mobile HUD overlay */}
