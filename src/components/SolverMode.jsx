@@ -14,7 +14,7 @@ import { submitScore } from '../utils/leaderboardService.js';
 import Leaderboard from './Leaderboard.jsx';
 import soundManager from '../engine/soundManager.js';
 import { moveEntities } from '../engine/entities.js';
-import { checkActivations } from '../engine/activationSystem.js';
+import { checkActivations, applyStartStates } from '../engine/activationSystem.js';
 import NotificationPanel from './NotificationPanel';
 import StoryModal from './StoryModal';
 import InventoryPreview from './InventoryPreview';
@@ -186,7 +186,24 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
     return [...levelMissions, defaultMission];
   }, [level.missions, theme]);
 
-  const [grid, setGrid] = useState(() => convertLegacyItems(level.grid));
+  // Compute initial grid + gameState together so applyStartStates can run on both
+  const _initRef = useRef(null);
+  if (!_initRef.current) {
+    const initGrid = convertLegacyItems(level.grid);
+    const initGS = {
+      collectedItems: [],
+      rescuedFriends: 0,
+      reachedLocations: [],
+      reachedExit: false,
+      inventory: [],
+      worn: {},
+      containers: {},
+    };
+    applyStartStates(initGrid, initGS);
+    _initRef.current = { grid: initGrid, gameState: initGS };
+  }
+
+  const [grid, setGrid] = useState(() => _initRef.current.grid);
   // Find start position - in multiplayer, each player gets a different start tile
   const startPos = useMemo(() => {
     if (isMultiplayer && multiplayerConfig?.assignedStartIndex != null) {
@@ -202,15 +219,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
   const [playerPos, setPlayerPos] = useState(() => ({ ...startPos }));
   const [lives, setLives] = useState(level.lives || 3);
   const maxInventory = level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY;
-  const [gameState, setGameState] = useState({
-    collectedItems: [],
-    rescuedFriends: 0,
-    reachedLocations: [],
-    reachedExit: false,
-    inventory: [],
-    worn: {}, // Wearable items (e.g., uniform)
-    containers: {}, // Container items (e.g., bag)
-  });
+  const [gameState, setGameState] = useState(() => _initRef.current.gameState);
   const [revealedTiles, setRevealedTiles] = useState(() => {
     const darkZoneTiles = theme?.getDarkZoneTiles?.(level.grid) || new Set();
     const isInDarkZone = theme?.isPlayerInDarkZone?.(startPos, level.grid, {}) || false;
@@ -330,7 +339,11 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
           const afterGrid = cloneGrid(currentGrid);
           gridRef.current = afterGrid;
           setGrid(afterGrid);
-          // broadcast the opened tiles to peers (so the peer who triggered also sees it if their grid differs)
+          const hasOpen = peerMoveActivations.some(r => r.direction === 'open');
+          const hasClose = peerMoveActivations.some(r => r.direction === 'close');
+          if (hasOpen) showMessageRef.current?.(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
+          else if (hasClose) showMessageRef.current?.(getMessage(themeId, 'gateClosed', {}) || 'Gate closed.', 2000, 'info');
+          // broadcast the opened/closed tiles to peers
           broadcastGridDiffCallbackRef.current?.(preGrid, afterGrid);
         }
         break;
@@ -527,6 +540,21 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
   const broadcastGridDiffCallbackRef = useRef(null);
   broadcastGridDiffCallbackRef.current = broadcastGridDiff;
 
+  // Helper: play sound and show message for activation results (open or close)
+  const handleActivationResults = useCallback((results, preGrid, postGrid, broadcast) => {
+    if (!results.length) return;
+    const hasOpen = results.some(r => r.direction === 'open');
+    const hasClose = results.some(r => r.direction === 'close');
+    soundManager.play('success');
+    if (hasOpen) {
+      showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
+    } else if (hasClose) {
+      showMessage(getMessage(themeId, 'gateClosed', {}) || 'Gate closed.', 2000, 'info');
+    }
+    if (postGrid) setGrid(postGrid);
+    if (broadcast && preGrid && postGrid) broadcast(preGrid, postGrid);
+  }, [showMessage, getMessage, themeId]);
+
   const respawn = useCallback(() => {
     setPlayerPos({ ...startPos });
   }, [startPos]);
@@ -550,15 +578,18 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
   }, [showNotification]);
 
   const restart = useCallback(() => {
-    setGrid(convertLegacyItems(level.grid));
-    setPlayerPos({ ...startPos });
-    setLives(level.lives || 3);
-    setGameState({
+    const restartGrid = convertLegacyItems(level.grid);
+    const restartGS = {
       collectedItems: [], rescuedFriends: 0,
       reachedLocations: [], reachedExit: false, inventory: [],
       worn: {},
       containers: {},
-    });
+    };
+    applyStartStates(restartGrid, restartGS);
+    setGrid(restartGrid);
+    setPlayerPos({ ...startPos });
+    setLives(level.lives || 3);
+    setGameState(restartGS);
     const darkZoneTiles = theme?.getDarkZoneTiles?.(level.grid) || new Set();
     const isInDarkZone = theme?.isPlayerInDarkZone?.(startPos, level.grid, {}) || false;
     setRevealedTiles(initializeRevealedTiles(startPos.x, startPos.y, level.grid, darkZoneTiles, isInDarkZone));
@@ -645,17 +676,10 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
     // Check if any activation requirements are now met
     const preDropActivGrid = cloneGrid(newGrid);
     const activationResults = checkActivations(newGrid, gameStateRef.current, { x: pos.x, y: pos.y }, [pos, ...Object.values(peerStatesRef.current)]);
-    if (activationResults.length > 0) {
-      soundManager.play('success');
-      const msg = getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!';
-      showMessage(msg, 2000, 'success');
-      const afterDropActivGrid = cloneGrid(newGrid);
-      setGrid(afterDropActivGrid);
-      broadcastGridDiff(preDropActivGrid, afterDropActivGrid);
-    }
+    handleActivationResults(activationResults, preDropActivGrid, activationResults.length > 0 ? cloneGrid(newGrid) : null, broadcastGridDiff);
 
     setDropMenuOpen(false);
-  }, [showNotification, theme, getItemLabel, themeId, getMessage, showMessage, broadcastGridDiff]);
+  }, [showNotification, theme, getItemLabel, themeId, getMessage, showMessage, broadcastGridDiff, handleActivationResults]);
 
   const pickUpItem = useCallback((cell, px, py) => {
     const currentGS = gameStateRef.current;
@@ -1467,13 +1491,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
         // Check activation requirements (player may need to stand on a spot)
         const preSwapActivGrid = cloneGrid(newGrid);
         const tileSwapActivations = checkActivations(newGrid, gameStateRef.current, null, [{ x: nx, y: ny }, ...Object.values(peerStatesRef.current)]);
-        if (tileSwapActivations.length > 0) {
-          soundManager.play('success');
-          showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
-          const afterSwapActivGrid = cloneGrid(newGrid);
-          setGrid(afterSwapActivGrid);
-          broadcastGridDiff(preSwapActivGrid, afterSwapActivGrid);
-        }
+        handleActivationResults(tileSwapActivations, preSwapActivGrid, tileSwapActivations.length > 0 ? cloneGrid(newGrid) : null, broadcastGridDiff);
         return;
       }
 
@@ -1500,13 +1518,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
       // Check activation requirements (player may need to stand on a spot)
       const preThemeActivGrid = cloneGrid(currentGrid);
       const themeMoveActivations = checkActivations(currentGrid, gameStateRef.current, null, [{ x: nx, y: ny }, ...Object.values(peerStatesRef.current)]);
-      if (themeMoveActivations.length > 0) {
-        soundManager.play('success');
-        showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
-        const afterThemeActivGrid = cloneGrid(currentGrid);
-        setGrid(afterThemeActivGrid);
-        broadcastGridDiff(preThemeActivGrid, afterThemeActivGrid);
-      }
+      handleActivationResults(themeMoveActivations, preThemeActivGrid, themeMoveActivations.length > 0 ? cloneGrid(currentGrid) : null, broadcastGridDiff);
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
       const preMovGrid = cloneGrid(currentGrid);
@@ -1550,13 +1562,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
       // Check activation requirements (player may need to stand on a spot)
       const preActivGrid = cloneGrid(currentGrid);
       const fallbackActivations = checkActivations(currentGrid, gameStateRef.current, null, [{ x: nx, y: ny }, ...Object.values(peerStatesRef.current)]);
-      if (fallbackActivations.length > 0) {
-        soundManager.play('success');
-        showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
-        const afterActivGrid = cloneGrid(currentGrid);
-        setGrid(afterActivGrid);
-        broadcastGridDiff(preActivGrid, afterActivGrid);
-      }
+      handleActivationResults(fallbackActivations, preActivGrid, fallbackActivations.length > 0 ? cloneGrid(currentGrid) : null, broadcastGridDiff);
 
       // Theme-specific post-movement logic (e.g., path tracking, puzzles, etc.)
       const preMovGrid2 = cloneGrid(currentGrid);
@@ -1587,7 +1593,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
         }
       }
     }
-  }, [theme, showMessage, loseLife, respawn, cancelInteraction, getMessage, themeId, broadcastGridDiff]);
+  }, [theme, showMessage, loseLife, respawn, cancelInteraction, getMessage, themeId, broadcastGridDiff, handleActivationResults]);
 
   // Store callback refs so keyboard handler doesn't need to depend on them
   const callbacksRef = useRef({});
