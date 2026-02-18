@@ -3,6 +3,7 @@ import { db } from './firebase.js';
 import {
   doc,
   setDoc,
+  getDoc,
   collection,
   query,
   where,
@@ -15,6 +16,7 @@ import {
 const LEADERBOARD_COLLECTION = 'leaderboards';
 
 // Submit a score to the leaderboard (only for named users)
+// Preserves best metrics: keeps min(old, new) for time and steps independently
 export async function submitScore(mapId, userId, userName, time, steps) {
   if (!userName) {
     // Anonymous users don't appear on leaderboards
@@ -22,17 +24,36 @@ export async function submitScore(mapId, userId, userName, time, steps) {
   }
 
   const entryId = `${mapId}_${userId}`;
+  const docRef = doc(db, LEADERBOARD_COLLECTION, entryId);
+
+  let bestTime = Math.round(time * 100) / 100;
+  let bestSteps = steps;
+
+  try {
+    const existingDoc = await getDoc(docRef);
+    if (existingDoc.exists()) {
+      const existing = existingDoc.data();
+      if (existing.time != null && existing.time < bestTime) {
+        bestTime = existing.time;
+      }
+      if (existing.steps != null && existing.steps < bestSteps) {
+        bestSteps = existing.steps;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not read existing score, saving current:', err);
+  }
 
   const entry = {
     mapId,
     userId,
     userName,
-    time: Math.round(time * 100) / 100, // Round to 2 decimal places
-    steps,
+    time: bestTime,
+    steps: bestSteps,
     completedAt: serverTimestamp()
   };
 
-  await setDoc(doc(db, LEADERBOARD_COLLECTION, entryId), entry);
+  await setDoc(docRef, entry);
   return entry;
 }
 
@@ -113,6 +134,16 @@ export async function getUserRanks(mapId, userId) {
   const stepsRank = stepsSnapshot.size + 1;
 
   return { timeRank, stepsRank, userScore };
+}
+
+// Get total number of players who have scores for a map
+export async function getPlayerCount(mapId) {
+  const q = query(
+    collection(db, LEADERBOARD_COLLECTION),
+    where('mapId', '==', mapId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.size;
 }
 
 // Format time for display (seconds to MM:SS.ms)

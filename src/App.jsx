@@ -5,8 +5,9 @@ import LevelSelect from './components/LevelSelect';
 import MainMenu from './components/MainMenu';
 import ThemeSelect from './components/ThemeSelect';
 import MultiplayerLobby from './components/MultiplayerLobby';
+import MapPage from './components/MapPage';
 import ThemeLoader, { preloadAllThemeTranslations } from './engine/themeLoader';
-import { migrateLevels } from './utils/storage';
+import { migrateLevels, loadLevelById } from './utils/storage';
 import { findAllTiles } from './engine/tiles';
 import { useMultiplayer } from './hooks/useMultiplayer';
 import { makeRoomId } from './utils/multiplayerService';
@@ -16,12 +17,35 @@ import { NotificationProvider } from './contexts/NotificationContext.jsx';
 import UserStatusBar from './components/UserStatusBar.jsx';
 import DevTasksPanel from './components/DevTasksPanel.jsx';
 import useDevMode from './hooks/useDevMode.js';
+import { parseRoute, modeToPath } from './hooks/useRouter.js';
 
 // Theme context for sharing theme across components
 export const ThemeContext = createContext(null);
 
+const loadingStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '100vh',
+  color: '#fff'
+};
+
+/** Push a new URL (creates history entry). */
+function pushUrl(path) {
+  if (path !== window.location.pathname) {
+    window.history.pushState(null, '', path);
+  }
+}
+
+/** Replace current URL (no new history entry). */
+function replaceUrl(path) {
+  if (path !== window.location.pathname) {
+    window.history.replaceState(null, '', path);
+  }
+}
+
 function AppContent() {
-  const [mode, setMode] = useState('menu');
+  const [mode, setMode] = useState(null); // null = loading from URL
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [editLevel, setEditLevel] = useState(null);
   const [selectedTheme, setSelectedTheme] = useState(null);
@@ -72,6 +96,101 @@ function AppContent() {
     preloadAllThemeTranslations();
   }, []);
 
+  // Initialize state from URL on mount
+  useEffect(() => {
+    const { mode: urlMode, params } = parseRoute(window.location.pathname);
+
+    if (params.mapId && (urlMode === 'mapPage' || urlMode === 'lobby')) {
+      loadLevelById(params.mapId).then(level => {
+        if (level) {
+          setSelectedLevel(level);
+          setSelectedTheme(level.themeId || 'forest');
+          setMode(urlMode);
+        } else {
+          setMode('menu');
+          replaceUrl('/');
+        }
+      });
+    } else if (params.editMapId && urlMode === 'build') {
+      loadLevelById(params.editMapId).then(level => {
+        if (level) {
+          setEditLevel(level);
+          setSelectedTheme(level.themeId || 'forest');
+          setMode('build');
+        } else {
+          setMode('menu');
+          replaceUrl('/');
+        }
+      });
+    } else if (params.themeId && urlMode === 'build') {
+      setSelectedTheme(params.themeId);
+      setMode('build');
+    } else {
+      setMode(urlMode);
+    }
+  }, []);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPopState = () => {
+      const { mode: urlMode, params } = parseRoute(window.location.pathname);
+
+      // Clean up websocket state on navigation
+      setWsEnabled(false);
+      setLobbyPeers([]);
+      setLobbyAssignedIndex(null);
+
+      if (params.mapId && (urlMode === 'mapPage' || urlMode === 'lobby')) {
+        if (selectedLevel?.id === params.mapId) {
+          setMode(urlMode);
+          if (urlMode === 'lobby') {
+            setMultiplayerConfig(null);
+          }
+        } else {
+          loadLevelById(params.mapId).then(level => {
+            if (level) {
+              setSelectedLevel(level);
+              setSelectedTheme(level.themeId || 'forest');
+              setMultiplayerConfig(null);
+              setMode(urlMode);
+            } else {
+              setMode('menu');
+            }
+          });
+        }
+      } else if (params.editMapId && urlMode === 'build') {
+        if (editLevel?.id === params.editMapId) {
+          setMode('build');
+        } else {
+          loadLevelById(params.editMapId).then(level => {
+            if (level) {
+              setEditLevel(level);
+              setSelectedTheme(level.themeId || 'forest');
+              setMode('build');
+            } else {
+              setMode('menu');
+            }
+          });
+        }
+      } else if (params.themeId && urlMode === 'build') {
+        setSelectedTheme(params.themeId);
+        setMode('build');
+      } else {
+        setMode(urlMode);
+        if (urlMode === 'menu' || urlMode === 'selectLevel') {
+          setSelectedLevel(null);
+          setSelectedTheme(null);
+          setTheme(null);
+          setMultiplayerConfig(null);
+          setEditLevel(null);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [selectedLevel, editLevel]);
+
   // Load theme when selected
   useEffect(() => {
     if (selectedTheme) {
@@ -85,6 +204,7 @@ function AppContent() {
         alert(`Failed to load theme "${selectedTheme}". Please try again.`);
         setSelectedTheme(null);
         setMode('menu');
+        pushUrl('/');
       });
     } else {
       // Remove theme data attribute when no theme
@@ -92,13 +212,24 @@ function AppContent() {
     }
   }, [selectedTheme]);
 
+  // Loading state while resolving URL
+  if (mode === null) {
+    return <div style={loadingStyle}>Loading...</div>;
+  }
+
   // Main menu
   if (mode === 'menu') {
     return (
       <>
         <MainMenu
-          onCreateNew={() => setMode('theme-select-build')}
-          onPlayLevels={() => setMode('selectLevel')}
+          onCreateNew={() => {
+            setMode('theme-select-build');
+            pushUrl('/build');
+          }}
+          onPlayLevels={() => {
+            setMode('selectLevel');
+            pushUrl('/play');
+          }}
         />
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
       </>
@@ -113,8 +244,12 @@ function AppContent() {
           onSelectTheme={(themeId) => {
             setSelectedTheme(themeId);
             setMode('build');
+            pushUrl(`/build/${themeId}`);
           }}
-          onBack={() => setMode('menu')}
+          onBack={() => {
+            setMode('menu');
+            pushUrl('/');
+          }}
         />
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
       </>
@@ -124,13 +259,7 @@ function AppContent() {
   // Builder mode (needs theme loaded)
   if (mode === 'build') {
     if (!theme) {
-      return <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        color: '#fff'
-      }}>Loading theme...</div>;
+      return <div style={loadingStyle}>Loading theme...</div>;
     }
 
     return (
@@ -143,6 +272,7 @@ function AppContent() {
               setEditLevel(null);
               setSelectedTheme(null);
               setTheme(null);
+              pushUrl('/');
             }}
             editLevel={editLevel}
           />
@@ -157,17 +287,52 @@ function AppContent() {
     return (
       <>
         <LevelSelect
-          onBack={() => setMode('menu')}
+          onBack={() => {
+            setMode('menu');
+            pushUrl('/');
+          }}
           onSelect={(level) => {
             setSelectedLevel(level);
-            setSelectedTheme(level.themeId || 'forest'); // Fallback to forest
+            setSelectedTheme(level.themeId || 'forest');
             setMultiplayerConfig(null);
             setMode('lobby');
+            pushUrl(`/play/${level.id}`);
           }}
           onEdit={(level) => {
             setEditLevel(level);
             setSelectedTheme(level.themeId || 'forest');
             setMode('build');
+            pushUrl(`/edit/${level.id}`);
+          }}
+          onViewMapPage={(level) => {
+            setSelectedLevel(level);
+            setSelectedTheme(level.themeId || 'forest');
+            setMode('mapPage');
+            pushUrl(`/map/${level.id}`);
+          }}
+        />
+        <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
+      </>
+    );
+  }
+
+  // Map page
+  if (mode === 'mapPage' && selectedLevel) {
+    return (
+      <>
+        <MapPage
+          level={selectedLevel}
+          onPlay={() => {
+            setMultiplayerConfig(null);
+            setMode('lobby');
+            pushUrl(`/play/${selectedLevel.id}`);
+          }}
+          onBack={() => {
+            setSelectedLevel(null);
+            setSelectedTheme(null);
+            setTheme(null);
+            setMode('selectLevel');
+            pushUrl('/play');
           }}
         />
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
@@ -178,13 +343,7 @@ function AppContent() {
   // Lobby mode: choose solo or online (needs theme loaded to read start tiles)
   if (mode === 'lobby' && selectedLevel) {
     if (!theme) {
-      return <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        color: '#fff'
-      }}>Loading theme...</div>;
+      return <div style={loadingStyle}>Loading theme...</div>;
     }
 
     const startTileType = theme.getStartTile?.() || 'start';
@@ -248,13 +407,7 @@ function AppContent() {
   // Solver mode (needs theme and level)
   if (mode === 'solve' && selectedLevel) {
     if (!theme) {
-      return <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        color: '#fff'
-      }}>Loading theme...</div>;
+      return <div style={loadingStyle}>Loading theme...</div>;
     }
 
     return (
@@ -270,11 +423,12 @@ function AppContent() {
             onBack={() => {
               solverMsgHandlerRef.current = null;
               setWsEnabled(false);
-              setMode('menu');
+              setMode('selectLevel');
               setSelectedLevel(null);
               setSelectedTheme(null);
               setTheme(null);
               setMultiplayerConfig(null);
+              pushUrl('/play');
             }}
           />
         </NotificationProvider>
@@ -285,13 +439,7 @@ function AppContent() {
 
   // Fallback
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      color: '#fff'
-    }}>
+    <div style={loadingStyle}>
       Error: Invalid state
     </div>
   );
