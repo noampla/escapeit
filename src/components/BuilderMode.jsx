@@ -85,6 +85,20 @@ function cleanupInvalidObjects(grid, TILE_TYPES) {
   return modified;
 }
 
+// Sync isOpen on tiles that have activationRequirements.startOpen set,
+// so gates look open/closed correctly in the builder.
+function syncStartOpenStates(grid) {
+  return grid.map(row => row.map(cell => {
+    const obj = cell.object;
+    if (!obj) return cell;
+    const reqs = obj.config?.activationRequirements;
+    if (!reqs?.conditionSequence) return cell;
+    const shouldBeOpen = reqs.startOpen || false;
+    if (obj.config.isOpen === shouldBeOpen) return cell;
+    return { ...cell, object: { ...obj, config: { ...obj.config, isOpen: shouldBeOpen } } };
+  }));
+}
+
 export default function BuilderMode({ onBack, editLevel, themeId }) {
   const theme = useContext(ThemeContext);
   const { t, isRTL, language, setLanguage, getTileLabel, getLocalizedThemeName } = useLanguage();
@@ -92,7 +106,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const lockTiles = useMemo(() => theme?.getLockTiles?.() || DEFAULT_LOCK_TILES, [theme]);
   const [grid, setGrid] = useState(() => {
     if (editLevel) {
-      return editLevel.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } })));
+      return syncStartOpenStates(editLevel.grid.map(r => r.map(c => ({ type: c.type, config: { ...c.config } }))));
     }
     return createEmptyGrid();
   });
@@ -160,37 +174,42 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   });
   const draftSaveTimerRef = useRef(null);
 
-  // Collect all tile paths from the grid for display (theme-agnostic)
-  // Looks for any tile that has a 'path' type field in its CONFIG_SCHEMA
+  // Collect all tile paths from the grid for display.
+  // Includes: legacy top-level pathTiles (backwards compat) and conditionSequence path steps.
   const allTilePaths = useMemo(() => {
     const paths = [];
-    const CONFIG_SCHEMA = theme?.getConfigSchema?.() || {};
 
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[y].length; x++) {
         const cell = grid[y][x];
-        // Check both object and floor layers
         for (const layer of [cell.object, cell.floor]) {
-          if (!layer?.type || !layer.config) continue;
+          if (!layer?.config) continue;
+          const config = layer.config;
 
-          // Check if this tile type has any 'path' fields in its config schema
-          const schema = CONFIG_SCHEMA[layer.type];
-          if (!schema) continue;
+          // Legacy: top-level pathTiles array (old levels only, always open-direction)
+          if (Array.isArray(config.pathTiles) && config.pathTiles.length > 0) {
+            paths.push({ sourceX: x, sourceY: y, tiles: config.pathTiles, direction: 'open' });
+          }
 
-          for (const [fieldKey, fieldDef] of Object.entries(schema)) {
-            if (fieldDef.type === 'path' && layer.config[fieldKey]?.length > 0) {
-              paths.push({
-                sourceX: x,
-                sourceY: y,
-                tiles: layer.config[fieldKey]
-              });
-            }
+          // New-style: path steps inside activationRequirements.conditionSequence
+          const condSeq = config.activationRequirements?.conditionSequence;
+          if (Array.isArray(condSeq)) {
+            condSeq.forEach((step, si) => {
+              if (step.conditionType === 'path' && step.pathTiles?.length > 0) {
+                paths.push({
+                  sourceX: x, sourceY: y,
+                  tiles: step.pathTiles,
+                  direction: step.direction || 'open',
+                  stepIndex: si,
+                });
+              }
+            });
           }
         }
       }
     }
     return paths;
-  }, [grid, theme]);
+  }, [grid]);
 
   // Check if theme has story content
   const storyContent = useMemo(() => theme?.getStoryContent?.(), [theme]);
@@ -208,23 +227,52 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
         const cell = grid[y][x];
         const config = cell.object?.config || cell.floor?.config;
         const activationReqs = config?.activationRequirements;
-
-        if (!activationReqs?.enabled || !activationReqs.requirements?.length) continue;
+        if (!activationReqs) continue;
 
         const tileKey = `${x},${y}`;
         const isSelected = tileKey === selectedKey;
 
-        activationReqs.requirements.forEach((req, idx) => {
-          markers.push({
-            x: req.x,
-            y: req.y,
-            index: idx + 1,
-            itemId: req.itemId,
-            showNumbers: activationReqs.orderMatters,
-            isSelected, // true for selected tile's markers (full opacity)
-            sourceTile: { x, y } // which tile this marker belongs to
+        // Support both old shape ({ enabled, requirements }) and new shape ({ conditionSequence })
+        if (activationReqs.conditionSequence) {
+          // New shape: iterate steps, color by direction
+          let globalReqIdx = 0;
+          activationReqs.conditionSequence.forEach((step, si) => {
+            if (step.conditionType === 'path') return; // path steps show path tiles, not item markers
+            const isOpen = step.direction === 'open';
+            (step.requirements || []).forEach((req, ri) => {
+              markers.push({
+                x: req.x,
+                y: req.y,
+                index: si + 1, // show step number
+                subIndex: ri + 1,
+                itemId: req.itemId,
+                showNumbers: true,
+                isOpen,
+                isSelected,
+                sourceTile: { x, y },
+                stepIndex: si,
+                reqIndex: ri,
+              });
+              globalReqIdx++;
+            });
           });
-        });
+        } else if (activationReqs.enabled && activationReqs.requirements?.length) {
+          // Old shape fallback
+          activationReqs.requirements.forEach((req, idx) => {
+            markers.push({
+              x: req.x,
+              y: req.y,
+              index: idx + 1,
+              itemId: req.itemId,
+              showNumbers: activationReqs.orderMatters,
+              isOpen: true,
+              isSelected,
+              sourceTile: { x, y },
+              stepIndex: 0,
+              reqIndex: idx,
+            });
+          });
+        }
       }
     }
 
@@ -586,6 +634,11 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     const newGrid = cloneGrid(grid);
     const cell = newGrid[y][x];
 
+    // Sync isOpen to startOpen so the gate looks correct in builder mode
+    if (newConfig?.activationRequirements?.conditionSequence !== undefined) {
+      newConfig = { ...newConfig, isOpen: newConfig.activationRequirements.startOpen || false };
+    }
+
     if (layer === 'hidden') {
       // Update hidden object config (buried beneath floor)
       if (cell.floor?.config?.hiddenObject) {
@@ -606,12 +659,17 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   };
 
   // Start path editing mode
-  const handleStartPathEdit = (x, y, fieldKey) => {
+  // stepIndex: null = old top-level path field, number = conditionSequence[stepIndex].pathTiles
+  const handleStartPathEdit = (x, y, fieldKey, stepIndex = null) => {
     const cell = grid[y][x];
     const config = cell.object?.config || cell.floor?.config || {};
-    const currentPath = config[fieldKey] || [];
-
-    setPathEditMode({ x, y, fieldKey });
+    let currentPath;
+    if (stepIndex !== null) {
+      currentPath = config[fieldKey]?.conditionSequence?.[stepIndex]?.pathTiles || [];
+    } else {
+      currentPath = config[fieldKey] || [];
+    }
+    setPathEditMode({ x, y, fieldKey, stepIndex });
     setPathTiles([...currentPath]);
   };
 
@@ -652,13 +710,24 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   const handleSavePathEdit = () => {
     if (!pathEditMode) return;
 
-    const { x, y, fieldKey } = pathEditMode;
+    const { x, y, fieldKey, stepIndex } = pathEditMode;
     const newGrid = cloneGrid(grid);
     const cell = newGrid[y][x];
 
-    // Update config with new path
     const config = cell.object?.config || cell.floor?.config || {};
-    const newConfig = { ...config, [fieldKey]: pathTiles };
+    let newConfig;
+
+    if (stepIndex !== null) {
+      // Write back to conditionSequence[stepIndex].pathTiles
+      const activationData = config[fieldKey] || { startOpen: false, conditionSequence: [] };
+      const newSeq = activationData.conditionSequence.map((step, i) =>
+        i === stepIndex ? { ...step, pathTiles } : step
+      );
+      newConfig = { ...config, [fieldKey]: { ...activationData, conditionSequence: newSeq } };
+    } else {
+      // Old top-level path field
+      newConfig = { ...config, [fieldKey]: pathTiles };
+    }
 
     if (cell.object) {
       cell.object.config = newConfig;
@@ -743,25 +812,37 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
   };
 
   // Start activation position picking mode
-  const handleStartActivationPick = (tileX, tileY, fieldKey, reqIndex) => {
-    setActivationPickMode({ tileX, tileY, fieldKey, reqIndex });
+  const handleStartActivationPick = (tileX, tileY, fieldKey, stepIndex, reqIndex) => {
+    setActivationPickMode({ tileX, tileY, fieldKey, stepIndex, reqIndex });
   };
 
   // Handle clicking on grid tiles while in activation pick mode
   const handleActivationPickClick = (clickX, clickY) => {
     if (!activationPickMode) return false;
 
-    const { tileX, tileY, fieldKey, reqIndex } = activationPickMode;
+    const { tileX, tileY, fieldKey, stepIndex, reqIndex } = activationPickMode;
     const cell = grid[tileY][tileX];
     const config = cell.object?.config || cell.floor?.config || {};
-    const activationData = config[fieldKey] || { enabled: false, orderMatters: false, requirements: [] };
+    const activationData = config[fieldKey] || { startOpen: false, conditionSequence: [] };
 
-    // Update the requirement with the new position
-    const updatedRequirements = activationData.requirements.map((req, i) =>
-      i === reqIndex ? { ...req, x: clickX, y: clickY } : req
-    );
-
-    const newActivationData = { ...activationData, requirements: updatedRequirements };
+    let newActivationData;
+    if (activationData.conditionSequence !== undefined) {
+      // New shape: update requirement within the correct step
+      const newSeq = activationData.conditionSequence.map((step, si) => {
+        if (si !== stepIndex) return step;
+        const newReqs = (step.requirements || []).map((req, ri) =>
+          ri === reqIndex ? { ...req, x: clickX, y: clickY } : req
+        );
+        return { ...step, requirements: newReqs };
+      });
+      newActivationData = { ...activationData, conditionSequence: newSeq };
+    } else {
+      // Old shape fallback
+      const updatedRequirements = (activationData.requirements || []).map((req, i) =>
+        i === reqIndex ? { ...req, x: clickX, y: clickY } : req
+      );
+      newActivationData = { ...activationData, requirements: updatedRequirements };
+    }
 
     // Update the grid
     const newGrid = cloneGrid(grid);
@@ -938,7 +1019,7 @@ export default function BuilderMode({ onBack, editLevel, themeId }) {
     // Load all level data including ID
     setLevelId(level.id);
     // Use the grid as-is (already in correct format with floor/object layers from storage.js migration)
-    setGrid(level.grid);
+    setGrid(syncStartOpenStates(level.grid));
     setMissions(level.missions || []);
     setLives(level.lives || DEFAULT_LIVES);
     setInventoryCapacity(level.inventoryCapacity || DEFAULT_INVENTORY_CAPACITY);

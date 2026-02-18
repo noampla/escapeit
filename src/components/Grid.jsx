@@ -454,6 +454,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
     if (allTilePaths && allTilePaths.length > 0) {
       allTilePaths.forEach((gatePath) => {
         const tiles = gatePath.tiles || [];
+        // Open-direction paths: blue; close-direction paths: orange-red
+        const isClose = gatePath.direction === 'close';
+        const pathR = isClose ? 255 : 100;
+        const pathG = isClose ? 120 : 150;
+        const pathB = isClose ? 80 : 255;
+
         tiles.forEach((tile, idx) => {
           const px = (tile.x - offsetX) * TILE_SIZE;
           const py = (tile.y - offsetY) * TILE_SIZE;
@@ -466,12 +472,12 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
             }
           }
 
-          // Highlight tile with reduced opacity
-          ctx.fillStyle = 'rgba(100, 150, 255, 0.15)';
+          // Highlight tile
+          ctx.fillStyle = `rgba(${pathR}, ${pathG}, ${pathB}, 0.15)`;
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
           // Subtle border
-          ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
+          ctx.strokeStyle = `rgba(${pathR}, ${pathG}, ${pathB}, 0.3)`;
           ctx.lineWidth = 1;
           ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
 
@@ -555,12 +561,17 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
         const strokeAlpha = isActive ? 0.9 : 0.4;
         const textAlpha = isActive ? 0.95 : 0.5;
 
-        // Highlight tile with orange/gold color
-        ctx.fillStyle = `rgba(255, 180, 50, ${fillAlpha})`;
+        // Color by direction: green for open steps, red for close steps
+        const markerR = marker.isOpen === false ? 255 : (marker.isOpen === true ? 80 : 255);
+        const markerG = marker.isOpen === false ? 80 : (marker.isOpen === true ? 200 : 180);
+        const markerB = marker.isOpen === false ? 80 : (marker.isOpen === true ? 80 : 50);
+
+        // Highlight tile
+        ctx.fillStyle = `rgba(${markerR}, ${markerG}, ${markerB}, ${fillAlpha})`;
         ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
         // Border
-        ctx.strokeStyle = `rgba(255, 180, 50, ${strokeAlpha})`;
+        ctx.strokeStyle = `rgba(${markerR}, ${markerG}, ${markerB}, ${strokeAlpha})`;
         ctx.lineWidth = isActive ? 3 : 2;
         ctx.strokeRect(px + 1.5, py + 1.5, TILE_SIZE - 3, TILE_SIZE - 3);
 
@@ -573,7 +584,7 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
           ctx.fillText(marker.index.toString(), px + TILE_SIZE / 2, py + TILE_SIZE / 2);
         } else {
           // Draw a small diamond marker
-          ctx.fillStyle = `rgba(255, 220, 100, ${strokeAlpha})`;
+          ctx.fillStyle = `rgba(${markerR}, ${markerG}, ${markerB}, ${strokeAlpha})`;
           ctx.beginPath();
           const cx = px + TILE_SIZE / 2;
           const cy = py + TILE_SIZE / 2;
