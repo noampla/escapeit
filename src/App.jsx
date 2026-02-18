@@ -110,6 +110,9 @@ function AppContent() {
           setMode('menu');
           replaceUrl('/');
         }
+      }).catch(() => {
+        setMode('menu');
+        replaceUrl('/');
       });
     } else if (params.editMapId && urlMode === 'build') {
       loadLevelById(params.editMapId).then(level => {
@@ -121,6 +124,9 @@ function AppContent() {
           setMode('menu');
           replaceUrl('/');
         }
+      }).catch(() => {
+        setMode('menu');
+        replaceUrl('/');
       });
     } else if (params.themeId && urlMode === 'build') {
       setSelectedTheme(params.themeId);
@@ -130,15 +136,21 @@ function AppContent() {
     }
   }, []);
 
+  // Helper: clean up all transient state (solver handler, ws, etc.)
+  const cleanupTransientState = useCallback(() => {
+    solverMsgHandlerRef.current = null;
+    setWsEnabled(false);
+    setLobbyPeers([]);
+    setLobbyAssignedIndex(null);
+  }, []);
+
   // Handle browser back/forward
   useEffect(() => {
     const onPopState = () => {
       const { mode: urlMode, params } = parseRoute(window.location.pathname);
 
-      // Clean up websocket state on navigation
-      setWsEnabled(false);
-      setLobbyPeers([]);
-      setLobbyAssignedIndex(null);
+      // Always clean up transient state on any navigation
+      cleanupTransientState();
 
       if (params.mapId && (urlMode === 'mapPage' || urlMode === 'lobby')) {
         if (selectedLevel?.id === params.mapId) {
@@ -156,7 +168,7 @@ function AppContent() {
             } else {
               setMode('menu');
             }
-          });
+          }).catch(() => setMode('menu'));
         }
       } else if (params.editMapId && urlMode === 'build') {
         if (editLevel?.id === params.editMapId) {
@@ -170,14 +182,14 @@ function AppContent() {
             } else {
               setMode('menu');
             }
-          });
+          }).catch(() => setMode('menu'));
         }
       } else if (params.themeId && urlMode === 'build') {
         setSelectedTheme(params.themeId);
         setMode('build');
       } else {
         setMode(urlMode);
-        if (urlMode === 'menu' || urlMode === 'selectLevel') {
+        if (urlMode === 'menu' || urlMode === 'selectLevel' || urlMode === 'theme-select-build') {
           setSelectedLevel(null);
           setSelectedTheme(null);
           setTheme(null);
@@ -189,7 +201,7 @@ function AppContent() {
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [selectedLevel, editLevel]);
+  }, [selectedLevel, editLevel, cleanupTransientState]);
 
   // Load theme when selected
   useEffect(() => {
@@ -248,7 +260,7 @@ function AppContent() {
           }}
           onBack={() => {
             setMode('menu');
-            pushUrl('/');
+            replaceUrl('/');
           }}
         />
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
@@ -272,7 +284,7 @@ function AppContent() {
               setEditLevel(null);
               setSelectedTheme(null);
               setTheme(null);
-              pushUrl('/');
+              replaceUrl('/');
             }}
             editLevel={editLevel}
           />
@@ -289,7 +301,7 @@ function AppContent() {
         <LevelSelect
           onBack={() => {
             setMode('menu');
-            pushUrl('/');
+            replaceUrl('/');
           }}
           onSelect={(level) => {
             setSelectedLevel(level);
@@ -332,7 +344,7 @@ function AppContent() {
             setSelectedTheme(null);
             setTheme(null);
             setMode('selectLevel');
-            pushUrl('/play');
+            replaceUrl('/play');
           }}
         />
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
@@ -391,6 +403,7 @@ function AppContent() {
               setSelectedLevel(null);
               setSelectedTheme(null);
               setTheme(null);
+              replaceUrl('/play');
             }}
             onBack={() => {
               setWsEnabled(false);
@@ -428,7 +441,7 @@ function AppContent() {
               setSelectedTheme(null);
               setTheme(null);
               setMultiplayerConfig(null);
-              pushUrl('/play');
+              replaceUrl('/play');
             }}
           />
         </NotificationProvider>

@@ -96,16 +96,20 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
   const [hoveredCard, setHoveredCard] = useState(null);
 
   useEffect(() => {
+    let ignore = false;
     loadLevels().then(async (loaded) => {
+      if (ignore) return;
       setLevels(loaded);
       // Fetch best times for all levels
       const times = {};
       await Promise.all(loaded.map(async (level) => {
+        if (ignore) return;
         const scores = await getTopScoresByTime(level.id, 1);
         times[level.id] = scores[0]?.time || null; // null means no scores yet
       }));
-      setBestTimes(times);
+      if (!ignore) setBestTimes(times);
     });
+    return () => { ignore = true; };
   }, []);
 
   // Sort levels based on selection
