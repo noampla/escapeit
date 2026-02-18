@@ -5,18 +5,21 @@
 export const PLAYER_REQUIREMENT_ID = '__player__';
 
 /**
- * Check if a single requirement is met
+ * Check if a single requirement is met.
+ * allPlayerPositions is an array of { x, y } for all players (local + peers).
+ * For __player__ requirements any player in the array can satisfy it.
  * @param {Array} grid - The game grid
  * @param {Object} requirement - { x, y, itemId }
- * @param {Object} playerPos - { x, y } current player position (needed for player requirements)
+ * @param {Array} allPlayerPositions - array of { x, y } for every player
  * @returns {boolean} - True if requirement is met
  */
-export function checkRequirement(grid, requirement, playerPos) {
+export function checkRequirement(grid, requirement, allPlayerPositions) {
   const { x, y, itemId } = requirement;
 
-  // Player position requirement
+  // Player position requirement - satisfied if ANY player is standing there
   if (itemId === PLAYER_REQUIREMENT_ID) {
-    return playerPos && playerPos.x === x && playerPos.y === y;
+    const positions = Array.isArray(allPlayerPositions) ? allPlayerPositions : (allPlayerPositions ? [allPlayerPositions] : []);
+    return positions.some(p => p && p.x === x && p.y === y);
   }
 
   const cell = grid[y]?.[x];
@@ -31,37 +34,54 @@ export function checkRequirement(grid, requirement, playerPos) {
 }
 
 /**
- * Check all requirements for an activatable tile (unordered mode)
+ * Check all requirements for an activatable tile (unordered mode).
+ * Each __player__ requirement must be satisfied by a DIFFERENT player position.
  * @param {Array} grid - The game grid
  * @param {Object} activationRequirements - The activation config
- * @param {Object} playerPos - { x, y } current player position
+ * @param {Array} allPlayerPositions - array of { x, y } for every player
  * @returns {boolean} - True if all requirements are met
  */
-export function checkAllRequirements(grid, activationRequirements, playerPos) {
+export function checkAllRequirements(grid, activationRequirements, allPlayerPositions) {
   if (!activationRequirements?.enabled) return false;
 
   const requirements = activationRequirements.requirements || [];
   if (requirements.length === 0) return false;
 
-  // All requirements must be met
-  return requirements.every(req => checkRequirement(grid, req, playerPos));
+  const positions = Array.isArray(allPlayerPositions) ? allPlayerPositions : (allPlayerPositions ? [allPlayerPositions] : []);
+
+  // For __player__ requirements, each must be satisfied by a distinct player.
+  // Track which player indices have already been "used" for a player requirement.
+  const usedPlayerIndices = new Set();
+  for (const req of requirements) {
+    if (req.itemId === PLAYER_REQUIREMENT_ID) {
+      const idx = positions.findIndex((p, i) => p && p.x === req.x && p.y === req.y && !usedPlayerIndices.has(i));
+      if (idx === -1) return false;
+      usedPlayerIndices.add(idx);
+    } else {
+      if (!checkRequirement(grid, req, positions)) return false;
+    }
+  }
+  return true;
 }
 
 /**
- * Check ordered requirements with fulfillment tracking
+ * Check ordered requirements with fulfillment tracking.
+ * Each __player__ requirement must be satisfied by a DIFFERENT player position.
  * @param {Array} grid - The game grid
  * @param {Object} gameState - Current game state (will be mutated for progress tracking)
  * @param {Object} activationRequirements - The activation config
  * @param {string} tileKey - Unique key for this tile ("x,y")
  * @param {Object} dropPosition - { x, y } position where item was just dropped (optional)
- * @param {Object} playerPos - { x, y } current player position
+ * @param {Array} allPlayerPositions - array of { x, y } for every player
  * @returns {boolean} - True if all requirements are met in order
  */
-export function checkOrderedRequirements(grid, gameState, activationRequirements, tileKey, dropPosition, playerPos) {
+export function checkOrderedRequirements(grid, gameState, activationRequirements, tileKey, dropPosition, allPlayerPositions) {
   if (!activationRequirements?.enabled || !activationRequirements.orderMatters) return false;
 
   const requirements = activationRequirements.requirements || [];
   if (requirements.length === 0) return false;
+
+  const positions = Array.isArray(allPlayerPositions) ? allPlayerPositions : (allPlayerPositions ? [allPlayerPositions] : []);
 
   // Initialize progress tracking
   if (!gameState.activationProgress) {
@@ -86,19 +106,33 @@ export function checkOrderedRequirements(grid, gameState, activationRequirements
       return progress.fulfilledCount >= requirements.length;
     }
 
-    // First verify all previous requirements are still in place
+    // Build set of player indices already used by previous player requirements
+    const usedPlayerIndices = new Set();
     let allPreviousMet = true;
     for (let i = 0; i < nextIndex; i++) {
-      if (!checkRequirement(grid, requirements[i], playerPos)) {
-        allPreviousMet = false;
-        break;
+      const prevReq = requirements[i];
+      if (prevReq.itemId === PLAYER_REQUIREMENT_ID) {
+        const idx = positions.findIndex((p, pi) => p && p.x === prevReq.x && p.y === prevReq.y && !usedPlayerIndices.has(pi));
+        if (idx === -1) { allPreviousMet = false; break; }
+        usedPlayerIndices.add(idx);
+      } else {
+        if (!checkRequirement(grid, prevReq, positions)) { allPreviousMet = false; break; }
       }
     }
 
     // Only check next requirement if previous ones are still met
-    if (allPreviousMet && checkRequirement(grid, nextReq, playerPos)) {
-      progress.fulfilledCount = nextIndex + 1;
-      gameState.activationProgress[tileKey] = progress;
+    if (allPreviousMet) {
+      let nextMet = false;
+      if (nextReq.itemId === PLAYER_REQUIREMENT_ID) {
+        const idx = positions.findIndex((p, pi) => p && p.x === nextReq.x && p.y === nextReq.y && !usedPlayerIndices.has(pi));
+        nextMet = idx !== -1;
+      } else {
+        nextMet = checkRequirement(grid, nextReq, positions);
+      }
+      if (nextMet) {
+        progress.fulfilledCount = nextIndex + 1;
+        gameState.activationProgress[tileKey] = progress;
+      }
     }
   }
 
@@ -160,14 +194,21 @@ export function getActivatableTiles(grid) {
 
 /**
  * Main check function: call after item drop/pickup or player movement
- * Checks all activatable tiles and activates those with met requirements
+ * Checks all activatable tiles and activates those with met requirements.
+ *
+ * playerPos may be a single { x, y } (solo) or an array of { x, y } (multiplayer).
+ * In multiplayer, __player__ requirements each need a DISTINCT player standing on them.
+ *
  * @param {Array} grid - The game grid
  * @param {Object} gameState - Current game state
  * @param {Object} dropPosition - { x, y } position where item was just dropped (optional, for ordered mode)
- * @param {Object} playerPos - { x, y } current player position
+ * @param {Object|Array} playerPos - { x, y } or [{ x, y }, ...] for all players
  * @returns {Array} - Array of activated tiles { x, y, type }
  */
 export function checkActivations(grid, gameState, dropPosition, playerPos) {
+  // Normalise to array so internal functions always see an array
+  const allPlayerPositions = Array.isArray(playerPos) ? playerPos : (playerPos ? [playerPos] : []);
+
   const activatableTiles = getActivatableTiles(grid);
   const results = [];
 
@@ -181,9 +222,9 @@ export function checkActivations(grid, gameState, dropPosition, playerPos) {
 
     let allMet = false;
     if (reqs.orderMatters) {
-      allMet = checkOrderedRequirements(grid, gameState, reqs, tileKey, dropPosition, playerPos);
+      allMet = checkOrderedRequirements(grid, gameState, reqs, tileKey, dropPosition, allPlayerPositions);
     } else {
-      allMet = checkAllRequirements(grid, reqs, playerPos);
+      allMet = checkAllRequirements(grid, reqs, allPlayerPositions);
     }
 
     if (allMet) {
