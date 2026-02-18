@@ -808,9 +808,13 @@ export default function Grid({ grid, onClick, onRightClick, onDrag, onRightDrag,
   }, [draw]);
 
   const getTileAt = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const localX = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-    const localY = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    // Account for CSS scaling (rect reflects display size, canvas.width is internal size)
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const localX = Math.floor((e.clientX - rect.left) * scaleX / TILE_SIZE);
+    const localY = Math.floor((e.clientY - rect.top) * scaleY / TILE_SIZE);
     const x = localX + offsetX;
     const y = localY + offsetY;
     if (x >= 0 && x < grid[0].length && y >= 0 && y < grid.length) return { x, y };
