@@ -429,55 +429,6 @@ export default function PropertiesPanel({
             </div>
           );
 
-        case 'path':
-          return (
-            <div key={fieldKey}>
-              <label style={baseLabel}>{fieldDef.label}</label>
-              <div
-                style={{
-                  ...inputStyle,
-                  background: '#1a1a1a',
-                  minHeight: 60,
-                  padding: 8,
-                  borderRadius: 4,
-                  color: '#aaa',
-                  fontSize: 11,
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  if (onStartPathEdit) {
-                    onStartPathEdit(x, y, fieldKey);
-                  }
-                }}
-              >
-                <p style={{ margin: '0 0 6px', color: '#bbb' }}>
-                  {(currentValue && currentValue.length > 0)
-                    ? `${currentValue.length} tiles in path. Click to edit.`
-                    : 'Click to create path on map'}
-                </p>
-                {currentValue && currentValue.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {currentValue.map((tile, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          background: '#444',
-                          padding: '2px 6px',
-                          borderRadius: 3,
-                          fontSize: 10,
-                          color: '#ddd'
-                        }}
-                      >
-                        {idx + 1}: ({tile.x},{tile.y})
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
-            </div>
-          );
-
         case 'canvas':
           return (
             <div key={fieldKey}>
@@ -525,181 +476,261 @@ export default function PropertiesPanel({
           );
 
         case 'activation': {
-          const activationData = currentValue || fieldDef.default || { enabled: false, orderMatters: false, requirements: [] };
-          const requirements = activationData.requirements || [];
+          // Normalise old shape { enabled, orderMatters, requirements } → new shape
+          let activationData = currentValue || fieldDef.default || { startOpen: false, conditionSequence: [] };
+          if (activationData.conditionSequence === undefined) {
+            // Old shape — migrate on the fly for display (save will persist new shape)
+            activationData = {
+              startOpen: false,
+              conditionSequence: activationData.enabled ? [{
+                direction: 'open',
+                enabled: true,
+                orderMatters: activationData.orderMatters || false,
+                requirements: activationData.requirements || [],
+              }] : [],
+            };
+          }
+          const conditionSequence = activationData.conditionSequence || [];
 
-          const updateActivation = (updates) => {
+          const updateData = (updates) => {
             update(fieldKey, { ...activationData, ...updates });
           };
 
-          const addRequirement = () => {
-            updateActivation({
-              requirements: [...requirements, { x: 0, y: 0, itemId: '' }]
+          const addStep = (direction) => {
+            updateData({
+              conditionSequence: [...conditionSequence, {
+                direction,
+                enabled: true,
+                orderMatters: false,
+                requirements: [],
+              }]
             });
           };
 
-          const removeRequirement = (idx) => {
-            updateActivation({
-              requirements: requirements.filter((_, i) => i !== idx)
-            });
+          const removeStep = (si) => {
+            updateData({ conditionSequence: conditionSequence.filter((_, i) => i !== si) });
           };
 
-          const updateRequirement = (idx, field, value) => {
-            const updated = requirements.map((req, i) =>
-              i === idx ? { ...req, [field]: value } : req
-            );
-            updateActivation({ requirements: updated });
+          const moveStep = (si, delta) => {
+            const ni = si + delta;
+            if (ni < 0 || ni >= conditionSequence.length) return;
+            const seq = [...conditionSequence];
+            [seq[si], seq[ni]] = [seq[ni], seq[si]];
+            updateData({ conditionSequence: seq });
           };
+
+          const updateStep = (si, stepUpdates) => {
+            const seq = conditionSequence.map((s, i) => i === si ? { ...s, ...stepUpdates } : s);
+            updateData({ conditionSequence: seq });
+          };
+
+          const addReq = (si) => {
+            const step = conditionSequence[si];
+            updateStep(si, { requirements: [...(step.requirements || []), { x: 0, y: 0, itemId: '' }] });
+          };
+
+          const removeReq = (si, ri) => {
+            const step = conditionSequence[si];
+            updateStep(si, { requirements: (step.requirements || []).filter((_, i) => i !== ri) });
+          };
+
+          const updateReq = (si, ri, field, value) => {
+            const step = conditionSequence[si];
+            const reqs = (step.requirements || []).map((r, i) => i === ri ? { ...r, [field]: value } : r);
+            updateStep(si, { requirements: reqs });
+          };
+
+          const iconBtn = (label, onClick, bg, title) => (
+            <button
+              onClick={onClick}
+              title={title}
+              style={{
+                padding: '1px 5px',
+                background: bg,
+                border: 'none',
+                borderRadius: 2,
+                color: '#ccc',
+                fontSize: 9,
+                cursor: 'pointer',
+                lineHeight: 1.4,
+              }}
+            >{label}</button>
+          );
 
           return (
             <div key={fieldKey}>
               <label style={baseLabel}>{fieldDef.label}</label>
-              <div
-                style={{
-                  background: '#1a1a1a',
-                  padding: 10,
-                  borderRadius: 4,
-                  border: '1px solid #333'
-                }}
-              >
-                {/* Enable checkbox */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#aaa', fontSize: 11, marginBottom: 8 }}>
+              <div style={{ background: '#1a1a1a', padding: 10, borderRadius: 4, border: '1px solid #333' }}>
+
+                {/* Start Open checkbox */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#aaa', fontSize: 11, marginBottom: 10 }}>
                   <input
                     type="checkbox"
-                    checked={activationData.enabled || false}
-                    onChange={e => updateActivation({ enabled: e.target.checked })}
+                    checked={activationData.startOpen || false}
+                    onChange={e => updateData({ startOpen: e.target.checked })}
                   />
-                  Enable activation
+                  Start Open
                 </label>
 
-                {activationData.enabled && (
-                  <>
-                    {/* Order matters checkbox */}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#888', fontSize: 10, marginBottom: 10 }}>
-                      <input
-                        type="checkbox"
-                        checked={activationData.orderMatters || false}
-                        onChange={e => updateActivation({ orderMatters: e.target.checked })}
-                      />
-                      Order matters (items must be placed in sequence)
-                    </label>
+                {/* Condition Sequence header + add buttons */}
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ color: '#888', fontSize: 10 }}>Condition Sequence ({conditionSequence.length})</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => addStep('open')}
+                        style={{ padding: '2px 7px', background: '#2a4a2a', border: '1px solid #3a6a3a', borderRadius: 3, color: '#8c8', fontSize: 9, cursor: 'pointer' }}
+                      >+ Open</button>
+                      <button
+                        onClick={() => addStep('close')}
+                        style={{ padding: '2px 7px', background: '#4a2a2a', border: '1px solid #6a3a3a', borderRadius: 3, color: '#c88', fontSize: 9, cursor: 'pointer' }}
+                      >+ Close</button>
+                    </div>
+                  </div>
 
-                    {/* Requirements list */}
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ color: '#888', fontSize: 10 }}>
-                          Requirements ({requirements.length})
-                        </span>
-                        <button
-                          onClick={addRequirement}
-                          style={{
-                            padding: '2px 8px',
-                            background: '#3a5a3a',
-                            border: 'none',
-                            borderRadius: 3,
-                            color: '#ccc',
-                            fontSize: 10,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          + Add
-                        </button>
-                      </div>
+                  {conditionSequence.length === 0 && (
+                    <p style={{ color: '#555', fontSize: 10, margin: 0, fontStyle: 'italic' }}>
+                      No steps. Add an open or close condition.
+                    </p>
+                  )}
 
-                      {requirements.length === 0 && (
-                        <p style={{ color: '#666', fontSize: 10, margin: 0, fontStyle: 'italic' }}>
-                          No requirements. Add items that must be placed to activate.
-                        </p>
-                      )}
+                  {conditionSequence.map((step, si) => {
+                    const isOpen = step.direction === 'open';
+                    const stepBg = isOpen ? '#1a2a1a' : '#2a1a1a';
+                    const badgeBg = isOpen ? '#2a5a2a' : '#5a2a2a';
+                    const badgeColor = isOpen ? '#8c8' : '#c88';
+                    const condType = step.conditionType || 'items';
+                    const reqs = step.requirements || [];
+                    const stepPathTiles = step.pathTiles || [];
 
-                      {requirements.map((req, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 4,
-                            marginBottom: 6,
-                            padding: '6px 8px',
-                            background: '#252525',
-                            borderRadius: 3
-                          }}
-                        >
-                          {/* Row 1: Index, position, and pick button */}
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            <span style={{ color: '#666', fontSize: 9, width: 18 }}>#{idx + 1}</span>
-                            <span style={{ color: '#888', fontSize: 9 }}>X:</span>
-                            <input
-                              type="number"
-                              min="0"
-                              max="99"
-                              value={req.x || 0}
-                              onChange={e => updateRequirement(idx, 'x', Number(e.target.value))}
-                              style={{ ...inputStyle, width: 36, padding: '2px 4px', fontSize: 10 }}
-                            />
-                            <span style={{ color: '#888', fontSize: 9 }}>Y:</span>
-                            <input
-                              type="number"
-                              min="0"
-                              max="99"
-                              value={req.y || 0}
-                              onChange={e => updateRequirement(idx, 'y', Number(e.target.value))}
-                              style={{ ...inputStyle, width: 36, padding: '2px 4px', fontSize: 10 }}
-                            />
+                    return (
+                      <div key={si} style={{ marginBottom: 6, padding: '6px 8px', background: stepBg, borderRadius: 3, border: `1px solid ${isOpen ? '#2a4a2a' : '#4a2a2a'}` }}>
+                        {/* Step header: badge + step number + reorder + remove */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                          <span style={{ background: badgeBg, color: badgeColor, fontSize: 8, padding: '1px 5px', borderRadius: 2, fontWeight: 700, letterSpacing: 0.5 }}>
+                            {step.direction.toUpperCase()}
+                          </span>
+                          <span style={{ color: '#666', fontSize: 9, flex: 1 }}>Step #{si + 1}</span>
+                          {iconBtn('↑', () => moveStep(si, -1), '#2a2a3a', 'Move up')}
+                          {iconBtn('↓', () => moveStep(si, 1), '#2a2a3a', 'Move down')}
+                          {iconBtn('✕', () => removeStep(si), '#4a2a2a', 'Remove step')}
+                        </div>
+
+                        {/* Enabled + Condition type toggle */}
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 5, alignItems: 'center' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#888', fontSize: 9 }}>
+                            <input type="checkbox" checked={step.enabled !== false} onChange={e => updateStep(si, { enabled: e.target.checked })} />
+                            Enabled
+                          </label>
+                          <div style={{ display: 'flex', gap: 2 }}>
                             <button
-                              onClick={() => onStartActivationPick?.(x, y, fieldKey, idx)}
-                              style={{
-                                padding: '2px 6px',
-                                background: '#3a4a5a',
-                                border: 'none',
-                                borderRadius: 2,
-                                color: '#ccc',
-                                fontSize: 9,
-                                cursor: 'pointer'
-                              }}
-                              title="Click on map to pick position"
-                            >
-                              Pick
-                            </button>
+                              onClick={() => updateStep(si, { conditionType: 'items' })}
+                              style={{ padding: '1px 6px', fontSize: 8, border: 'none', borderRadius: '2px 0 0 2px', cursor: 'pointer', background: condType === 'items' ? '#3a5a7a' : '#2a2a2a', color: condType === 'items' ? '#adf' : '#666' }}
+                            >Items</button>
                             <button
-                              onClick={() => removeRequirement(idx)}
-                              style={{
-                                padding: '2px 5px',
-                                background: '#4a2a2a',
-                                border: 'none',
-                                borderRadius: 2,
-                                color: '#aaa',
-                                fontSize: 9,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                          {/* Row 2: Item ID dropdown */}
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 18 }}>
-                            <span style={{ color: '#888', fontSize: 9 }}>Item:</span>
-                            <select
-                              value={req.itemId || ''}
-                              onChange={e => updateRequirement(idx, 'itemId', e.target.value)}
-                              style={{ ...inputStyle, flex: 1, padding: '2px 4px', fontSize: 10 }}
-                            >
-                              <option value="">-- Select item --</option>
-                              <option value={PLAYER_REQUIREMENT_ID} style={{ color: '#7af' }}>Player (stand on spot)</option>
-                              {availableItemIds.map(id => (
-                                <option key={id} value={id}>{id}</option>
-                              ))}
-                            </select>
+                              onClick={() => updateStep(si, { conditionType: 'path' })}
+                              style={{ padding: '1px 6px', fontSize: 8, border: 'none', borderRadius: '0 2px 2px 0', cursor: 'pointer', background: condType === 'path' ? '#3a5a7a' : '#2a2a2a', color: condType === 'path' ? '#adf' : '#666' }}
+                            >Path</button>
                           </div>
                         </div>
-                      ))}
-                    </div>
 
-                    <p style={{ color: '#666', fontSize: 9, margin: 0, lineHeight: 1.4 }}>
-                      Place items at specified positions or require the player to stand on a spot to activate this tile.
-                    </p>
-                  </>
-                )}
+                        {/* Items condition */}
+                        {condType === 'items' && (
+                          <>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#888', fontSize: 9, marginBottom: 5 }}>
+                              <input type="checkbox" checked={step.orderMatters || false} onChange={e => updateStep(si, { orderMatters: e.target.checked })} />
+                              Order matters
+                            </label>
+
+                            <div style={{ marginBottom: 2 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ color: '#666', fontSize: 9 }}>Requirements ({reqs.length})</span>
+                                <button
+                                  onClick={() => addReq(si)}
+                                  style={{ padding: '1px 6px', background: '#2a3a4a', border: 'none', borderRadius: 2, color: '#aaa', fontSize: 9, cursor: 'pointer' }}
+                                >+ Add</button>
+                              </div>
+
+                              {reqs.length === 0 && (
+                                <p style={{ color: '#444', fontSize: 9, margin: 0, fontStyle: 'italic' }}>No requirements yet.</p>
+                              )}
+
+                              {reqs.map((req, ri) => (
+                                <div key={ri} style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 4, padding: '4px 6px', background: '#1e1e1e', borderRadius: 2 }}>
+                                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                    <span style={{ color: '#555', fontSize: 8, width: 16 }}>#{ri + 1}</span>
+                                    <span style={{ color: '#777', fontSize: 9 }}>X:</span>
+                                    <input
+                                      type="number" min="0" max="99"
+                                      value={req.x || 0}
+                                      onChange={e => updateReq(si, ri, 'x', Number(e.target.value))}
+                                      style={{ ...inputStyle, width: 34, padding: '1px 3px', fontSize: 9 }}
+                                    />
+                                    <span style={{ color: '#777', fontSize: 9 }}>Y:</span>
+                                    <input
+                                      type="number" min="0" max="99"
+                                      value={req.y || 0}
+                                      onChange={e => updateReq(si, ri, 'y', Number(e.target.value))}
+                                      style={{ ...inputStyle, width: 34, padding: '1px 3px', fontSize: 9 }}
+                                    />
+                                    <button
+                                      onClick={() => onStartActivationPick?.(x, y, fieldKey, si, ri)}
+                                      style={{ padding: '1px 5px', background: '#3a4a5a', border: 'none', borderRadius: 2, color: '#ccc', fontSize: 8, cursor: 'pointer' }}
+                                      title="Click on map to pick position"
+                                    >Pick</button>
+                                    <button
+                                      onClick={() => removeReq(si, ri)}
+                                      style={{ padding: '1px 4px', background: '#4a2a2a', border: 'none', borderRadius: 2, color: '#aaa', fontSize: 8, cursor: 'pointer' }}
+                                    >✕</button>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 16 }}>
+                                    <span style={{ color: '#777', fontSize: 9 }}>Item:</span>
+                                    <select
+                                      value={req.itemId || ''}
+                                      onChange={e => updateReq(si, ri, 'itemId', e.target.value)}
+                                      style={{ ...inputStyle, flex: 1, padding: '1px 3px', fontSize: 9 }}
+                                    >
+                                      <option value="">-- Select item --</option>
+                                      <option value={PLAYER_REQUIREMENT_ID} style={{ color: '#7af' }}>Player (stand on spot)</option>
+                                      {availableItemIds.map(id => (
+                                        <option key={id} value={id}>{id}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Path condition */}
+                        {condType === 'path' && (
+                          <div
+                            style={{ background: '#1e1e1e', padding: '6px 8px', borderRadius: 3, cursor: 'pointer', color: '#aaa', fontSize: 10 }}
+                            onClick={() => onStartPathEdit?.(x, y, fieldKey, si)}
+                          >
+                            {stepPathTiles.length > 0
+                              ? `${stepPathTiles.length} tiles in path. Click to edit.`
+                              : 'Click to create path on map'}
+                            {stepPathTiles.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                                {stepPathTiles.map((t, ti) => (
+                                  <span key={ti} style={{ background: '#333', padding: '1px 5px', borderRadius: 2, fontSize: 9, color: '#ccc' }}>
+                                    {ti + 1}:({t.x},{t.y})
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p style={{ color: '#555', fontSize: 9, margin: 0, lineHeight: 1.4 }}>
+                  Steps are executed in order. Each step fires once when its conditions are met.
+                </p>
               </div>
               <HelpText type={tileType} field={fieldKey} show={showHelp} CONFIG_HELP={CONFIG_HELP} />
             </div>

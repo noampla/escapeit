@@ -1,8 +1,38 @@
 // Activation System - Enables puzzle-based activation of doors/gates
 // Items with specific IDs must be placed at specific positions to activate
 // Special itemId '__player__' means player must stand on the position
+//
+// Data model (new):
+//   activationRequirements: {
+//     startOpen: false,
+//     conditionSequence: [
+//       { direction: 'open'|'close', enabled, orderMatters, requirements: [{x,y,itemId},...] },
+//       ...
+//     ]
+//   }
+// Backwards-compat: old shape { enabled, orderMatters, requirements } treated as single open-step.
 
 export const PLAYER_REQUIREMENT_ID = '__player__';
+
+/**
+ * Normalise activationRequirements to the new conditionSequence shape.
+ */
+function normaliseActivationRequirements(reqs) {
+  if (!reqs) return null;
+  if (Array.isArray(reqs.conditionSequence)) {
+    return { startOpen: reqs.startOpen || false, conditionSequence: reqs.conditionSequence };
+  }
+  // Old shape
+  return {
+    startOpen: false,
+    conditionSequence: [{
+      direction: 'open',
+      enabled: reqs.enabled || false,
+      orderMatters: reqs.orderMatters || false,
+      requirements: reqs.requirements || []
+    }]
+  };
+}
 
 /**
  * Check if a single requirement is met.
@@ -34,23 +64,22 @@ export function checkRequirement(grid, requirement, allPlayerPositions) {
 }
 
 /**
- * Check all requirements for an activatable tile (unordered mode).
+ * Check all requirements for a condition step (unordered mode).
  * Each __player__ requirement must be satisfied by a DIFFERENT player position.
  * @param {Array} grid - The game grid
- * @param {Object} activationRequirements - The activation config
+ * @param {Object} step - { enabled, orderMatters, requirements }
  * @param {Array} allPlayerPositions - array of { x, y } for every player
  * @returns {boolean} - True if all requirements are met
  */
-export function checkAllRequirements(grid, activationRequirements, allPlayerPositions) {
-  if (!activationRequirements?.enabled) return false;
+export function checkAllRequirements(grid, step, allPlayerPositions) {
+  if (!step?.enabled) return false;
 
-  const requirements = activationRequirements.requirements || [];
+  const requirements = step.requirements || [];
   if (requirements.length === 0) return false;
 
   const positions = Array.isArray(allPlayerPositions) ? allPlayerPositions : (allPlayerPositions ? [allPlayerPositions] : []);
 
   // For __player__ requirements, each must be satisfied by a distinct player.
-  // Track which player indices have already been "used" for a player requirement.
   const usedPlayerIndices = new Set();
   for (const req of requirements) {
     if (req.itemId === PLAYER_REQUIREMENT_ID) {
@@ -69,44 +98,33 @@ export function checkAllRequirements(grid, activationRequirements, allPlayerPosi
  * Each __player__ requirement must be satisfied by a DIFFERENT player position.
  * @param {Array} grid - The game grid
  * @param {Object} gameState - Current game state (will be mutated for progress tracking)
- * @param {Object} activationRequirements - The activation config
- * @param {string} tileKey - Unique key for this tile ("x,y")
+ * @param {Object} step - { enabled, orderMatters, requirements }
+ * @param {string} progressKey - Unique key for this step's progress (e.g. "x,y:step:N")
  * @param {Object} dropPosition - { x, y } position where item was just dropped (optional)
  * @param {Array} allPlayerPositions - array of { x, y } for every player
  * @returns {boolean} - True if all requirements are met in order
  */
-export function checkOrderedRequirements(grid, gameState, activationRequirements, tileKey, dropPosition, allPlayerPositions) {
-  if (!activationRequirements?.enabled || !activationRequirements.orderMatters) return false;
+export function checkOrderedRequirements(grid, gameState, step, progressKey, dropPosition, allPlayerPositions) {
+  if (!step?.enabled || !step.orderMatters) return false;
 
-  const requirements = activationRequirements.requirements || [];
+  const requirements = step.requirements || [];
   if (requirements.length === 0) return false;
 
   const positions = Array.isArray(allPlayerPositions) ? allPlayerPositions : (allPlayerPositions ? [allPlayerPositions] : []);
 
-  // Initialize progress tracking
-  if (!gameState.activationProgress) {
-    gameState.activationProgress = {};
-  }
-  const progress = gameState.activationProgress[tileKey] || { fulfilledCount: 0 };
+  if (!gameState.activationProgress) gameState.activationProgress = {};
+  const progress = gameState.activationProgress[progressKey] || { fulfilledCount: 0 };
 
-  // Only advance if:
-  // 1. All previous requirements are still met
-  // 2. The NEXT requirement (at index fulfilledCount) is now met
-  // 3. The drop position matches the next required position (if dropPosition provided)
   const nextIndex = progress.fulfilledCount;
 
   if (nextIndex < requirements.length) {
     const nextReq = requirements[nextIndex];
 
-    // If dropPosition is provided, only advance if this drop is at the next required position
-    // (skip this check for player requirements since those are position-based already)
     if (dropPosition && nextReq.itemId !== PLAYER_REQUIREMENT_ID &&
         (dropPosition.x !== nextReq.x || dropPosition.y !== nextReq.y)) {
-      // Drop is not at the next required position - don't advance
       return progress.fulfilledCount >= requirements.length;
     }
 
-    // Build set of player indices already used by previous player requirements
     const usedPlayerIndices = new Set();
     let allPreviousMet = true;
     for (let i = 0; i < nextIndex; i++) {
@@ -120,7 +138,6 @@ export function checkOrderedRequirements(grid, gameState, activationRequirements
       }
     }
 
-    // Only check next requirement if previous ones are still met
     if (allPreviousMet) {
       let nextMet = false;
       if (nextReq.itemId === PLAYER_REQUIREMENT_ID) {
@@ -131,7 +148,7 @@ export function checkOrderedRequirements(grid, gameState, activationRequirements
       }
       if (nextMet) {
         progress.fulfilledCount = nextIndex + 1;
-        gameState.activationProgress[tileKey] = progress;
+        gameState.activationProgress[progressKey] = progress;
       }
     }
   }
@@ -169,7 +186,48 @@ export function activateTile(grid, x, y) {
 }
 
 /**
- * Find all tiles with activation requirements
+ * Execute deactivation on a tile (door closes, gate closes)
+ * @param {Array} grid - The game grid
+ * @param {number} x - Tile x position
+ * @param {number} y - Tile y position
+ * @returns {Object} - { success, method, modifyGrid }
+ */
+export function deactivateTile(grid, x, y) {
+  const cell = grid[y]?.[x];
+  if (!cell?.object) return { success: false };
+
+  const tileType = cell.object.type;
+
+  if (tileType === 'door-key-open') {
+    cell.object.type = 'door-key';
+    cell.object.config = { ...(cell.object.config || {}), activated: false };
+    return { success: true, method: 'replace', modifyGrid: true };
+  }
+  if (tileType === 'door-card-open') {
+    cell.object.type = 'door-card';
+    cell.object.config = { ...(cell.object.config || {}), activated: false };
+    return { success: true, method: 'replace', modifyGrid: true };
+  }
+  if (tileType === 'ancient-gate') {
+    cell.object.config = { ...(cell.object.config || {}), isOpen: false };
+    return { success: true, method: 'flag', modifyGrid: true };
+  }
+
+  return { success: false };
+}
+
+/**
+ * Returns true if the tile is currently open/activated.
+ */
+function isTileOpen(config, tileType) {
+  if (config?.isOpen) return true;
+  if (config?.activated) return true;
+  if (tileType === 'door-key-open' || tileType === 'door-card-open') return true;
+  return false;
+}
+
+/**
+ * Find all tiles with activation requirements (new or old shape).
  * @param {Array} grid - The game grid
  * @returns {Array} - Array of { x, y, type, config }
  */
@@ -179,13 +237,11 @@ export function getActivatableTiles(grid) {
     for (let x = 0; x < grid[y].length; x++) {
       const cell = grid[y][x];
       const config = cell.object?.config;
-      if (config?.activationRequirements?.enabled) {
-        tiles.push({
-          x,
-          y,
-          type: cell.object.type,
-          config
-        });
+      const reqs = config?.activationRequirements;
+      if (!reqs) continue;
+      // Accept both old shape (.enabled) and new shape (.conditionSequence)
+      if (reqs.enabled || Array.isArray(reqs.conditionSequence)) {
+        tiles.push({ x, y, type: cell.object.type, config });
       }
     }
   }
@@ -193,21 +249,61 @@ export function getActivatableTiles(grid) {
 }
 
 /**
- * Main check function: call after item drop/pickup or player movement
- * Checks all activatable tiles and activates those with met requirements.
+ * Apply startOpen states at game start (call once before first render).
+ * Opens tiles with startOpen:true silently and advances their step counter
+ * past any leading 'open' steps.
+ * @param {Array} grid - The game grid (mutated)
+ * @param {Object} gameState - Game state (mutated)
+ */
+export function applyStartStates(grid, gameState) {
+  if (!gameState.activationProgress) gameState.activationProgress = {};
+
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[y].length; x++) {
+      const cell = grid[y][x];
+      const config = cell.object?.config;
+      const reqs = config?.activationRequirements;
+      if (!reqs) continue;
+
+      const norm = normaliseActivationRequirements(reqs);
+      if (!norm) continue;
+
+      const tileKey = `${x},${y}`;
+
+      if (norm.startOpen) {
+        activateTile(grid, x, y);
+        // Advance past any leading open-steps (already satisfied by startOpen)
+        let step = 0;
+        while (step < norm.conditionSequence.length && norm.conditionSequence[step].direction === 'open') {
+          step++;
+        }
+        gameState.activationProgress[tileKey] = { currentStep: step };
+      } else {
+        if (!gameState.activationProgress[tileKey]) {
+          gameState.activationProgress[tileKey] = { currentStep: 0 };
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Main check function: call after item drop/pickup or player movement.
+ * Fires the current step in each activatable tile's condition sequence if met.
+ * Handles both opening and closing in a single call.
  *
  * playerPos may be a single { x, y } (solo) or an array of { x, y } (multiplayer).
- * In multiplayer, __player__ requirements each need a DISTINCT player standing on them.
  *
  * @param {Array} grid - The game grid
  * @param {Object} gameState - Current game state
- * @param {Object} dropPosition - { x, y } position where item was just dropped (optional, for ordered mode)
+ * @param {Object} dropPosition - { x, y } position where item was just dropped (optional)
  * @param {Object|Array} playerPos - { x, y } or [{ x, y }, ...] for all players
- * @returns {Array} - Array of activated tiles { x, y, type }
+ * @returns {Array} - Array of { x, y, type, direction, ...activateResult }
  */
 export function checkActivations(grid, gameState, dropPosition, playerPos) {
-  // Normalise to array so internal functions always see an array
   const allPlayerPositions = Array.isArray(playerPos) ? playerPos : (playerPos ? [playerPos] : []);
+
+  if (!gameState.activationProgress) gameState.activationProgress = {};
 
   const activatableTiles = getActivatableTiles(grid);
   const results = [];
@@ -215,22 +311,44 @@ export function checkActivations(grid, gameState, dropPosition, playerPos) {
   for (const tile of activatableTiles) {
     const { x, y, config } = tile;
     const tileKey = `${x},${y}`;
-    const reqs = config.activationRequirements;
+    const norm = normaliseActivationRequirements(config.activationRequirements);
+    if (!norm) continue;
 
-    // Skip if already activated
-    if (config.activated || config.isOpen) continue;
+    const { conditionSequence } = norm;
+    if (!conditionSequence.length) continue;
 
-    let allMet = false;
-    if (reqs.orderMatters) {
-      allMet = checkOrderedRequirements(grid, gameState, reqs, tileKey, dropPosition, allPlayerPositions);
+    const progress = gameState.activationProgress[tileKey] || { currentStep: 0 };
+    const stepIdx = progress.currentStep;
+
+    if (stepIdx >= conditionSequence.length) continue; // All steps exhausted
+
+    const step = conditionSequence[stepIdx];
+    if (!step?.enabled) continue;
+    if (step.conditionType === 'path') continue; // path steps handled by onPlayerMove
+
+    const tileOpen = isTileOpen(config, tile.type);
+
+    // Direction mismatch → silent no-op (no message to player)
+    if (step.direction === 'open' && tileOpen) continue;
+    if (step.direction === 'close' && !tileOpen) continue;
+
+    const progressKey = `${tileKey}:step:${stepIdx}`;
+    let met;
+    if (step.orderMatters) {
+      met = checkOrderedRequirements(grid, gameState, step, progressKey, dropPosition, allPlayerPositions);
     } else {
-      allMet = checkAllRequirements(grid, reqs, allPlayerPositions);
+      met = checkAllRequirements(grid, step, allPlayerPositions);
     }
 
-    if (allMet) {
-      const result = activateTile(grid, x, y);
+    if (met) {
+      const result = step.direction === 'open'
+        ? activateTile(grid, x, y)
+        : deactivateTile(grid, x, y);
+
       if (result.success) {
-        results.push({ x, y, type: tile.type, ...result });
+        progress.currentStep = stepIdx + 1;
+        gameState.activationProgress[tileKey] = progress;
+        results.push({ x, y, type: tile.type, direction: step.direction, ...result });
       }
     }
   }

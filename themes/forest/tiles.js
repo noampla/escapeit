@@ -1,4 +1,6 @@
 // Forest theme tile definitions
+import { activateTile, deactivateTile } from '../../src/engine/activationSystem.js';
+
 export const TILE_TYPES = {
   empty: {
     label: 'Empty',
@@ -287,11 +289,10 @@ export const TILE_TYPES = {
     layer: 'object',
     configurable: true,
     defaultConfig: {
-      pathTiles: [],  // Array of {x, y} coordinates in the correct order
       isOpen: false   // Runtime state - whether the gate is currently open
     },
-    tooltip: 'Ancient stone gate. Create a path by clicking tiles in order. Walk the path correctly to open.',
-    walkable: false  // Not walkable until path is completed
+    tooltip: 'Ancient stone gate. Configure open/close conditions in the activation sequence.',
+    walkable: false  // Not walkable until opened
   },
   sign: {
     label: 'Sign',
@@ -375,8 +376,7 @@ export const CONFIG_HELP = {
     name: 'Name for this friend. Shown in messages and missions.',
   },
   'ancient-gate': {
-    pathTiles: 'Click tiles on the map to define the path. Tiles must be connected (up/down/left/right). Player must walk the path in order without leaving.',
-    activationRequirements: 'Configure items that must be placed at specific positions to open the gate. Alternative to path-based opening.',
+    activationRequirements: 'Configure the sequence of open/close conditions for the gate. Use item placement, player position, or path walking.',
   },
   sign: {
     message: 'The message that appears when the player presses E to read the sign.',
@@ -407,18 +407,12 @@ export const CONFIG_SCHEMA = {
     }
   },
   'ancient-gate': {
-    pathTiles: {
-      type: 'path',  // Special type handled by the builder
-      label: 'Path Tiles',
-      default: []
-    },
     activationRequirements: {
       type: 'activation',
-      label: 'Item Activation',
+      label: 'Activation',
       default: {
-        enabled: false,
-        orderMatters: false,
-        requirements: []
+        startOpen: false,
+        conditionSequence: []
       }
     }
   },
@@ -1950,9 +1944,73 @@ export function onPlayerMove(gameState, grid, newX, newY) {
     }
   }
 
-  // Check each gate's path
   for (const gate of gates) {
     const gateKey = `${gate.x},${gate.y}`;
+
+    // --- New-style: conditionSequence path step ---
+    const condSeq = gate.config?.activationRequirements?.conditionSequence;
+    if (condSeq) {
+      if (!gameState.activationProgress) gameState.activationProgress = {};
+      const seqProg = gameState.activationProgress[gateKey] || { currentStep: 0 };
+      const stepIdx = seqProg.currentStep;
+      const step = condSeq[stepIdx];
+
+      if (step?.conditionType === 'path' && step?.enabled !== false) {
+        const stepPathTiles = step.pathTiles || [];
+        if (stepPathTiles.length > 0) {
+          const tileOpen = gate.config?.isOpen === true;
+          const dirMismatch = (step.direction === 'open' && tileOpen) || (step.direction === 'close' && !tileOpen);
+
+          if (!dirMismatch) {
+            const seqProgressKey = `${gateKey}:seq:${stepIdx}`;
+            const sp = gameState.ancientGateProgress[seqProgressKey] || { step: 0, active: false };
+            const curIdx = stepPathTiles.findIndex(t => t.x === newX && t.y === newY);
+
+            if (curIdx !== -1) {
+              if (curIdx === 0) {
+                sp.step = 1;
+                sp.active = true;
+                gameState.ancientGateProgress[seqProgressKey] = sp;
+              } else if (sp.active && curIdx === sp.step) {
+                sp.step++;
+                gameState.ancientGateProgress[seqProgressKey] = sp;
+
+                if (sp.step >= stepPathTiles.length) {
+                  // Path completed — open or close the gate
+                  const result = step.direction === 'open'
+                    ? activateTile(grid, gate.x, gate.y)
+                    : deactivateTile(grid, gate.x, gate.y);
+
+                  if (result.success) {
+                    seqProg.currentStep = stepIdx + 1;
+                    gameState.activationProgress[gateKey] = seqProg;
+                    delete gameState.ancientGateProgress[seqProgressKey];
+                    const msg = step.direction === 'open'
+                      ? '🌟 The ancient gate opens with a mystical glow!'
+                      : '🔒 The ancient gate closes.';
+                    return { success: true, message: msg, modifyGrid: true };
+                  }
+                }
+              } else if (sp.active) {
+                sp.step = 0;
+                sp.active = false;
+                gameState.ancientGateProgress[seqProgressKey] = sp;
+                return { success: false, message: '❌ You broke the path sequence. Start again from the beginning.', modifyGrid: false };
+              }
+            } else if (sp.active) {
+              sp.step = 0;
+              sp.active = false;
+              gameState.ancientGateProgress[seqProgressKey] = sp;
+              return { success: false, message: '❌ You left the path. Start again from the beginning.', modifyGrid: false };
+            }
+          }
+        }
+      }
+      // If current step is not a path step, skip old-style check for this gate
+      continue;
+    }
+
+    // --- Old-style: top-level pathTiles ---
     const pathTiles = gate.config?.pathTiles || [];
 
     // Skip if no path defined or already open
