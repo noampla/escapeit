@@ -36,7 +36,7 @@ export default function MobileNotificationOverlay() {
           onClick={clearCurrent}
           style={{
             position: 'absolute',
-            top: 52,
+            top: 'calc(52px + env(safe-area-inset-top, 0px))',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 450,
@@ -73,8 +73,8 @@ export default function MobileNotificationOverlay() {
         onClick={() => setShowHistory(true)}
         style={{
           position: 'absolute',
-          top: 8,
-          right: 50,
+          top: 'calc(8px + env(safe-area-inset-top, 0px))',
+          right: 'calc(50px + env(safe-area-inset-right, 0px))',
           zIndex: 450,
           pointerEvents: 'auto',
           width: 32,
@@ -132,7 +132,7 @@ export default function MobileNotificationOverlay() {
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              margin: '40px 12px 12px',
+              margin: 'calc(40px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px))',
               background: 'rgba(20, 25, 30, 0.92)',
               borderRadius: 14,
               overflow: 'hidden',
