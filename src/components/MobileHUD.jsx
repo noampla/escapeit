@@ -55,7 +55,7 @@ export default function MobileHUD({
       right: 0,
       pointerEvents: 'none',
       zIndex: 400,
-      padding: '8px 12px',
+      padding: 'calc(8px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 0 calc(12px + env(safe-area-inset-left, 0px))',
     }}>
       {/* Top row: lives + time/moves + sound */}
       <div style={{

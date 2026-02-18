@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import Grid from './Grid';
 import MobileJoystick from './MobileJoystick';
 import MobileHUD from './MobileHUD';
@@ -8,6 +8,8 @@ import StoryModal from './StoryModal';
 import Leaderboard from './Leaderboard.jsx';
 import InventoryPreview from './InventoryPreview';
 import { TILE_SIZE } from '../utils/constants';
+
+const CONTROL_MODE_KEY = 'escapeit_control_mode';
 
 function calculatePlayerViewport(playerPos, grid, tilesX = 20, tilesY = 15) {
   const gridCols = grid[0].length;
@@ -97,6 +99,17 @@ export default function MobileSolverLayout({
 }) {
   const gridContainerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [controlMode, setControlMode] = useState(() => {
+    try { return localStorage.getItem(CONTROL_MODE_KEY) || 'joystick'; }
+    catch { return 'joystick'; }
+  });
+  const toggleControlMode = useCallback(() => {
+    setControlMode(prev => {
+      const next = prev === 'joystick' ? 'dpad' : 'joystick';
+      try { localStorage.setItem(CONTROL_MODE_KEY, next); } catch {}
+      return next;
+    });
+  }, []);
 
   // Measure container
   useEffect(() => {
@@ -114,8 +127,8 @@ export default function MobileSolverLayout({
 
   // Calculate viewport for full screen
   const viewportBounds = useMemo(() => {
-    const tilesX = Math.max(10, Math.floor(containerSize.width / TILE_SIZE));
-    const tilesY = Math.max(8, Math.floor(containerSize.height / TILE_SIZE));
+    const tilesX = Math.max(10, Math.ceil(containerSize.width / TILE_SIZE));
+    const tilesY = Math.max(8, Math.ceil(containerSize.height / TILE_SIZE));
     return calculatePlayerViewport(playerPos, grid, tilesX, tilesY);
   }, [playerPos, grid, containerSize]);
 
@@ -232,6 +245,8 @@ export default function MobileSolverLayout({
           onInteractRelease={handleInteractRelease}
           interactionState={interactionState}
           isRTL={isRTL}
+          mode={controlMode}
+          onToggleMode={toggleControlMode}
         />
       )}
 
