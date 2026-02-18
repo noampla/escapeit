@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
 const COLLECTION = 'maps';
@@ -140,6 +140,13 @@ export async function saveLevel(level) {
 
 export async function deleteLevel(id) {
   await deleteDoc(doc(db, COLLECTION, id));
+}
+
+// Load a single level by ID (for direct URL access)
+export async function loadLevelById(id) {
+  const docSnap = await getDoc(doc(db, COLLECTION, id));
+  if (!docSnap.exists()) return null;
+  return { ...restoreLevel(docSnap.data()), id: docSnap.id };
 }
 
 // Load levels created by a specific user
