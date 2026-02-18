@@ -230,6 +230,8 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
 
   // Multiplayer state
   const [peerStates, setPeerStates] = useState({}); // { [playerId]: { x, y, direction, inventory?: [] } }
+  const peerStatesRef = useRef({});
+  peerStatesRef.current = peerStates;
   const [peersAtExit, setPeersAtExit] = useState(new Set());
   // Track recent local pickups for race condition resolution: "tileX,tileY" -> { itemType, timestamp }
   const pendingPickupsRef = useRef(new Map());
@@ -303,15 +305,31 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
   const handleMultiplayerMessage = useCallback((msg) => {
     switch (msg.type) {
       case 'player_move': {
-        setPeerStates(prev => ({
-          ...prev,
+        const updatedPeerStates = {
+          ...peerStatesRef.current,
           [msg.fromPlayerId]: {
-            ...(prev[msg.fromPlayerId] || {}),
+            ...(peerStatesRef.current[msg.fromPlayerId] || {}),
             x: msg.x,
             y: msg.y,
             direction: msg.direction,
           }
-        }));
+        };
+        peerStatesRef.current = updatedPeerStates;
+        setPeerStates(updatedPeerStates);
+        // Re-check activations now that a peer has moved - they may have stepped on a trigger
+        const localPos = playerPosRef.current;
+        const allPositions = [localPos, ...Object.values(updatedPeerStates)].filter(Boolean);
+        const currentGrid = gridRef.current;
+        const preGrid = cloneGrid(currentGrid);
+        const peerMoveActivations = checkActivations(currentGrid, gameStateRef.current, null, allPositions);
+        if (peerMoveActivations.length > 0) {
+          soundManager.play('success');
+          const afterGrid = cloneGrid(currentGrid);
+          gridRef.current = afterGrid;
+          setGrid(afterGrid);
+          // broadcast the opened tiles to peers (so the peer who triggered also sees it if their grid differs)
+          broadcastGridDiffCallbackRef.current?.(preGrid, afterGrid);
+        }
         break;
       }
       case 'item_pickup': {
@@ -502,6 +520,9 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
       }
     }
   }, []);
+  // Ref so handleMultiplayerMessage (defined before broadcastGridDiff) can call it
+  const broadcastGridDiffCallbackRef = useRef(null);
+  broadcastGridDiffCallbackRef.current = broadcastGridDiff;
 
   const respawn = useCallback(() => {
     setPlayerPos({ ...startPos });
@@ -620,7 +641,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
 
     // Check if any activation requirements are now met
     const preDropActivGrid = cloneGrid(newGrid);
-    const activationResults = checkActivations(newGrid, gameStateRef.current, { x: pos.x, y: pos.y }, pos);
+    const activationResults = checkActivations(newGrid, gameStateRef.current, { x: pos.x, y: pos.y }, [pos, ...Object.values(peerStatesRef.current)]);
     if (activationResults.length > 0) {
       soundManager.play('success');
       const msg = getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!';
@@ -1442,7 +1463,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
         autoMarkCaveBorders(nx, ny);
         // Check activation requirements (player may need to stand on a spot)
         const preSwapActivGrid = cloneGrid(newGrid);
-        const tileSwapActivations = checkActivations(newGrid, gameStateRef.current, null, { x: nx, y: ny });
+        const tileSwapActivations = checkActivations(newGrid, gameStateRef.current, null, [{ x: nx, y: ny }, ...Object.values(peerStatesRef.current)]);
         if (tileSwapActivations.length > 0) {
           soundManager.play('success');
           showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
@@ -1475,7 +1496,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
 
       // Check activation requirements (player may need to stand on a spot)
       const preThemeActivGrid = cloneGrid(currentGrid);
-      const themeMoveActivations = checkActivations(currentGrid, gameStateRef.current, null, { x: nx, y: ny });
+      const themeMoveActivations = checkActivations(currentGrid, gameStateRef.current, null, [{ x: nx, y: ny }, ...Object.values(peerStatesRef.current)]);
       if (themeMoveActivations.length > 0) {
         soundManager.play('success');
         showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
@@ -1525,7 +1546,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
 
       // Check activation requirements (player may need to stand on a spot)
       const preActivGrid = cloneGrid(currentGrid);
-      const fallbackActivations = checkActivations(currentGrid, gameStateRef.current, null, { x: nx, y: ny });
+      const fallbackActivations = checkActivations(currentGrid, gameStateRef.current, null, [{ x: nx, y: ny }, ...Object.values(peerStatesRef.current)]);
       if (fallbackActivations.length > 0) {
         soundManager.play('success');
         showMessage(getMessage(themeId, 'puzzleSolved', {}) || 'Puzzle solved!', 2000, 'success');
