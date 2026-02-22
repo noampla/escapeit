@@ -25,8 +25,8 @@ export const INTERACTIONS = {
     duration: 1500,
     requirements: { inventory: ['axe'], tile: 'tree' },
     checkCustom: (gameState, tile, grid, _x, _y) => {
-      // Can only chop trees if standing on the same floor type
-      // Exception: sweater allows interacting with things on snow from non-snow tiles
+      // Floor type restriction: only block interacting WITH snow from non-snow
+      // (requires sweater to interact with snow tiles from ground/cave)
       const playerPos = gameState.playerPos;
       if (!playerPos) return true; // Fallback: allow if no player position
 
@@ -36,10 +36,13 @@ export const INTERACTIONS = {
       // Same floor type - always allowed
       if (targetFloor === playerFloor) return true;
 
-      // Different floor types - only allow if target is snow and player has sweater
-      if (targetFloor === 'snow' && hasSweater(gameState)) return true;
+      // Standing on snow → allow interacting with ground/cave
+      if (playerFloor === 'snow') return true;
 
-      return false;
+      // Standing on ground/cave → need sweater to interact with snow
+      if (targetFloor === 'snow' && !hasSweater(gameState)) return false;
+
+      return true;
     },
     execute: (gameState, grid, x, y) => {
       // Tree is now an object tile - replace tree object with wood item object

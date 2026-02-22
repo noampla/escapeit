@@ -1,7 +1,12 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import Anthropic from '@anthropic-ai/sdk';
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, '../.env') });
 
 const PORT = process.env.PORT || 8080;
 
