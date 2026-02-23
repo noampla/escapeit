@@ -123,7 +123,14 @@ export const INTERACTIONS = {
     duration: 2000,
     requirements: {
       inventory: ['rope', 'wood'],
-      tileAny: ['ground', 'campfire', 'raft']  // Can build on these tiles
+      selfOnly: true  // Build on tile player is standing on
+    },
+    checkCustom: (gameState, tile, grid, x, y) => {
+      // Can build raft on ground, snow, campfire floor types where player is standing
+      const playerPos = gameState.playerPos;
+      if (!playerPos) return false;
+      const playerFloorType = grid[playerPos.y]?.[playerPos.x]?.floor?.type;
+      return ['ground', 'snow', 'campfire'].includes(playerFloorType);
     },
     execute: (gameState, grid, x, y) => {
       const ropeIdx = findItemIndex(gameState.inventory, 'rope');
