@@ -510,7 +510,7 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
         const newCell = newGrid[row][col];
         const objectChanged = (newCell?.object?.type ?? null) !== (oldCell?.object?.type ?? null) ||
           JSON.stringify(newCell?.object?.config ?? {}) !== JSON.stringify(oldCell?.object?.config ?? {});
-        const floorChanged = !objectChanged && (
+        const floorChanged = (
           (newCell?.floor?.type ?? null) !== (oldCell?.floor?.type ?? null) ||
           JSON.stringify(newCell?.floor?.config ?? {}) !== JSON.stringify(oldCell?.floor?.config ?? {})
         );
@@ -523,7 +523,8 @@ export default function SolverMode({ level, onBack, isTestMode = false, multipla
             newType: newCell.object?.type ?? null,
             newConfig: newCell.object?.config ?? {},
           });
-        } else if (floorChanged) {
+        }
+        if (floorChanged) {
           mpSendRef.current({
             type: 'tile_change',
             tileX: col,
