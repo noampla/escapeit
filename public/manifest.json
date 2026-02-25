@@ -1,0 +1,17 @@
+{
+  "name": "Escape It",
+  "short_name": "EscapeIt",
+  "description": "Build, play, and escape! Create puzzle escape-room maps with multiple themes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080e18",
+  "theme_color": "#080e18",
+  "icons": [
+    {
+      "src": "/images/escapeit-logo.png",
+      "sizes": "512x492",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

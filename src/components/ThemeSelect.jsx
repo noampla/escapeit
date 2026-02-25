@@ -21,6 +21,16 @@ export default function ThemeSelect({ onSelectTheme, onBack }) {
         textAlign: 'center',
         marginBottom: '40px'
       }}>
+        <img
+          src="/images/escapeit-logo.png"
+          alt="Escape It"
+          style={{
+            width: '72px',
+            height: '72px',
+            marginBottom: '12px',
+            filter: 'drop-shadow(0 2px 12px rgba(255, 255, 255, 0.15))',
+          }}
+        />
         <h2 style={{
           fontSize: '36px',
           fontWeight: 'bold',

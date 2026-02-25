@@ -220,20 +220,30 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
             {isRTL ? `${t('levelSelect.backToMenu')} →` : `← ${t('levelSelect.backToMenu')}`}
           </button>
 
-          <h2 style={{
-            color: '#ffffff',
-            fontSize: 32,
-            fontWeight: '900',
-            textShadow: '0 4px 16px rgba(0, 0, 0, 0.8)',
-            letterSpacing: 2,
-            textTransform: 'uppercase',
-            margin: 0,
-            flex: 1,
-            textAlign: 'center',
-            direction: isRTL ? 'rtl' : 'ltr',
-          }}>
-            {t('levelSelect.title')}
-          </h2>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <img
+              src="/images/escapeit-logo.png"
+              alt="Escape It"
+              style={{
+                width: 44,
+                height: 44,
+                filter: 'drop-shadow(0 2px 8px rgba(255, 255, 255, 0.15))',
+              }}
+            />
+            <h2 style={{
+              color: '#ffffff',
+              fontSize: 32,
+              fontWeight: '900',
+              textShadow: '0 4px 16px rgba(0, 0, 0, 0.8)',
+              letterSpacing: 2,
+              textTransform: 'uppercase',
+              margin: 0,
+              textAlign: 'center',
+              direction: isRTL ? 'rtl' : 'ltr',
+            }}>
+              {t('levelSelect.title')}
+            </h2>
+          </div>
 
           {/* Sort dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
