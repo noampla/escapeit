@@ -1,6 +1,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import Anthropic from '@anthropic-ai/sdk';
+import admin from 'firebase-admin';
 import { config } from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -13,16 +14,83 @@ const PORT = process.env.PORT || 8080;
 // ─── Anthropic client ────────────────────────────────────────────
 const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
+// ─── Firebase Admin (uses ADC on Cloud Run, service account key locally) ──
+import { existsSync, readFileSync } from 'fs';
+const serviceAccountPath = resolve(__dirname, 'escapeit-b9b45-firebase-adminsdk-fbsvc-345b451185.json');
+if (existsSync(serviceAccountPath)) {
+  const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+} else {
+  admin.initializeApp({ projectId: 'escapeit-b9b45' }); // ADC on Cloud Run
+}
+const firestore = admin.firestore();
+
+// ─── Levels listing cache ────────────────────────────────────────
+let levelsCache = null;
+let levelsCacheTime = 0;
+const LEVELS_CACHE_TTL = 30_000; // 30 seconds
+
 // ─── HTTP server (handles REST + upgrades to WS) ────────────────
 const httpServer = createServer(async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // ── GET /api/levels (metadata only — no grid) ──
+  if (req.method === 'GET' && req.url === '/api/levels') {
+    try {
+      const now = Date.now();
+      if (levelsCache && (now - levelsCacheTime < LEVELS_CACHE_TTL)) {
+        log(`LEVELS  cache hit (${levelsCache.length} levels)`);
+        respond(res, 200, levelsCache);
+        return;
+      }
+
+      log('LEVELS  fetching from Firestore...');
+      const snapshot = await firestore.collection('maps')
+        .select('name', 'themeId', 'missions', 'lives', 'inventoryCapacity',
+                'fixedOrder', 'createdAt', 'updatedAt', 'creatorId', 'creatorName')
+        .get();
+
+      const levels = snapshot.docs.map(doc => {
+        const d = doc.data();
+        // Normalize timestamps — could be Firestore Timestamp or plain number
+        const normalizeTime = (v) => {
+          if (!v) return null;
+          if (v._seconds) return v._seconds * 1000;
+          if (typeof v === 'number') return v;
+          return null;
+        };
+        return {
+          id: doc.id,
+          name: d.name || 'Untitled',
+          themeId: d.themeId || 'forest',
+          missions: d.missions || [],
+          lives: d.lives || 3,
+          inventoryCapacity: d.inventoryCapacity || 8,
+          fixedOrder: d.fixedOrder || false,
+          createdAt: normalizeTime(d.createdAt),
+          updatedAt: normalizeTime(d.updatedAt),
+          creatorId: d.creatorId || null,
+          creatorName: d.creatorName || null,
+        };
+      });
+
+      levelsCache = levels;
+      levelsCacheTime = now;
+      log(`LEVELS  OK (${levels.length} levels)`);
+      respond(res, 200, levels);
+    } catch (err) {
+      log(`LEVELS  ERROR: ${err.message}`);
+      respond(res, 500, { error: 'Failed to load levels' });
+    }
     return;
   }
 

@@ -26,3 +26,6 @@ nul
 .env*
 .env.local
 hosting*.env
+
+# Firebase service account keys
+*firebase-adminsdk*

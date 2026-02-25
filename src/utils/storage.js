@@ -114,32 +114,44 @@ export async function saveLevels(levels) {
   }
 }
 
-export async function loadLevels() {
-  console.log('loadLevels: fetching from Firebase...');
-  const snapshot = await getDocs(collection(db, COLLECTION));
-  // Use document ID as the level's id (in case data.id is missing/different)
-  const levels = snapshot.docs.map(d => {
-    const data = restoreLevel(d.data());
-    return { ...data, id: d.id }; // Ensure doc ID is used
-  });
-  console.log('loadLevels: got', levels.length, 'levels:', levels.map(l => `${l.id}: ${l.name} (${l.themeId})`));
+// In-memory cache to avoid re-downloading all grids on every mount
+let _levelsCache = null;
+let _levelsCacheTime = 0;
+const CACHE_TTL = 60_000; // 1 minute
 
-  // Check for duplicate IDs (shouldn't happen with doc IDs)
-  const ids = levels.map(l => l.id);
-  const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
-  if (duplicates.length > 0) {
-    console.warn('DUPLICATE IDs FOUND:', duplicates);
+// Server URL — same pattern as aiMapService.js
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+
+export async function loadLevels(forceRefresh = false) {
+  if (!forceRefresh && _levelsCache && (Date.now() - _levelsCacheTime < CACHE_TTL)) {
+    console.log('loadLevels: returning cached', _levelsCache.length, 'levels');
+    return _levelsCache;
   }
 
+  console.log('loadLevels: fetching from API (metadata only)...');
+  const res = await fetch(`${BASE_URL}/api/levels`);
+  if (!res.ok) throw new Error(`Failed to load levels: ${res.status}`);
+  const levels = await res.json();
+  console.log('loadLevels: got', levels.length, 'levels:', levels.map(l => `${l.id}: ${l.name} (${l.themeId})`));
+
+  _levelsCache = levels;
+  _levelsCacheTime = Date.now();
   return levels;
+}
+
+export function invalidateLevelsCache() {
+  _levelsCache = null;
+  _levelsCacheTime = 0;
 }
 
 export async function saveLevel(level) {
   await setDoc(doc(db, COLLECTION, level.id), flattenLevel(level));
+  invalidateLevelsCache();
 }
 
 export async function deleteLevel(id) {
   await deleteDoc(doc(db, COLLECTION, id));
+  invalidateLevelsCache();
 }
 
 // Load a single level by ID (for direct URL access)

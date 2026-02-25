@@ -1,19 +1,33 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { loadLevels, deleteLevel } from '../utils/storage';
 import { getThemeById } from '../utils/themeRegistry';
 import { useUser } from '../contexts/UserContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getTopScoresByTime, getTopScoresBySteps, formatTime } from '../utils/leaderboardService.js';
 
-// Mini leaderboard preview showing top 3 for time and steps
-function LeaderboardPreview({ mapId }) {
+// Mini leaderboard preview — lazy-loaded via IntersectionObserver
+function LeaderboardPreview({ mapId, onBestTime }) {
   const { t } = useLanguage();
   const [timeScores, setTimeScores] = useState([]);
   const [stepsScores, setStepsScores] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState(false);
+  const ref = useRef(null);
+
+  // Only start fetching when the card scrolls into view
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    if (!mapId) return;
+    if (!mapId || !visible) return;
     setLoading(true);
     Promise.all([
       getTopScoresByTime(mapId, 3),
@@ -22,16 +36,18 @@ function LeaderboardPreview({ mapId }) {
       setTimeScores(time);
       setStepsScores(steps);
       setLoading(false);
+      // Report best time to parent for sorting
+      if (onBestTime) onBestTime(mapId, time[0]?.time ?? null);
     }).catch(() => setLoading(false));
-  }, [mapId]);
+  }, [mapId, visible]);
 
-  if (loading) {
-    return <div style={{ color: '#666', fontSize: 11 }}>{t('common.loading')}</div>;
+  if (!visible || loading) {
+    return <div ref={ref} style={{ color: '#666', fontSize: 11 }}>{loading && visible ? t('common.loading') : ''}</div>;
   }
 
   if (timeScores.length === 0 && stepsScores.length === 0) {
     return (
-      <div style={{ color: '#777', fontSize: 14, fontStyle: 'italic', textAlign: 'center', padding: '4px 0' }}>
+      <div ref={ref} style={{ color: '#777', fontSize: 14, fontStyle: 'italic', textAlign: 'center', padding: '4px 0' }}>
         {t('leaderboard.noScores')}
       </div>
     );
@@ -40,7 +56,7 @@ function LeaderboardPreview({ mapId }) {
   const medals = ['🥇', '🥈', '🥉'];
 
   return (
-    <div style={{ display: 'flex', gap: 28, justifyContent: 'center', padding: '2px 0' }}>
+    <div ref={ref} style={{ display: 'flex', gap: 28, justifyContent: 'center', padding: '2px 0' }}>
       {/* Fastest times */}
       {timeScores.length > 0 && (
         <div style={{ textAlign: 'center' }}>
@@ -90,26 +106,26 @@ function shuffleArray(array) {
 export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage }) {
   const { t, isRTL, getLocalizedThemeName } = useLanguage();
   const [levels, setLevels] = useState([]);
-  const [bestTimes, setBestTimes] = useState({}); // mapId -> best time in seconds
+  const [bestTimes, setBestTimes] = useState({}); // populated by LeaderboardPreview callbacks
   const { userId } = useUser();
   const [sortBy, setSortBy] = useState('random');
   const [hoveredCard, setHoveredCard] = useState(null);
 
   useEffect(() => {
     let ignore = false;
-    loadLevels().then(async (loaded) => {
+    loadLevels().then((loaded) => {
       if (ignore) return;
       setLevels(loaded);
-      // Fetch best times for all levels
-      const times = {};
-      await Promise.all(loaded.map(async (level) => {
-        if (ignore) return;
-        const scores = await getTopScoresByTime(level.id, 1);
-        times[level.id] = scores[0]?.time || null; // null means no scores yet
-      }));
-      if (!ignore) setBestTimes(times);
     });
     return () => { ignore = true; };
+  }, []);
+
+  // Callback for LeaderboardPreview to report best times (used for sorting)
+  const handleBestTime = useCallback((mapId, time) => {
+    setBestTimes(prev => {
+      if (prev[mapId] === time) return prev;
+      return { ...prev, [mapId]: time };
+    });
   }, []);
 
   // Sort levels based on selection
@@ -118,31 +134,27 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
 
     switch (sortBy) {
       case 'easy':
-        // Sort by fastest solve time (easiest = quickest to solve)
-        // Maps with no scores go to the end
         return [...levels].sort((a, b) => {
           const timeA = bestTimes[a.id];
           const timeB = bestTimes[b.id];
-          if (timeA === null && timeB === null) return 0;
-          if (timeA === null) return 1; // no score goes last
-          if (timeB === null) return -1;
-          return timeA - timeB; // lower time = easier
+          if (timeA == null && timeB == null) return 0;
+          if (timeA == null) return 1;
+          if (timeB == null) return -1;
+          return timeA - timeB;
         });
       case 'hard':
-        // Sort by slowest solve time (hardest = took longest to solve)
-        // Maps with no scores go last
         return [...levels].sort((a, b) => {
           const timeA = bestTimes[a.id];
           const timeB = bestTimes[b.id];
-          if (timeA === null && timeB === null) return 0;
-          if (timeA === null) return 1; // no score goes last
-          if (timeB === null) return -1;
-          return timeB - timeA; // higher time = harder
+          if (timeA == null && timeB == null) return 0;
+          if (timeA == null) return 1;
+          if (timeB == null) return -1;
+          return timeB - timeA;
         });
       case 'newest':
         return [...levels].sort((a, b) => {
-          const dateA = a.createdAt?.toDate?.() || new Date(0);
-          const dateB = b.createdAt?.toDate?.() || new Date(0);
+          const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+          const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
           return dateB - dateA;
         });
       case 'random':
@@ -394,7 +406,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}>
-                      <LeaderboardPreview mapId={level.id} />
+                      <LeaderboardPreview mapId={level.id} onBestTime={handleBestTime} />
                     </div>
 
                     {/* Action buttons */}

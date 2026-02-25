@@ -309,20 +309,26 @@ function AppContent() {
             setMode('menu');
             replaceUrl('/');
           }}
-          onSelect={(level) => {
+          onSelect={async (levelMeta) => {
+            const level = await loadLevelById(levelMeta.id);
+            if (!level) return;
             setSelectedLevel(level);
             setSelectedTheme(level.themeId || 'forest');
             setMultiplayerConfig(null);
             setMode('lobby');
             pushUrl(`/play/${level.id}`);
           }}
-          onEdit={(level) => {
+          onEdit={async (levelMeta) => {
+            const level = await loadLevelById(levelMeta.id);
+            if (!level) return;
             setEditLevel(level);
             setSelectedTheme(level.themeId || 'forest');
             setMode('build');
             pushUrl(`/edit/${level.id}`);
           }}
-          onViewMapPage={(level) => {
+          onViewMapPage={async (levelMeta) => {
+            const level = await loadLevelById(levelMeta.id);
+            if (!level) return;
             setSelectedLevel(level);
             setSelectedTheme(level.themeId || 'forest');
             setMode('mapPage');
