@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
 const COLLECTION = 'maps';
@@ -154,12 +154,14 @@ export async function deleteLevel(id) {
   invalidateLevelsCache();
 }
 
-// Load a single level by ID (for direct URL access)
+// Load a single level by ID — fetches full doc (including grid) from the server
 export async function loadLevelById(id) {
   try {
-    const docSnap = await getDoc(doc(db, COLLECTION, id));
-    if (!docSnap.exists()) return null;
-    return { ...restoreLevel(docSnap.data()), id: docSnap.id };
+    const res = await fetch(`${BASE_URL}/api/levels/${id}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`loadLevelById failed: ${res.status}`);
+    const data = await res.json();
+    return { ...restoreLevel(data), id: data.id };
   } catch (err) {
     console.error('loadLevelById failed:', err);
     return null;

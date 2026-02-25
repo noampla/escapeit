@@ -106,16 +106,19 @@ function shuffleArray(array) {
 export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage }) {
   const { t, isRTL, getLocalizedThemeName } = useLanguage();
   const [levels, setLevels] = useState([]);
+  const [shuffledLevels, setShuffledLevels] = useState([]);
   const [bestTimes, setBestTimes] = useState({}); // populated by LeaderboardPreview callbacks
   const { userId } = useUser();
   const [sortBy, setSortBy] = useState('random');
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [loadingId, setLoadingId] = useState(null); // level ID currently being loaded
 
   useEffect(() => {
     let ignore = false;
     loadLevels().then((loaded) => {
       if (ignore) return;
       setLevels(loaded);
+      setShuffledLevels(shuffleArray(loaded)); // shuffle once on load
     });
     return () => { ignore = true; };
   }, []);
@@ -128,7 +131,15 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
     });
   }, []);
 
-  // Sort levels based on selection
+  // Wrapper: tracks loading state so buttons give visual feedback
+  const handlePlay = useCallback(async (level) => {
+    if (loadingId) return;
+    setLoadingId(level.id);
+    try { await onSelect(level); } catch (e) { console.error(e); }
+    setLoadingId(null); // only runs if component stays mounted (navigation failed)
+  }, [loadingId, onSelect]);
+
+  // Sort levels based on selection — random order is stable (not recomputed on bestTimes change)
   const sortedLevels = useMemo(() => {
     if (levels.length === 0) return [];
 
@@ -159,9 +170,9 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
         });
       case 'random':
       default:
-        return shuffleArray(levels);
+        return shuffledLevels.length === levels.length ? shuffledLevels : levels;
     }
-  }, [levels, sortBy, bestTimes]);
+  }, [levels, sortBy, bestTimes, shuffledLevels]);
 
   const handleDelete = (id, name) => {
     if (confirm(t('levelSelect.deleteConfirm', { name }))) {
@@ -262,7 +273,11 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
             <span style={{ color: '#888', fontSize: 13 }}>{t('levelSelect.sortBy')}:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'random') setShuffledLevels(shuffleArray(levels)); // reshuffle on manual pick
+                setSortBy(val);
+              }}
               style={{
                 padding: '8px 12px',
                 background: '#2a2a2a',
@@ -331,7 +346,7 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
                   }}
                   onMouseEnter={() => setHoveredCard(level.id)}
                   onMouseLeave={() => setHoveredCard(null)}
-                  onClick={() => onSelect(level)}
+                  onClick={() => handlePlay(level)}
                 >
                   {/* Theme Icon */}
                   <div style={{
@@ -418,37 +433,45 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={() => onSelect(level)}
+                        onClick={() => handlePlay(level)}
+                        disabled={!!loadingId}
                         style={{
                           ...btnStyle,
                           flex: 1,
                           padding: '12px 18px',
-                          background: 'linear-gradient(145deg, #2a5a3a 0%, #1a4a2a 100%)',
+                          background: loadingId === level.id
+                            ? 'linear-gradient(145deg, #1a3a2a 0%, #0a2a1a 100%)'
+                            : 'linear-gradient(145deg, #2a5a3a 0%, #1a4a2a 100%)',
                           fontSize: 15,
+                          opacity: loadingId && loadingId !== level.id ? 0.5 : 1,
+                          cursor: loadingId ? 'default' : 'pointer',
                         }}
                         onMouseEnter={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #3a6a4a 0%, #2a5a3a 100%)';
+                          if (!loadingId) e.currentTarget.style.background = 'linear-gradient(145deg, #3a6a4a 0%, #2a5a3a 100%)';
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #2a5a3a 0%, #1a4a2a 100%)';
+                          if (!loadingId) e.currentTarget.style.background = 'linear-gradient(145deg, #2a5a3a 0%, #1a4a2a 100%)';
                         }}
                       >
-                        ▶ {t('levelSelect.play')}
+                        {loadingId === level.id ? '...' : `▶ ${t('levelSelect.play')}`}
                       </button>
 
                       <button
                         onClick={() => onViewMapPage(level)}
+                        disabled={!!loadingId}
                         style={{
                           ...btnStyle,
                           padding: '12px 14px',
                           background: 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)',
                           fontSize: 15,
+                          opacity: loadingId ? 0.5 : 1,
+                          cursor: loadingId ? 'default' : 'pointer',
                         }}
                         onMouseEnter={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #4a4a5a 0%, #3a3a4a 100%)';
+                          if (!loadingId) e.currentTarget.style.background = 'linear-gradient(145deg, #4a4a5a 0%, #3a3a4a 100%)';
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.background = 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)';
+                          if (!loadingId) e.currentTarget.style.background = 'linear-gradient(145deg, #3a3a4a 0%, #2a2a3a 100%)';
                         }}
                         title={t('levelSelect.viewMapPage')}
                       >
@@ -466,10 +489,10 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
                             fontSize: 15,
                           }}
                           onMouseEnter={(e) => {
-                            e.target.style.background = 'linear-gradient(145deg, #5a5a3a 0%, #4a4a2a 100%)';
+                            e.currentTarget.style.background = 'linear-gradient(145deg, #5a5a3a 0%, #4a4a2a 100%)';
                           }}
                           onMouseLeave={(e) => {
-                            e.target.style.background = 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)';
+                            e.currentTarget.style.background = 'linear-gradient(145deg, #4a4a2a 0%, #3a3a1a 100%)';
                           }}
                           title={t('levelSelect.edit')}
                         >
@@ -486,10 +509,10 @@ export default function LevelSelect({ onSelect, onEdit, onBack, onViewMapPage })
                             fontSize: 15,
                           }}
                           onMouseEnter={(e) => {
-                            e.target.style.background = 'linear-gradient(145deg, #6a3a3a 0%, #5a2a2a 100%)';
+                            e.currentTarget.style.background = 'linear-gradient(145deg, #6a3a3a 0%, #5a2a2a 100%)';
                           }}
                           onMouseLeave={(e) => {
-                            e.target.style.background = 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)';
+                            e.currentTarget.style.background = 'linear-gradient(145deg, #5a2a2a 0%, #4a1a1a 100%)';
                           }}
                           title={t('levelSelect.delete')}
                         >

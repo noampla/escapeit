@@ -30,6 +30,10 @@ let levelsCache = null;
 let levelsCacheTime = 0;
 const LEVELS_CACHE_TTL = 30_000; // 30 seconds
 
+// ─── Leaderboard cache ───────────────────────────────────────────
+const lbCache = new Map(); // mapId → { data, time }
+const LB_CACHE_TTL = 30_000; // 30 seconds
+
 // ─── HTTP server (handles REST + upgrades to WS) ────────────────
 const httpServer = createServer(async (req, res) => {
   // CORS headers
@@ -150,6 +154,93 @@ const httpServer = createServer(async (req, res) => {
     } catch (err) {
       log(`AI-GEN  ERROR: ${err.message}`);
       respond(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // ── Parse URL for parametric routes ──
+  let pathname = req.url || '/';
+  try { pathname = new URL(req.url, 'http://x').pathname; } catch {}
+
+  // ── GET /api/levels/:id — full level doc including grid ──
+  const levelIdMatch = pathname.match(/^\/api\/levels\/([^/]+)$/);
+  if (req.method === 'GET' && levelIdMatch) {
+    const id = levelIdMatch[1];
+    try {
+      const docSnap = await firestore.collection('maps').doc(id).get();
+      if (!docSnap.exists) { respond(res, 404, { error: 'Level not found' }); return; }
+      const data = docSnap.data();
+      const normalizeTime = (v) => {
+        if (!v) return null;
+        if (v._seconds !== undefined) return v._seconds * 1000;
+        if (typeof v === 'number') return v;
+        return null;
+      };
+      log(`LEVEL   ${id} (${data.grid?.length ?? '?'} cells)`);
+      respond(res, 200, { id: docSnap.id, ...data, createdAt: normalizeTime(data.createdAt), updatedAt: normalizeTime(data.updatedAt) });
+    } catch (err) {
+      log(`LEVEL   ERROR: ${err.message}`);
+      respond(res, 500, { error: 'Failed to load level' });
+    }
+    return;
+  }
+
+  // ── Leaderboard cache ──
+  // (keyed by mapId — stores { topByTime, topBySteps, playerCount })
+
+  // ── GET /api/leaderboard/:mapId/me?userId=xxx — user rank ──
+  const lbMeMatch = pathname.match(/^\/api\/leaderboard\/([^/]+)\/me$/);
+  if (req.method === 'GET' && lbMeMatch) {
+    const mapId = lbMeMatch[1];
+    let qs;
+    try { qs = new URL(req.url, 'http://x').searchParams; } catch { qs = new URLSearchParams(); }
+    const userId = qs.get('userId');
+    if (!userId) { respond(res, 400, { error: 'userId required' }); return; }
+    try {
+      const entryId = `${mapId}_${userId}`;
+      const docSnap = await firestore.collection('leaderboards').doc(entryId).get();
+      if (!docSnap.exists) { respond(res, 200, { userScore: null, timeRank: null, stepsRank: null }); return; }
+      const userScore = docSnap.data();
+      const [timeBetter, stepsBetter] = await Promise.all([
+        firestore.collection('leaderboards').where('mapId', '==', mapId).where('time', '<', userScore.time).get(),
+        firestore.collection('leaderboards').where('mapId', '==', mapId).where('steps', '<', userScore.steps).get(),
+      ]);
+      log(`LBME    ${mapId} user=${userId}`);
+      respond(res, 200, { userScore, timeRank: timeBetter.size + 1, stepsRank: stepsBetter.size + 1 });
+    } catch (err) {
+      log(`LBME    ERROR: ${err.message}`);
+      respond(res, 500, { error: 'Failed to load user rank' });
+    }
+    return;
+  }
+
+  // ── GET /api/leaderboard/:mapId — top scores + playerCount, 30s cache ──
+  const lbMatch = pathname.match(/^\/api\/leaderboard\/([^/]+)$/);
+  if (req.method === 'GET' && lbMatch) {
+    const mapId = lbMatch[1];
+    const cached = lbCache.get(mapId);
+    if (cached && Date.now() - cached.time < LB_CACHE_TTL) {
+      log(`LB      cache hit ${mapId}`);
+      respond(res, 200, cached.data);
+      return;
+    }
+    try {
+      const [timeSnap, stepsSnap, countSnap] = await Promise.all([
+        firestore.collection('leaderboards').where('mapId', '==', mapId).orderBy('time', 'asc').limit(10).get(),
+        firestore.collection('leaderboards').where('mapId', '==', mapId).orderBy('steps', 'asc').limit(10).get(),
+        firestore.collection('leaderboards').where('mapId', '==', mapId).count().get(),
+      ]);
+      const data = {
+        topByTime: timeSnap.docs.map((d, i) => ({ id: d.id, rank: i + 1, ...d.data() })),
+        topBySteps: stepsSnap.docs.map((d, i) => ({ id: d.id, rank: i + 1, ...d.data() })),
+        playerCount: countSnap.data().count,
+      };
+      lbCache.set(mapId, { data, time: Date.now() });
+      log(`LB      ${mapId} time=${data.topByTime.length} steps=${data.topBySteps.length} players=${data.playerCount}`);
+      respond(res, 200, data);
+    } catch (err) {
+      log(`LB      ERROR: ${err.message}`);
+      respond(res, 500, { error: 'Failed to load leaderboard' });
     }
     return;
   }

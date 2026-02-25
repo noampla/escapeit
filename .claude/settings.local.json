@@ -16,7 +16,8 @@
       "Bash(npx eslint:*)",
       "Bash(node -e:*)",
       "Bash(npx:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

@@ -326,13 +326,12 @@ function AppContent() {
             setMode('build');
             pushUrl(`/edit/${level.id}`);
           }}
-          onViewMapPage={async (levelMeta) => {
-            const level = await loadLevelById(levelMeta.id);
-            if (!level) return;
-            setSelectedLevel(level);
-            setSelectedTheme(level.themeId || 'forest');
+          onViewMapPage={(levelMeta) => {
+            // Navigate instantly with metadata — grid is not needed on the map page
+            setSelectedLevel(levelMeta);
+            setSelectedTheme(levelMeta.themeId || 'forest');
             setMode('mapPage');
-            pushUrl(`/map/${level.id}`);
+            pushUrl(`/map/${levelMeta.id}`);
           }}
         />
         <DevTasksPanel isOpen={isDevPanelOpen} onClose={closeDevPanel} />
@@ -346,10 +345,14 @@ function AppContent() {
       <>
         <MapPage
           level={selectedLevel}
-          onPlay={() => {
+          onPlay={async () => {
+            // Load full level (with grid) now — it's only needed for actual gameplay
+            const fullLevel = await loadLevelById(selectedLevel.id);
+            if (!fullLevel) return;
+            setSelectedLevel(fullLevel);
             setMultiplayerConfig(null);
             setMode('lobby');
-            pushUrl(`/play/${selectedLevel.id}`);
+            pushUrl(`/play/${fullLevel.id}`);
           }}
           onBack={() => {
             setSelectedLevel(null);
