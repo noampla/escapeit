@@ -25,4 +25,4 @@ dist-ssr
 nul
 .env*
 .env.local
-hosting*
+hosting*.env

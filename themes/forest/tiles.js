@@ -2246,16 +2246,16 @@ export function getDroppedTorchLitTiles(grid) {
   const lit = new Set();
   if (!grid || !Array.isArray(grid)) return lit;
 
-  // Find all dropped torches in dark zone tiles
+  // Find all dropped torches in dark zone tiles or cave-entry tiles
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid[y].length; x++) {
       const cell = grid[y][x];
       // Check if this is a torch item on the ground
       if (cell.object?.type === 'item-torch') {
-        // Check if it's in a dark zone tile
+        // Check if it's in a dark zone tile OR cave-entry tile
         const floorType = cell.floor?.type;
         const tileDef = TILE_TYPES[floorType];
-        if (tileDef?.isDarkZone === true) {
+        if (tileDef?.isDarkZone === true || floorType === 'cave-entry') {
           // Add the torch tile and 4 cardinal neighbors
           lit.add(`${x},${y}`);
           lit.add(`${x},${y - 1}`);
